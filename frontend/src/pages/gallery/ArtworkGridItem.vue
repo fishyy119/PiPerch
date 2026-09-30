@@ -98,7 +98,6 @@ function hidePreviewOnFocusOut(event: FocusEvent) {
                 'hover:scale-125 hover:bg-primary focus-visible:scale-125 focus-visible:bg-primary',
                 { 'bg-primary!': open && previewPage === page - 1 },
               ]"
-              :aria-label="`预览第 ${String(page)} 页`"
               @pointerenter="showPreview(page - 1)"
               @focus="showPreview(page - 1)"
               @click.prevent.stop

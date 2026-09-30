@@ -26,6 +26,8 @@ def _response(settings: AppSettings) -> SettingsResponse:
         library_root=str(settings.library_root),
         download_concurrency=settings.download_concurrency,
         request_interval_ms=settings.request_interval_ms,
+        webp_enabled=settings.webp_enabled,
+        webp_quality=settings.webp_quality,
     )
 
 
@@ -46,6 +48,8 @@ async def update_settings(
             library_root=Path(request.library_root),
             download_concurrency=request.download_concurrency,
             request_interval_ms=request.request_interval_ms,
+            webp_enabled=request.webp_enabled,
+            webp_quality=request.webp_quality,
         )
     )
     await container.pixiv.reconfigure(settings.proxy_url, settings.request_interval_ms)

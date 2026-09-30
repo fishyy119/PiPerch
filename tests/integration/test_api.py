@@ -149,6 +149,8 @@ def test_health_and_settings_return_cookie(
             "libraryRoot": str(current.library_root),
             "downloadConcurrency": current.download_concurrency,
             "requestIntervalMs": current.request_interval_ms,
+            "webpEnabled": current.webp_enabled,
+            "webpQuality": current.webp_quality,
         },
     )
     assert response.status_code == 200
@@ -168,6 +170,8 @@ def test_health_and_settings_return_cookie(
             "libraryRoot": str(current.library_root),
             "downloadConcurrency": current.download_concurrency,
             "requestIntervalMs": current.request_interval_ms,
+            "webpEnabled": current.webp_enabled,
+            "webpQuality": current.webp_quality,
         },
     )
     assert cleared.status_code == 200
@@ -191,6 +195,8 @@ def test_settings_update_and_proxy_redaction(
             "libraryRoot": str(library),
             "downloadConcurrency": 4,
             "requestIntervalMs": 800,
+            "webpEnabled": False,
+            "webpQuality": 90,
         },
     )
 
@@ -198,10 +204,14 @@ def test_settings_update_and_proxy_redaction(
     payload = response.json()
     assert payload["proxyUrl"] == "http://user:***@127.0.0.1:7890"
     assert payload["downloadConcurrency"] == 4
+    assert payload["webpEnabled"] is False
+    assert payload["webpQuality"] == 90
     assert Path(payload["libraryRoot"]) == library.resolve()
     persisted = json.loads(container.paths.settings.read_text(encoding="utf-8"))
     assert persisted["proxy_url"] == "http://user:password@127.0.0.1:7890"
     assert persisted["library_root"] == str(library.resolve())
+    assert persisted["webp_enabled"] is False
+    assert persisted["webp_quality"] == 90
 
     repeated = client.put(
         "/api/settings",
@@ -211,6 +221,8 @@ def test_settings_update_and_proxy_redaction(
             "libraryRoot": payload["libraryRoot"],
             "downloadConcurrency": 4,
             "requestIntervalMs": 800,
+            "webpEnabled": False,
+            "webpQuality": 90,
         },
     )
     assert repeated.status_code == 200
@@ -232,6 +244,8 @@ def test_settings_rejects_invalid_proxy_without_persisting(
             "libraryRoot": str(current.library_root),
             "downloadConcurrency": current.download_concurrency,
             "requestIntervalMs": current.request_interval_ms,
+            "webpEnabled": current.webp_enabled,
+            "webpQuality": current.webp_quality,
         },
     )
 

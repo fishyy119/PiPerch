@@ -1,0 +1,131 @@
+from __future__ import annotations
+
+from pathlib import Path
+from typing import TYPE_CHECKING, cast
+
+import pytest
+from anyio import to_thread
+from PIL import Image
+
+from piperch.domain import AppSettings, ArtworkType, ItemState, MediaRecord, RemoteArtwork
+from piperch.paths import AppPaths
+from piperch.services.downloads import ArtworkDownloadService
+
+if TYPE_CHECKING:
+    from collections.abc import Awaitable, Callable, Sequence
+
+    from pytest import MonkeyPatch
+
+    from piperch.pixiv import PixivClient
+    from piperch.repositories import ArtworkRepository
+    from piperch.settings import SettingsManager
+
+
+class StubSettings:
+    def __init__(self, settings: AppSettings) -> None:
+        self._settings = settings
+
+    def get(self) -> AppSettings:
+        return self._settings
+
+
+class StubArtworkRepository:
+    def __init__(self) -> None:
+        self.saved_media: tuple[MediaRecord, ...] | None = None
+
+    def is_complete(self, _artwork_id: int, _library_root: Path) -> bool:
+        return False
+
+    def list_media(self, _artwork_id: int) -> tuple[MediaRecord, ...]:
+        return ()
+
+    def save_download(self, _artwork: RemoteArtwork, media: Sequence[MediaRecord]) -> None:
+        self.saved_media = tuple(media)
+
+
+class StubPixivClient:
+    def __init__(self, artwork: RemoteArtwork) -> None:
+        self._artwork = artwork
+
+    async def get_artwork(self, artwork_id: int, _cookie: str | None) -> RemoteArtwork:
+        assert artwork_id == self._artwork.artwork_id
+        return self._artwork
+
+    async def download(self, _url: str, target: Path, _cookie: str | None) -> tuple[str, int]:
+        Image.new("RGBA", (8, 8), (30, 120, 210, 128)).save(target, "PNG")
+        size = await to_thread.run_sync(lambda: target.stat().st_size)
+        return "image/png", size
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(("webp_enabled", "expected_suffix"), [(True, ".webp"), (False, ".png")])
+async def test_download_respects_webp_settings(
+    tmp_path: Path,
+    monkeypatch: MonkeyPatch,
+    webp_enabled: bool,
+    expected_suffix: str,
+) -> None:
+    paths = AppPaths.from_data_dir(tmp_path / "data")
+    paths.ensure_directories()
+    settings = AppSettings(
+        pixiv_cookie=None,
+        proxy_url=None,
+        library_root=paths.default_library,
+        download_concurrency=1,
+        request_interval_ms=0,
+        webp_enabled=webp_enabled,
+        webp_quality=67,
+    )
+    artwork = RemoteArtwork(
+        artwork_id=123,
+        artwork_type=ArtworkType.ILLUST,
+        title="测试作品",
+        description="",
+        author_id=456,
+        author_name="测试作者",
+        author_account=None,
+        author_avatar_url=None,
+        series_id=None,
+        series_title=None,
+        page_count=1,
+        width=8,
+        height=8,
+        x_restrict=0,
+        is_ai=False,
+        published_at=None,
+        original_urls=("https://i.pximg.net/123_p0.png",),
+        thumbnail_url=None,
+    )
+    repository = StubArtworkRepository()
+    qualities: list[int] = []
+    transcode = ArtworkDownloadService._transcode_to_webp
+
+    def capture_quality(source: Path, quality: int) -> tuple[Path, int]:
+        qualities.append(quality)
+        return transcode(source, quality)
+
+    monkeypatch.setattr(ArtworkDownloadService, "_transcode_to_webp", capture_quality)
+    service = ArtworkDownloadService(
+        paths,
+        cast("SettingsManager", StubSettings(settings)),
+        cast("ArtworkRepository", repository),
+        cast("PixivClient", StubPixivClient(artwork)),
+    )
+
+    async def is_cancel_requested() -> bool:
+        return False
+
+    result = await service.download_artwork(123, "job-id", cast("Callable[[], Awaitable[bool]]", is_cancel_requested))
+
+    assert result is ItemState.SUCCEEDED
+    assert qualities == ([67] if webp_enabled else [])
+    assert repository.saved_media is not None
+    media = repository.saved_media[0]
+    assert Path(media.relative_path).suffix == expected_suffix
+    assert media.mime_type == ("image/webp" if webp_enabled else "image/png")
+    saved = settings.library_root / media.relative_path
+    assert saved.is_file()
+    with Image.open(saved) as image:
+        assert image.format == ("WEBP" if webp_enabled else "PNG")
+        assert "A" in image.getbands()
+        assert image.getpixel((0, 0))[3] == 128

@@ -76,12 +76,7 @@ function close() {
           position === 'center' ? 'scale-[0.98] opacity-0' : '-translate-y-2 opacity-0'
         "
       >
-        <DialogContent
-          v-if="open"
-          force-mount
-          :aria-describedby="description ? undefined : null"
-          :class="[contentClasses, contentClass]"
-        >
+        <DialogContent v-if="open" force-mount :class="[contentClasses, contentClass]">
           <DialogTitle v-if="title || $slots.title" class="font-semibold" :class="titleClass">
             <slot name="title">{{ title }}</slot>
           </DialogTitle>

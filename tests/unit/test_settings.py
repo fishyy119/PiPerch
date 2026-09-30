@@ -36,6 +36,8 @@ def test_initialize_creates_complete_default_settings(tmp_path: Path) -> None:
         "library_root": str(paths.default_library),
         "download_concurrency": 3,
         "request_interval_ms": 500,
+        "webp_enabled": True,
+        "webp_quality": 85,
     }
 
 
@@ -51,8 +53,12 @@ def test_initialize_fills_and_persists_missing_values(tmp_path: Path) -> None:
 
     assert current.download_concurrency == 4
     assert current.request_interval_ms == 500
+    assert current.webp_enabled is True
+    assert current.webp_quality == 85
     assert payload["library_root"] == str(paths.default_library)
     assert payload["request_interval_ms"] == 500
+    assert payload["webp_enabled"] is True
+    assert payload["webp_quality"] == 85
     assert "pixiv_cookie" in payload
     assert "proxy_url" in payload
 

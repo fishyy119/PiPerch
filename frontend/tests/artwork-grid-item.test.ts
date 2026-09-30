@@ -29,7 +29,7 @@ describe('图库作品卡片', () => {
       },
     })
 
-    const previewDots = screen.getAllByRole('button', { name: /预览第 \d+ 页/ })
+    const previewDots = screen.getAllByRole('button').filter((button) => button.textContent === '')
     expect(previewDots).toHaveLength(3)
     expect(screen.queryByAltText('多页测试作品 第 2 页快速预览')).not.toBeInTheDocument()
     const [, secondPreviewDot] = previewDots

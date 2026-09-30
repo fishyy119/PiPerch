@@ -8,6 +8,8 @@ export const settingsSchema = z.object({
   libraryRoot: z.string(),
   downloadConcurrency: z.number().int().min(1).max(8),
   requestIntervalMs: z.number().int().min(0).max(60_000),
+  webpEnabled: z.boolean(),
+  webpQuality: z.number().int().min(1).max(100),
 })
 export type Settings = z.infer<typeof settingsSchema>
 

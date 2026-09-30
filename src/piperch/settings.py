@@ -29,6 +29,8 @@ class StoredSettings(BaseModel):
     library_root: Path
     download_concurrency: int = Field(default=3, ge=1, le=8, strict=True)
     request_interval_ms: int = Field(default=500, ge=0, le=60_000, strict=True)
+    webp_enabled: bool = Field(default=True, strict=True)
+    webp_quality: int = Field(default=85, ge=1, le=100, strict=True)
 
     @field_validator("pixiv_cookie")
     @classmethod
@@ -88,6 +90,8 @@ class SettingsManager:
         library_root: Path,
         download_concurrency: int,
         request_interval_ms: int,
+        webp_enabled: bool,
+        webp_quality: int,
     ) -> AppSettings:
         with self._lock:
             current = self._require_current()
@@ -111,6 +115,8 @@ class SettingsManager:
                     "library_root": resolved_root,
                     "download_concurrency": download_concurrency,
                     "request_interval_ms": request_interval_ms,
+                    "webp_enabled": webp_enabled,
+                    "webp_quality": webp_quality,
                 }
             )
             self._save(updated)
@@ -141,4 +147,6 @@ class SettingsManager:
             library_root=settings.library_root,
             download_concurrency=settings.download_concurrency,
             request_interval_ms=settings.request_interval_ms,
+            webp_enabled=settings.webp_enabled,
+            webp_quality=settings.webp_quality,
         )

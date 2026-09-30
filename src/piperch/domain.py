@@ -39,6 +39,8 @@ class AppSettings:
     library_root: Path
     download_concurrency: int
     request_interval_ms: int
+    webp_enabled: bool
+    webp_quality: int
 
 
 @dataclass(frozen=True, slots=True)

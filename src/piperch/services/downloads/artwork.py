@@ -10,7 +10,7 @@ from urllib.parse import urlparse
 from uuid import uuid4
 
 from anyio import to_thread
-from PIL import Image
+from PIL import Image, ImageOps
 
 from piperch.domain import ArtworkType, ItemState, MediaRecord, RemoteArtwork
 from piperch.errors import UpstreamError
@@ -24,6 +24,7 @@ if TYPE_CHECKING:
     from piperch.settings import SettingsManager
 
 _IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp"}
+_THUMBNAIL_WEBP_QUALITY = 75
 
 
 class DownloadCancelledError(Exception):
@@ -68,6 +69,8 @@ class ArtworkDownloadService:
                 stage,
                 settings.pixiv_cookie,
                 settings.download_concurrency,
+                settings.webp_enabled,
+                settings.webp_quality,
                 is_cancel_requested,
                 existing_media,
                 settings.library_root,
@@ -106,6 +109,8 @@ class ArtworkDownloadService:
         stage: Path,
         cookie: str | None,
         concurrency: int,
+        webp_enabled: bool,
+        webp_quality: int,
         is_cancel_requested: Callable[[], Awaitable[bool]],
         existing_media: Sequence[MediaRecord],
         library_root: Path,
@@ -124,13 +129,37 @@ class ArtworkDownloadService:
                 stage,
             )
             if reused_cover is not None:
-                records.append(reused_cover)
-            else:
+                if not webp_enabled and reused_cover.mime_type == "image/webp":
+                    (stage / Path(reused_cover.relative_path).name).unlink()
+                    reused_cover = None
+                else:
+                    records.append(
+                        await self._finalize_image(
+                            stage / Path(reused_cover.relative_path).name,
+                            reused_cover.mime_type,
+                            reused_cover.byte_size,
+                            "cover",
+                            None,
+                            webp_enabled and reused_cover.mime_type != "image/webp",
+                            webp_quality,
+                        )
+                    )
+            if reused_cover is None:
                 cover = stage / (f"{artwork.artwork_id}_cover{self._extension(cover_url, '.jpg')}")
                 await self._raise_if_cancelled(is_cancel_requested)
                 mime, size = await self._pixiv.download(cover_url, cover, cookie)
                 self._require_media_type(mime, "image/", "Ugoira 封面")
-                records.append(MediaRecord("cover", cover.name, mime, size))
+                records.append(
+                    await self._finalize_image(
+                        cover,
+                        mime,
+                        size,
+                        "cover",
+                        None,
+                        webp_enabled,
+                        webp_quality,
+                    )
+                )
             archive = stage / f"{artwork.artwork_id}_ugoira.zip"
             reused_archive = await to_thread.run_sync(
                 self._reuse_media,
@@ -190,12 +219,31 @@ class ArtworkDownloadService:
                     stage,
                 )
                 if reused is not None:
-                    return reused
+                    if not webp_enabled and reused.mime_type == "image/webp":
+                        (stage / Path(reused.relative_path).name).unlink()
+                    else:
+                        return await self._finalize_image(
+                            stage / Path(reused.relative_path).name,
+                            reused.mime_type,
+                            reused.byte_size,
+                            "page",
+                            page_index,
+                            webp_enabled and reused.mime_type != "image/webp",
+                            webp_quality,
+                        )
                 await self._raise_if_cancelled(is_cancel_requested)
                 target = stage / (f"{artwork.artwork_id}_p{page_index}{self._extension(url, '.jpg')}")
                 mime, size = await self._pixiv.download(url, target, cookie)
                 self._require_media_type(mime, "image/", "作品原图")
-                return MediaRecord("page", target.name, mime, size, page_index)
+                return await self._finalize_image(
+                    target,
+                    mime,
+                    size,
+                    "page",
+                    page_index,
+                    webp_enabled,
+                    webp_quality,
+                )
 
         tasks = [asyncio.create_task(download_page(index, url)) for index, url in enumerate(artwork.original_urls)]
         try:
@@ -205,6 +253,46 @@ class ArtworkDownloadService:
                 task.cancel()
             await asyncio.gather(*tasks, return_exceptions=True)
             raise
+
+    @staticmethod
+    async def _finalize_image(
+        source: Path,
+        mime_type: str,
+        byte_size: int,
+        role: str,
+        page_index: int | None,
+        transcode: bool,
+        webp_quality: int,
+    ) -> MediaRecord:
+        if transcode:
+            source, byte_size = await to_thread.run_sync(
+                ArtworkDownloadService._transcode_to_webp,
+                source,
+                webp_quality,
+            )
+            mime_type = "image/webp"
+        return MediaRecord(role, source.name, mime_type, byte_size, page_index)
+
+    @staticmethod
+    def _transcode_to_webp(source: Path, quality: int) -> tuple[Path, int]:
+        """以临时文件完成 WebP 转码，成功后再移除原文件。"""
+        target = source.with_suffix(".webp")
+        temporary = target.with_name(f"{target.name}.part")
+        temporary.unlink(missing_ok=True)
+        try:
+            with Image.open(source) as opened:
+                image = ImageOps.exif_transpose(opened)
+                has_alpha = "A" in image.getbands() or "transparency" in image.info
+                if image.mode not in {"RGB", "RGBA"}:
+                    image = image.convert("RGBA" if has_alpha else "RGB")
+                image.save(temporary, "WEBP", quality=quality, method=4)
+            temporary.replace(target)
+        except (OSError, ValueError) as error:
+            temporary.unlink(missing_ok=True)
+            raise UpstreamError("webp_conversion_failed", f"图片 {source.name} 转码为 WebP 失败。") from error
+        if source != target:
+            source.unlink()
+        return target, target.stat().st_size
 
     @staticmethod
     async def _raise_if_cancelled(
@@ -321,5 +409,5 @@ class ArtworkDownloadService:
             image.thumbnail((512, 512))
             if image.mode not in {"RGB", "RGBA"}:
                 image = image.convert("RGB")
-            image.save(temporary, "WEBP", quality=82)
+            image.save(temporary, "WEBP", quality=_THUMBNAIL_WEBP_QUALITY)
         temporary.replace(target)

@@ -38,6 +38,8 @@ class SettingsResponse(ApiModel):
     library_root: str
     download_concurrency: int
     request_interval_ms: int
+    webp_enabled: bool
+    webp_quality: int
 
 
 class SettingsUpdate(ApiModel):
@@ -46,6 +48,8 @@ class SettingsUpdate(ApiModel):
     library_root: str = Field(min_length=1)
     download_concurrency: int = Field(ge=1, le=8)
     request_interval_ms: int = Field(ge=0, le=60_000)
+    webp_enabled: bool
+    webp_quality: int = Field(ge=1, le=100)
 
     @field_validator("proxy_url")
     @classmethod

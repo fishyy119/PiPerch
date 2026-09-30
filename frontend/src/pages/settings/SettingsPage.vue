@@ -8,6 +8,8 @@ import { errorMessage } from '@/shared/errors'
 import Button from '@ui/Button.vue'
 import Card from '@ui/Card.vue'
 import Input from '@ui/Input.vue'
+import Slider from '@ui/Slider.vue'
+import Switch from '@ui/Switch.vue'
 import Textarea from '@ui/Textarea.vue'
 
 const queryClient = useQueryClient()
@@ -18,6 +20,8 @@ const form = reactive({
   libraryRoot: '',
   downloadConcurrency: 3,
   requestIntervalMs: 500,
+  webpEnabled: true,
+  webpQuality: 85,
 })
 
 const settingsQuery = useQuery({ queryKey: ['settings'], queryFn: getSettings })
@@ -30,6 +34,8 @@ watch(
     form.libraryRoot = settings.libraryRoot
     form.downloadConcurrency = settings.downloadConcurrency
     form.requestIntervalMs = settings.requestIntervalMs
+    form.webpEnabled = settings.webpEnabled
+    form.webpQuality = settings.webpQuality
   },
   { immediate: true },
 )
@@ -42,6 +48,8 @@ const saveMutation = useMutation({
       libraryRoot: form.libraryRoot.trim(),
       downloadConcurrency: form.downloadConcurrency,
       requestIntervalMs: form.requestIntervalMs,
+      webpEnabled: form.webpEnabled,
+      webpQuality: form.webpQuality,
     }),
   onMutate: () => {
     notice.value = ''
@@ -126,6 +134,33 @@ const validationMutation = useMutation({
             required
           />
         </label>
+        <label
+          class="flex min-h-16 items-center justify-between gap-4 rounded-xl border border-input px-4 py-3 text-sm md:col-span-2"
+        >
+          <span class="grid gap-1">
+            <span>将下载的图片转码为 WebP</span>
+            <span class="text-xs text-muted-foreground"
+              >减小图库占用空间，不影响 Ugoira 动画包。</span
+            >
+          </span>
+          <Switch v-model="form.webpEnabled" />
+        </label>
+        <div class="grid gap-3 text-sm md:col-span-2">
+          <div class="flex items-center justify-between gap-4">
+            <span>WebP 质量</span>
+            <output class="min-w-9 text-right font-medium tabular-nums">
+              {{ form.webpQuality }}
+            </output>
+          </div>
+          <Slider
+            v-model="form.webpQuality"
+            :min="1"
+            :max="100"
+            :step="1"
+            :disabled="!form.webpEnabled"
+          />
+          <span class="text-xs text-muted-foreground">默认 85；数值越高，画质和文件体积越大。</span>
+        </div>
       </div>
       <Button class="mt-5" type="submit" :disabled="saveMutation.isPending.value"
         ><Save :size="17" />{{ saveMutation.isPending.value ? '保存中…' : '保存设置' }}</Button
