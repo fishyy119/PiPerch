@@ -247,7 +247,7 @@ function typeLabel(type: string) {
           </p>
           <div
             v-else-if="relatedQuery.data.value?.length"
-            class="grid grid-cols-[repeat(auto-fit,10rem)] justify-between gap-x-4 gap-y-5"
+            class="grid grid-cols-[repeat(auto-fill,10rem)] justify-between gap-x-4 gap-y-5"
           >
             <RouterLink
               v-for="related in relatedQuery.data.value"
