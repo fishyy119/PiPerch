@@ -1,0 +1,275 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+import httpx
+
+from piperch.domain import ArtworkType, DiscoveryCandidate, FollowedUser, RemoteArtwork, TagRecord, UgoiraFrame
+from piperch.errors import UpstreamError
+from piperch.pixiv.parsing import (
+    artwork_type as _artwork_type,
+)
+from piperch.pixiv.parsing import (
+    as_integer as _integer,
+)
+from piperch.pixiv.parsing import (
+    as_mapping as _mapping,
+)
+from piperch.pixiv.parsing import (
+    as_optional_integer as _optional_integer,
+)
+from piperch.pixiv.parsing import (
+    as_sequence as _sequence,
+)
+from piperch.pixiv.parsing import (
+    as_text as _text,
+)
+from piperch.pixiv.parsing import (
+    candidate_from_artwork_body,
+    candidate_from_mapping,
+    parse_artwork_ids,
+    parse_pixiv_user_id,
+)
+from piperch.pixiv.transport import PixivTransport
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+    from pathlib import Path
+
+
+class PixivClient:
+    """提供 Pixiv AJAX 协议所需的作品发现和元数据操作。"""
+
+    def __init__(self, *, proxy_url: str | None, request_interval_ms: int) -> None:
+        self._transport = PixivTransport(
+            proxy_url=proxy_url,
+            request_interval_ms=request_interval_ms,
+        )
+
+    async def reconfigure(self, proxy_url: str | None, request_interval_ms: int) -> None:
+        await self._transport.reconfigure(proxy_url, request_interval_ms)
+
+    async def close(self) -> None:
+        await self._transport.close()
+
+    async def validate_cookie(self, cookie: str | None) -> bool:
+        if not cookie:
+            return False
+        try:
+            await self._transport.get_body("/ajax/user/extra", cookie=cookie, params={"lang": "zh"})
+        except UpstreamError:
+            return False
+        return True
+
+    async def discover_artworks(
+        self,
+        inputs: Sequence[str],
+        page: int,
+        cookie: str | None,
+        *,
+        page_size: int = 24,
+    ) -> tuple[list[DiscoveryCandidate], int | None]:
+        artwork_ids = parse_artwork_ids(inputs)
+        start = page * page_size
+        selected = artwork_ids[start : start + page_size]
+        candidates = [
+            candidate_from_artwork_body(
+                artwork_id,
+                _mapping(await self._transport.get_body(f"/ajax/illust/{artwork_id}", cookie=cookie)),
+            )
+            for artwork_id in selected
+        ]
+        next_page = page + 1 if start + page_size < len(artwork_ids) else None
+        return candidates, next_page
+
+    async def discover_user(
+        self,
+        user_id: int,
+        page: int,
+        cookie: str | None,
+        *,
+        page_size: int = 48,
+    ) -> tuple[list[DiscoveryCandidate], int | None]:
+        ordered = await self.list_user_artwork_ids(user_id, cookie)
+        start = page * page_size
+        selected = ordered[start : start + page_size]
+        if not selected:
+            return [], None
+
+        # 用户主页只返回作品 ID，预览所需的卡片元数据可以一次批量取得。逐个读取完整作品
+        # 会为每项额外请求详情和分页数据，在默认限速下单页需要一分钟左右。
+        params = httpx.QueryParams({"ids[]": tuple(str(artwork_id) for artwork_id in selected), "lang": "zh"})
+        cards = _mapping(
+            await self._transport.get_body(
+                f"/ajax/user/{user_id}/illusts",
+                cookie=cookie,
+                params=params,
+            )
+        )
+        candidates = [
+            candidate_from_mapping(card, default_artwork_id=artwork_id)
+            for artwork_id in selected
+            if (card := _mapping(cards.get(str(artwork_id))))
+        ]
+        next_page = page + 1 if start + page_size < len(ordered) else None
+        return candidates, next_page
+
+    async def list_user_artwork_ids(self, user_id: int, cookie: str | None) -> list[int]:
+        """读取作者全部插画和漫画 ID，不为每个作品请求详情。"""
+        body = _mapping(await self._transport.get_body(f"/ajax/user/{user_id}/profile/all", cookie=cookie))
+        ids = {
+            *(_integer(key) for key in _mapping(body.get("illusts"))),
+            *(_integer(key) for key in _mapping(body.get("manga"))),
+        }
+        return sorted((item for item in ids if item > 0), reverse=True)
+
+    async def list_followed_users(self, cookie: str | None) -> list[FollowedUser]:
+        """读取当前账号公开与非公开关注的作者，并按 Pixiv 返回顺序去重。"""
+        own_user_id = parse_pixiv_user_id(cookie)
+        if own_user_id is None:
+            raise UpstreamError(
+                "pixiv_cookie_required",
+                "请先在设置中保存包含 PHPSESSID 的 Pixiv Cookie。",
+                401,
+            )
+
+        followed: dict[int, FollowedUser] = {}
+        page_size = 100
+        for visibility in ("show", "hide"):
+            offset = 0
+            for _ in range(100):
+                body = _mapping(
+                    await self._transport.get_body(
+                        f"/ajax/user/{own_user_id}/following",
+                        cookie=cookie,
+                        params={
+                            "offset": offset,
+                            "limit": page_size,
+                            "rest": visibility,
+                            "tag": "",
+                            "acceptingRequests": 0,
+                            "lang": "zh",
+                        },
+                    )
+                )
+                raw_users = _sequence(body.get("users"))
+                for raw in raw_users:
+                    user = _mapping(raw)
+                    user_id = _integer(user.get("userId"))
+                    if user_id <= 0:
+                        continue
+                    followed.setdefault(
+                        user_id,
+                        FollowedUser(
+                            user_id=user_id,
+                            name=_text(user.get("userName")) or f"用户 {user_id}",
+                            avatar_url=_text(user.get("profileImageUrl")) or None,
+                        ),
+                    )
+                offset += len(raw_users)
+                total = max(0, _integer(body.get("total")))
+                if not raw_users or offset >= total:
+                    break
+            else:
+                raise UpstreamError("following_too_many_pages", "关注作者分页数量超出安全上限。")
+        return list(followed.values())
+
+    async def discover_series(
+        self,
+        series_id: int,
+        page: int,
+        cookie: str | None,
+    ) -> tuple[list[DiscoveryCandidate], int | None]:
+        body = _mapping(
+            await self._transport.get_body(
+                f"/ajax/series/{series_id}",
+                cookie=cookie,
+                params={"p": page + 1, "lang": "zh"},
+            )
+        )
+        page_data = _mapping(body.get("page"))
+        entries = _sequence(page_data.get("series"))
+        artwork_ids = [artwork_id for item in entries if (artwork_id := _integer(_mapping(item).get("workId"))) > 0]
+        thumbnails = _sequence(_mapping(body.get("thumbnails")).get("illust"))
+        cards = {
+            artwork_id: card
+            for raw in thumbnails
+            if (card := _mapping(raw)) and (artwork_id := _integer(card.get("id"))) > 0
+        }
+        candidates = [
+            candidate_from_mapping(cards[artwork_id], default_artwork_id=artwork_id)
+            for artwork_id in artwork_ids
+            if artwork_id in cards
+        ]
+        series_rows = _sequence(body.get("illustSeries"))
+        total = _integer(_mapping(series_rows[0]).get("total")) if series_rows else 0
+        next_page = page + 1 if entries and (not total or (page + 1) * 12 < total) else None
+        return candidates, next_page
+
+    async def get_artwork(self, artwork_id: int, cookie: str | None) -> RemoteArtwork:
+        body = _mapping(await self._transport.get_body(f"/ajax/illust/{artwork_id}", cookie=cookie))
+        artwork_type = _artwork_type(body.get("illustType"))
+        pages_body = await self._transport.get_body(f"/ajax/illust/{artwork_id}/pages", cookie=cookie)
+        original_urls = tuple(
+            url
+            for page in _sequence(pages_body)
+            if (url := _text(_mapping(_mapping(page).get("urls")).get("original")))
+        )
+
+        frames: tuple[UgoiraFrame, ...] = ()
+        ugoira_zip_url: str | None = None
+        if artwork_type is ArtworkType.UGOIRA:
+            ugoira = _mapping(await self._transport.get_body(f"/ajax/illust/{artwork_id}/ugoira_meta", cookie=cookie))
+            ugoira_zip_url = _text(ugoira.get("originalSrc")) or _text(ugoira.get("src")) or None
+            frames = tuple(
+                UgoiraFrame(
+                    file_name=_text(frame.get("file"), f"{index:06}.jpg"),
+                    delay_ms=max(0, _integer(frame.get("delay"), 100)),
+                )
+                for index, raw in enumerate(_sequence(ugoira.get("frames")))
+                if (frame := _mapping(raw))
+            )
+
+        tag_root = _mapping(body.get("tags"))
+        parsed_tags = tuple(
+            TagRecord(
+                name=_text(tag.get("tag")),
+                translated_name=_text(tag.get("translation")) or None,
+            )
+            for raw in _sequence(tag_root.get("tags"))
+            if (tag := _mapping(raw)) and _text(tag.get("tag"))
+        )
+        series_data = _mapping(body.get("seriesNavData"))
+        urls = _mapping(body.get("urls"))
+        author_id = _optional_integer(body.get("userId"))
+        if author_id is None:
+            raise UpstreamError("invalid_pixiv_response", "Pixiv 作品数据缺少作者 ID。")
+        return RemoteArtwork(
+            artwork_id=artwork_id,
+            artwork_type=artwork_type,
+            title=_text(body.get("illustTitle")) or _text(body.get("title")) or f"作品 {artwork_id}",
+            description=_text(body.get("description")),
+            author_id=author_id,
+            author_name=_text(body.get("userName")) or f"用户 {author_id}",
+            author_account=_text(body.get("userAccount")) or None,
+            author_avatar_url=None,
+            series_id=_optional_integer(series_data.get("seriesId")),
+            series_title=_text(series_data.get("title")) or None,
+            page_count=max(1, _integer(body.get("pageCount"), len(original_urls) or 1)),
+            width=_optional_integer(body.get("width")),
+            height=_optional_integer(body.get("height")),
+            x_restrict=max(0, _integer(body.get("xRestrict"))),
+            is_ai=_integer(body.get("aiType")) >= 2,
+            published_at=_text(body.get("createDate")) or None,
+            original_urls=original_urls,
+            thumbnail_url=_text(urls.get("regular")) or _text(urls.get("small")) or None,
+            ugoira_zip_url=ugoira_zip_url,
+            ugoira_frames=frames,
+            tags=parsed_tags,
+        )
+
+    async def fetch_thumbnail(self, url: str, cookie: str | None) -> tuple[bytes, str]:
+        return await self._transport.fetch_thumbnail(url, cookie)
+
+    async def download(self, url: str, target: Path, cookie: str | None) -> tuple[str, int]:
+        return await self._transport.download(url, target, cookie)
