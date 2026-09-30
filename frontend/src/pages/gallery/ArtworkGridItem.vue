@@ -5,6 +5,7 @@ import { RouterLink } from 'vue-router'
 import type { ArtworkSummary } from '@/features/gallery/gallery-api'
 import Checkbox from '@ui/Checkbox.vue'
 import HoverCard from '@ui/HoverCard.vue'
+import SmartCropImage from '@ui/SmartCropImage.vue'
 
 const props = defineProps<{
   artwork: ArtworkSummary
@@ -51,7 +52,7 @@ function hidePreviewOnFocusOut(event: FocusEvent) {
         class="block size-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
         :to="`/artworks/${String(artwork.artworkId)}`"
       >
-        <img
+        <SmartCropImage
           class="size-full object-cover transition duration-300 group-hover:scale-[1.025]"
           :src="`/api/artworks/${String(artwork.artworkId)}/thumbnail`"
           :alt="artwork.title"

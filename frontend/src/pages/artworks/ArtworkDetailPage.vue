@@ -9,6 +9,7 @@ import SafeHtml from '@/pages/artworks/SafeHtml.vue'
 import Button from '@ui/Button.vue'
 import Card from '@ui/Card.vue'
 import ConfirmDialog from '@ui/ConfirmDialog.vue'
+import SmartCropImage from '@ui/SmartCropImage.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -255,7 +256,7 @@ function typeLabel(type: string) {
               :to="`/artworks/${String(related.artworkId)}`"
             >
               <div class="size-40 overflow-hidden rounded-xl bg-muted">
-                <img
+                <SmartCropImage
                   class="size-full object-cover transition duration-300 group-hover:scale-[1.025]"
                   :src="`/api/artworks/${String(related.artworkId)}/thumbnail`"
                   :alt="related.title"
