@@ -7,7 +7,14 @@ import pytest
 from anyio import to_thread
 from PIL import Image
 
-from piperch.domain import AppSettings, ArtworkType, ItemState, MediaRecord, RemoteArtwork
+from piperch.domain import (
+    AppSettings,
+    ArtworkType,
+    DownloadProgressPhase,
+    ItemState,
+    MediaRecord,
+    RemoteArtwork,
+)
 from piperch.paths import AppPaths
 from piperch.services.downloads import ArtworkDownloadService
 
@@ -87,13 +94,17 @@ async def test_download_respects_webp_settings(
         author_avatar_url=None,
         series_id=None,
         series_title=None,
-        page_count=1,
+        page_count=3,
         width=8,
         height=8,
         x_restrict=0,
         is_ai=False,
         published_at=None,
-        original_urls=("https://i.pximg.net/123_p0.png",),
+        original_urls=(
+            "https://i.pximg.net/123_p0.png",
+            "https://i.pximg.net/123_p1.png",
+            "https://i.pximg.net/123_p2.png",
+        ),
         thumbnail_url=None,
     )
     repository = StubArtworkRepository()
@@ -115,10 +126,31 @@ async def test_download_respects_webp_settings(
     async def is_cancel_requested() -> bool:
         return False
 
-    result = await service.download_artwork(123, "job-id", cast("Callable[[], Awaitable[bool]]", is_cancel_requested))
+    progress: list[tuple[DownloadProgressPhase, int, int | None]] = []
+
+    async def report_progress(
+        phase: DownloadProgressPhase,
+        completed_pages: int,
+        total_pages: int | None,
+    ) -> None:
+        progress.append((phase, completed_pages, total_pages))
+
+    result = await service.download_artwork(
+        123,
+        "job-id",
+        cast("Callable[[], Awaitable[bool]]", is_cancel_requested),
+        report_progress,
+    )
 
     assert result is ItemState.SUCCEEDED
-    assert qualities == ([67] if webp_enabled else [])
+    assert progress == [
+        (DownloadProgressPhase.DOWNLOADING, 0, 3),
+        (DownloadProgressPhase.DOWNLOADING, 1, 3),
+        (DownloadProgressPhase.DOWNLOADING, 2, 3),
+        (DownloadProgressPhase.DOWNLOADING, 3, 3),
+        (DownloadProgressPhase.FINALIZING, 3, 3),
+    ]
+    assert qualities == ([67, 67, 67] if webp_enabled else [])
     assert repository.saved_media is not None
     media = repository.saved_media[0]
     assert Path(media.relative_path).suffix == expected_suffix

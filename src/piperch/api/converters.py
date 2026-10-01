@@ -6,6 +6,7 @@ from piperch.api.models import (
     DownloadItemResponse,
     DownloadJobDetailResponse,
     DownloadJobSummaryResponse,
+    DownloadProgressResponse,
     JobCounts,
     MediaResponse,
     TagResponse,
@@ -76,6 +77,16 @@ def download_job_summary_response(job: DownloadJobRecord) -> DownloadJobSummaryR
             succeeded=job.counts.get(ItemState.SUCCEEDED, 0),
             failed=job.counts.get(ItemState.FAILED, 0),
             cancelled=job.counts.get(ItemState.CANCELLED, 0),
+        ),
+        progress=(
+            DownloadProgressResponse(
+                current_artwork_id=job.progress.current_artwork_id,
+                completed_pages=job.progress.completed_pages,
+                total_pages=job.progress.total_pages,
+                phase=job.progress.phase,
+            )
+            if job.progress is not None
+            else None
         ),
     )
 

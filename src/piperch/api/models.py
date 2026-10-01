@@ -190,6 +190,13 @@ class JobCounts(ApiModel):
     cancelled: int = 0
 
 
+class DownloadProgressResponse(ApiModel):
+    current_artwork_id: int
+    completed_pages: int = Field(ge=0)
+    total_pages: int | None = Field(default=None, ge=1)
+    phase: Literal["preparing", "downloading", "finalizing"]
+
+
 class DownloadJobSummaryResponse(ApiModel):
     job_id: str
     source_label: str
@@ -199,6 +206,7 @@ class DownloadJobSummaryResponse(ApiModel):
     finished_at: str | None
     error_summary: str | None
     counts: JobCounts
+    progress: DownloadProgressResponse | None
 
 
 class DownloadJobDetailResponse(DownloadJobSummaryResponse):

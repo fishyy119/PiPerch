@@ -14,7 +14,9 @@ def test_initial_migration_and_sqlite_pragmas(tmp_path: Path) -> None:
 
     database = Database(paths.database)
     try:
-        table_names = set(inspect(database.engine).get_table_names())
+        inspector = inspect(database.engine)
+        table_names = set(inspector.get_table_names())
+        download_item_columns = {column["name"] for column in inspector.get_columns("download_items")}
         with database.connect() as connection:
             foreign_keys = connection.scalar(text("PRAGMA foreign_keys"))
             journal_mode = connection.scalar(text("PRAGMA journal_mode"))
@@ -35,6 +37,7 @@ def test_initial_migration_and_sqlite_pragmas(tmp_path: Path) -> None:
         "tags",
         "ugoira_frames",
     } <= table_names
+    assert {"progress_phase", "progress_completed", "progress_total"} <= download_item_columns
     assert foreign_keys == 1
     assert str(journal_mode).lower() == "wal"
     assert synchronous == 1

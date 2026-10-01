@@ -43,6 +43,12 @@ class ItemState(StrEnum):
     CANCELLED = "cancelled"
 
 
+class DownloadProgressPhase(StrEnum):
+    PREPARING = "preparing"
+    DOWNLOADING = "downloading"
+    FINALIZING = "finalizing"
+
+
 @dataclass(frozen=True, slots=True)
 class AppSettings:
     pixiv_cookie: str | None
@@ -178,6 +184,14 @@ class DownloadItemRecord:
 
 
 @dataclass(frozen=True, slots=True)
+class DownloadProgress:
+    current_artwork_id: int
+    completed_pages: int
+    total_pages: int | None
+    phase: DownloadProgressPhase
+
+
+@dataclass(frozen=True, slots=True)
 class DownloadJobRecord:
     job_id: str
     source_label: str
@@ -189,3 +203,4 @@ class DownloadJobRecord:
     error_summary: str | None
     counts: dict[ItemState, int] = field(default_factory=lambda: {})
     items: tuple[DownloadItemRecord, ...] = ()
+    progress: DownloadProgress | None = None

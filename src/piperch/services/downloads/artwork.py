@@ -12,7 +12,7 @@ from uuid import uuid4
 from anyio import to_thread
 from PIL import Image, ImageOps
 
-from piperch.domain import ArtworkType, ItemState, MediaRecord, RemoteArtwork
+from piperch.domain import ArtworkType, DownloadProgressPhase, ItemState, MediaRecord, RemoteArtwork
 from piperch.errors import UpstreamError
 
 if TYPE_CHECKING:
@@ -49,6 +49,7 @@ class ArtworkDownloadService:
         artwork_id: int,
         job_id: str,
         is_cancel_requested: Callable[[], Awaitable[bool]],
+        report_progress: Callable[[DownloadProgressPhase, int, int | None], Awaitable[None]] | None = None,
     ) -> ItemState:
         settings = await to_thread.run_sync(self._settings.get)
         if await to_thread.run_sync(
@@ -60,6 +61,13 @@ class ArtworkDownloadService:
 
         artwork = await self._pixiv.get_artwork(artwork_id, settings.pixiv_cookie)
         await self._raise_if_cancelled(is_cancel_requested)
+        total_pages = max(1, artwork.page_count)
+        await self._report_progress(
+            report_progress,
+            DownloadProgressPhase.DOWNLOADING,
+            0,
+            total_pages,
+        )
         existing_media = await to_thread.run_sync(self._artworks.list_media, artwork_id)
         stage = self._paths.staging / job_id / str(artwork_id)
         await to_thread.run_sync(self._prepare_stage, stage)
@@ -74,6 +82,20 @@ class ArtworkDownloadService:
                 is_cancel_requested,
                 existing_media,
                 settings.library_root,
+                report_progress,
+            )
+            if artwork.artwork_type is ArtworkType.UGOIRA:
+                await self._report_progress(
+                    report_progress,
+                    DownloadProgressPhase.DOWNLOADING,
+                    total_pages,
+                    total_pages,
+                )
+            await self._report_progress(
+                report_progress,
+                DownloadProgressPhase.FINALIZING,
+                total_pages,
+                total_pages,
             )
             await to_thread.run_sync(self._validate_stage, artwork, stage)
             final_dir = settings.library_root / str(artwork.author_id) / str(artwork_id)
@@ -114,6 +136,7 @@ class ArtworkDownloadService:
         is_cancel_requested: Callable[[], Awaitable[bool]],
         existing_media: Sequence[MediaRecord],
         library_root: Path,
+        report_progress: Callable[[DownloadProgressPhase, int, int | None], Awaitable[None]] | None,
     ) -> tuple[MediaRecord, ...]:
         records: list[MediaRecord] = []
         if artwork.artwork_type is ArtworkType.UGOIRA:
@@ -207,6 +230,20 @@ class ArtworkDownloadService:
                 f"Pixiv 返回了 {len(artwork.original_urls)}/{artwork.page_count} 个作品原图地址。",
             )
         semaphore = asyncio.Semaphore(concurrency)
+        progress_lock = asyncio.Lock()
+        completed_pages = 0
+
+        async def complete_page(record: MediaRecord) -> MediaRecord:
+            nonlocal completed_pages
+            async with progress_lock:
+                completed_pages += 1
+                await self._report_progress(
+                    report_progress,
+                    DownloadProgressPhase.DOWNLOADING,
+                    completed_pages,
+                    artwork.page_count,
+                )
+            return record
 
         async def download_page(page_index: int, url: str) -> MediaRecord:
             async with semaphore:
@@ -222,27 +259,31 @@ class ArtworkDownloadService:
                     if not webp_enabled and reused.mime_type == "image/webp":
                         (stage / Path(reused.relative_path).name).unlink()
                     else:
-                        return await self._finalize_image(
-                            stage / Path(reused.relative_path).name,
-                            reused.mime_type,
-                            reused.byte_size,
-                            "page",
-                            page_index,
-                            webp_enabled and reused.mime_type != "image/webp",
-                            webp_quality,
+                        return await complete_page(
+                            await self._finalize_image(
+                                stage / Path(reused.relative_path).name,
+                                reused.mime_type,
+                                reused.byte_size,
+                                "page",
+                                page_index,
+                                webp_enabled and reused.mime_type != "image/webp",
+                                webp_quality,
+                            )
                         )
                 await self._raise_if_cancelled(is_cancel_requested)
                 target = stage / (f"{artwork.artwork_id}_p{page_index}{self._extension(url, '.jpg')}")
                 mime, size = await self._pixiv.download(url, target, cookie)
                 self._require_media_type(mime, "image/", "作品原图")
-                return await self._finalize_image(
-                    target,
-                    mime,
-                    size,
-                    "page",
-                    page_index,
-                    webp_enabled,
-                    webp_quality,
+                return await complete_page(
+                    await self._finalize_image(
+                        target,
+                        mime,
+                        size,
+                        "page",
+                        page_index,
+                        webp_enabled,
+                        webp_quality,
+                    )
                 )
 
         tasks = [asyncio.create_task(download_page(index, url)) for index, url in enumerate(artwork.original_urls)]
@@ -300,6 +341,16 @@ class ArtworkDownloadService:
     ) -> None:
         if await is_cancel_requested():
             raise DownloadCancelledError
+
+    @staticmethod
+    async def _report_progress(
+        report_progress: Callable[[DownloadProgressPhase, int, int | None], Awaitable[None]] | None,
+        phase: DownloadProgressPhase,
+        completed_pages: int,
+        total_pages: int | None,
+    ) -> None:
+        if report_progress is not None:
+            await report_progress(phase, completed_pages, total_pages)
 
     @staticmethod
     def _require_media_type(mime_type: str, prefix: str, label: str) -> None:

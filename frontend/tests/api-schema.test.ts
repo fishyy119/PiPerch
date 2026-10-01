@@ -4,6 +4,7 @@ import { setupServer } from 'msw/node'
 import {
   discover,
   listBookmarkFolders,
+  listDownloadJobs,
   listFollowedUsers,
   listSelectableBookmarkArtworkIds,
   listSelectableUserArtworkIds,
@@ -72,6 +73,52 @@ describe('API 响应边界', () => {
     )
 
     await expect(listSelectableUserArtworkIds(42)).resolves.toEqual([103, 102, 101])
+  })
+
+  it('读取下载任务的当前作品页级进度', async () => {
+    server.use(
+      http.get('/api/download-jobs', () =>
+        HttpResponse.json({
+          items: [
+            {
+              jobId: 'job-1',
+              sourceLabel: '收藏来源',
+              state: 'running',
+              createdAt: '2026-10-01T00:00:00Z',
+              startedAt: '2026-10-01T00:00:01Z',
+              finishedAt: null,
+              errorSummary: null,
+              counts: {
+                queued: 7,
+                running: 1,
+                skipped: 0,
+                succeeded: 2,
+                failed: 0,
+                cancelled: 0,
+              },
+              progress: {
+                currentArtworkId: 123456,
+                completedPages: 37,
+                totalPages: 120,
+                phase: 'downloading',
+              },
+            },
+          ],
+          page: 0,
+          size: 100,
+          totalElements: 1,
+          totalPages: 1,
+        }),
+      ),
+    )
+
+    const result = await listDownloadJobs()
+    expect(result.items[0]?.progress).toEqual({
+      currentArtworkId: 123456,
+      completedPages: 37,
+      totalPages: 120,
+      phase: 'downloading',
+    })
   })
 
   it('读取当前账号关注的作者', async () => {

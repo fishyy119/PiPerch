@@ -11,6 +11,7 @@ from piperch.domain import (
     BookmarkFolderReference,
     BookmarkVisibility,
     DiscoveryCandidate,
+    DownloadProgressPhase,
     FollowedUser,
     MediaRecord,
     RemoteArtwork,
@@ -432,6 +433,15 @@ def test_download_job_list_uses_summary_and_detail_includes_items(
 ) -> None:
     client, container = app_client
     job_id = container.downloads.create_job([101], "接口契约测试")
+    claimed = container.downloads.claim_next()
+    assert claimed is not None
+    _, item = claimed
+    container.downloads.update_item_progress(
+        item.item_id,
+        DownloadProgressPhase.DOWNLOADING,
+        2,
+        5,
+    )
 
     summary = client.get("/api/download-jobs?size=100")
     detail = client.get(f"/api/download-jobs/{job_id}")
@@ -440,6 +450,12 @@ def test_download_job_list_uses_summary_and_detail_includes_items(
     assert summary.json()["items"][0]["jobId"] == job_id
     assert "items" not in summary.json()["items"][0]
     assert "cancelRequested" not in summary.json()["items"][0]
+    assert summary.json()["items"][0]["progress"] == {
+        "currentArtworkId": 101,
+        "completedPages": 2,
+        "totalPages": 5,
+        "phase": "downloading",
+    }
     assert detail.status_code == 200
     assert [item["artworkId"] for item in detail.json()["items"]] == [101]
 

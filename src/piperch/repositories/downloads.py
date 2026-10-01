@@ -9,9 +9,16 @@ from uuid import uuid4
 from sqlalchemy import and_, func, insert, select, update
 
 from piperch.database.tables import download_items, download_jobs
-from piperch.domain import DownloadItemRecord, DownloadJobRecord, ItemState, JobState
+from piperch.domain import (
+    DownloadItemRecord,
+    DownloadJobRecord,
+    DownloadProgress,
+    DownloadProgressPhase,
+    ItemState,
+    JobState,
+)
 from piperch.errors import ConflictError, NotFoundError
-from piperch.repositories._rows import integer, optional_string, string
+from piperch.repositories._rows import integer, optional_integer, optional_string, string
 from piperch.utils.datetime import utc_now_text
 
 if TYPE_CHECKING:
@@ -59,7 +66,13 @@ class DownloadRepository:
             connection.execute(
                 update(download_items)
                 .where(download_items.c.state == ItemState.RUNNING.value)
-                .values(state=ItemState.QUEUED.value, started_at=None)
+                .values(
+                    state=ItemState.QUEUED.value,
+                    started_at=None,
+                    progress_phase=None,
+                    progress_completed=0,
+                    progress_total=None,
+                )
             )
             connection.execute(
                 update(download_jobs)
@@ -130,6 +143,9 @@ class DownloadRepository:
                     error=None,
                     started_at=now,
                     finished_at=None,
+                    progress_phase=DownloadProgressPhase.PREPARING.value,
+                    progress_completed=0,
+                    progress_total=None,
                 )
             )
             return (
@@ -143,6 +159,33 @@ class DownloadRepository:
                 ),
             )
 
+    def update_item_progress(
+        self,
+        item_id: int,
+        phase: DownloadProgressPhase,
+        completed_pages: int,
+        total_pages: int | None,
+    ) -> None:
+        if completed_pages < 0:
+            raise ValueError("已完成页数不能为负数。")
+        if total_pages is not None and (total_pages < 1 or completed_pages > total_pages):
+            raise ValueError("下载页数进度无效。")
+        with self._database.begin() as connection:
+            connection.execute(
+                update(download_items)
+                .where(
+                    and_(
+                        download_items.c.id == item_id,
+                        download_items.c.state == ItemState.RUNNING.value,
+                    )
+                )
+                .values(
+                    progress_phase=phase.value,
+                    progress_completed=completed_pages,
+                    progress_total=total_pages,
+                )
+            )
+
     def complete_item(self, item_id: int, state: ItemState, error: str | None = None) -> None:
         with self._database.begin() as connection:
             job_id = connection.scalar(select(download_items.c.job_id).where(download_items.c.id == item_id))
@@ -151,7 +194,14 @@ class DownloadRepository:
             connection.execute(
                 update(download_items)
                 .where(download_items.c.id == item_id)
-                .values(state=state.value, error=error, finished_at=utc_now_text())
+                .values(
+                    state=state.value,
+                    error=error,
+                    finished_at=utc_now_text(),
+                    progress_phase=None,
+                    progress_completed=0,
+                    progress_total=None,
+                )
             )
             remaining = connection.scalar(
                 select(func.count())
@@ -188,7 +238,13 @@ class DownloadRepository:
                         download_items.c.state == ItemState.QUEUED.value,
                     )
                 )
-                .values(state=ItemState.CANCELLED.value, finished_at=utc_now_text())
+                .values(
+                    state=ItemState.CANCELLED.value,
+                    finished_at=utc_now_text(),
+                    progress_phase=None,
+                    progress_completed=0,
+                    progress_total=None,
+                )
             )
 
     def is_cancel_requested(self, job_id: str) -> bool:
@@ -218,7 +274,14 @@ class DownloadRepository:
                         download_items.c.state == ItemState.FAILED.value,
                     )
                 )
-                .values(state=ItemState.QUEUED.value, error=None, finished_at=None)
+                .values(
+                    state=ItemState.QUEUED.value,
+                    error=None,
+                    finished_at=None,
+                    progress_phase=None,
+                    progress_completed=0,
+                    progress_total=None,
+                )
             )
             connection.execute(
                 update(download_jobs)
@@ -309,6 +372,10 @@ class DownloadRepository:
                 .mappings()
                 .all()
             )
+            progress_row = next(
+                (item for item in item_rows if string(item["state"]) == ItemState.RUNNING.value),
+                None,
+            )
             items = tuple(
                 DownloadItemRecord(
                     item_id=integer(item["id"]),
@@ -328,6 +395,36 @@ class DownloadRepository:
             ).all()
             items = ()
             counts = Counter({ItemState(string(item.state)): integer(item.item_count) for item in count_rows})
+            progress_row = (
+                connection.execute(
+                    select(
+                        download_items.c.artwork_id,
+                        download_items.c.progress_phase,
+                        download_items.c.progress_completed,
+                        download_items.c.progress_total,
+                    )
+                    .where(
+                        and_(
+                            download_items.c.job_id == row["id"],
+                            download_items.c.state == ItemState.RUNNING.value,
+                        )
+                    )
+                    .limit(1)
+                )
+                .mappings()
+                .first()
+            )
+        progress_phase = optional_string(progress_row["progress_phase"]) if progress_row is not None else None
+        progress = (
+            DownloadProgress(
+                current_artwork_id=integer(progress_row["artwork_id"]),
+                completed_pages=integer(progress_row["progress_completed"]),
+                total_pages=optional_integer(progress_row["progress_total"]),
+                phase=DownloadProgressPhase(progress_phase),
+            )
+            if progress_row is not None and progress_phase is not None
+            else None
+        )
         return DownloadJobRecord(
             job_id=string(row["id"]),
             source_label=string(row["source_label"]),
@@ -339,4 +436,5 @@ class DownloadRepository:
             error_summary=optional_string(row["error_summary"]),
             counts=dict(counts),
             items=items if include_items else (),
+            progress=progress,
         )

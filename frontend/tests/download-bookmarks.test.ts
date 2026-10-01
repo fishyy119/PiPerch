@@ -108,6 +108,53 @@ afterAll(() => {
 })
 
 describe('收藏下载来源', () => {
+  it('将当前作品的页进度计入任务进度条', async () => {
+    server.use(
+      http.get('/api/download-jobs', () =>
+        HttpResponse.json({
+          items: [
+            {
+              jobId: 'job-progress',
+              sourceLabel: '收藏来源',
+              state: 'running',
+              createdAt: '2026-10-01T00:00:00Z',
+              startedAt: '2026-10-01T00:00:01Z',
+              finishedAt: null,
+              errorSummary: null,
+              counts: {
+                queued: 7,
+                running: 1,
+                skipped: 0,
+                succeeded: 2,
+                failed: 0,
+                cancelled: 0,
+              },
+              progress: {
+                currentArtworkId: 123456,
+                completedPages: 37,
+                totalPages: 120,
+                phase: 'downloading',
+              },
+            },
+          ],
+          page: 0,
+          size: 100,
+          totalElements: 1,
+          totalPages: 1,
+        }),
+      ),
+    )
+    const { container } = render(DownloadPage, {
+      global: {
+        plugins: [createPinia(), [VueQueryPlugin, { queryClient: new QueryClient() }]],
+      },
+    })
+
+    expect(await screen.findByText('作品 123456 · 37 / 120 页')).toBeInTheDocument()
+    const progressBar = container.querySelector('.h-full.bg-primary.transition-all')
+    expect(progressBar).toHaveStyle({ width: `${String(((2 + 37 / 120) / 10) * 100)}%` })
+  })
+
   it('稳定缓存收藏标签，并只在主动刷新时重新获取', async () => {
     const user = userEvent.setup()
     render(DownloadPage, {
