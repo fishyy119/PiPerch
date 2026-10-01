@@ -38,6 +38,75 @@ def test_parse_pixiv_user_id_reads_phpsessid_prefix() -> None:
 
 
 @pytest.mark.asyncio
+async def test_discovery_recommendations_follow_recommended_ids_and_ignore_missing_metadata() -> None:
+    with respx.mock(assert_all_called=True) as router:
+        route = router.get(
+            "https://www.pixiv.net/ajax/discovery/artworks",
+            params={"mode": "all", "limit": 100, "lang": "zh"},
+        ).mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "error": False,
+                    "body": {
+                        "recommendedIllusts": [
+                            {"illustId": "103", "recommendMethods": ["history"]},
+                            {"illustId": "102", "recommendMethods": ["bookmark"]},
+                            {"illustId": "103", "recommendMethods": ["history"]},
+                            {"illustId": "404", "recommendMethods": []},
+                            {"illustId": "invalid", "recommendMethods": []},
+                        ],
+                        "thumbnails": {
+                            "illust": [
+                                {"id": "102", "title": "第二件作品", "userName": "作者乙"},
+                                {
+                                    "id": "103",
+                                    "title": "第一件作品",
+                                    "illustType": 0,
+                                    "pageCount": 1,
+                                    "userName": "作者甲",
+                                    "pages": [
+                                        {
+                                            "width": 1200,
+                                            "height": 800,
+                                            "urls": {
+                                                "1200x1200_standard": "https://i.pximg.net/103-large.jpg",
+                                                "540x540": "https://i.pximg.net/103-medium.jpg",
+                                                "360x360": "https://i.pximg.net/103-small.jpg",
+                                            },
+                                        }
+                                    ],
+                                },
+                                {
+                                    "id": "101",
+                                    "title": "未被推荐的缩略图",
+                                    "userName": "作者丙",
+                                },
+                                {"id": "invalid"},
+                            ],
+                            "novel": [
+                                {
+                                    "id": "999",
+                                    "title": "小说",
+                                }
+                            ],
+                        },
+                    },
+                },
+            )
+        )
+        client = PixivClient(proxy_url=None, request_interval_ms=0)
+        try:
+            recommendations = await client.discover_recommended_artworks("PHPSESSID=42_secret")
+        finally:
+            await client.close()
+
+    assert route.call_count == 1
+    assert [item.artwork_id for item in recommendations] == [103, 102]
+    assert recommendations[0].thumbnail_url == "https://i.pximg.net/103-medium.jpg"
+
+
+@pytest.mark.asyncio
 async def test_cookie_validation_does_not_retry_forbidden_response() -> None:
     with respx.mock(assert_all_called=True) as router:
         route = router.get(

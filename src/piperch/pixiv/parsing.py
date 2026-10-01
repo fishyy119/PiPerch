@@ -93,6 +93,15 @@ def candidate_from_mapping(
     default_artwork_id: int = 0,
 ) -> DiscoveryCandidate:
     artwork_id = as_integer(item.get("id"), default_artwork_id)
+    thumbnail_url = as_text(item.get("url"))
+    if not thumbnail_url:
+        pages = as_sequence(item.get("pages"))
+        first_page = as_mapping(pages[0]) if pages else {}
+        urls = as_mapping(first_page.get("urls"))
+        # 部分 Pixiv 缩略图列表使用尺寸名称作为键，其他接口则直接提供 url。
+        thumbnail_url = (
+            as_text(urls.get("540x540")) or as_text(urls.get("360x360")) or as_text(urls.get("1200x1200_standard"))
+        )
     return DiscoveryCandidate(
         artwork_id=artwork_id,
         title=as_text(item.get("title")) or f"作品 {artwork_id}",
@@ -101,5 +110,5 @@ def candidate_from_mapping(
         page_count=max(1, as_integer(item.get("pageCount"), 1)),
         x_restrict=max(0, as_integer(item.get("xRestrict"))),
         is_ai=as_integer(item.get("aiType")) >= 2,
-        thumbnail_url=as_text(item.get("url")) or None,
+        thumbnail_url=thumbnail_url or None,
     )

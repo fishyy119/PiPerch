@@ -93,6 +93,63 @@ class PixivClient:
         next_page = page + 1 if start + page_size < len(artwork_ids) else None
         return candidates, next_page
 
+    async def discover_recommended_artworks(
+        self,
+        cookie: str | None,
+    ) -> list[DiscoveryCandidate]:
+        """读取当前账号的发现作品流，并按推荐顺序去重。"""
+        self._require_current_user_id(cookie)
+        body = _mapping(
+            await self._transport.get_body(
+                "/ajax/discovery/artworks",
+                cookie=cookie,
+                params={"mode": "all", "limit": 100, "lang": "zh"},
+            )
+        )
+        candidates_by_id: dict[int, DiscoveryCandidate] = {}
+        thumbnails = _mapping(body.get("thumbnails"))
+        for raw_thumbnail in _sequence(thumbnails.get("illust")):
+            thumbnail = _mapping(raw_thumbnail)
+            artwork_id = _integer(thumbnail.get("id"))
+            if artwork_id <= 0:
+                continue
+            candidates_by_id.setdefault(
+                artwork_id,
+                candidate_from_mapping(thumbnail, default_artwork_id=artwork_id),
+            )
+
+        ordered: dict[int, DiscoveryCandidate] = {}
+        for raw_recommendation in _sequence(body.get("recommendedIllusts")):
+            recommendation = _mapping(raw_recommendation)
+            artwork_id = _integer(
+                recommendation.get("illustId"),
+                _integer(raw_recommendation),
+            )
+            candidate = candidates_by_id.get(artwork_id)
+            if candidate is not None:
+                ordered.setdefault(artwork_id, candidate)
+        return list(ordered.values())
+
+    async def list_artwork_preview_urls(
+        self,
+        artwork_id: int,
+        cookie: str | None,
+    ) -> list[str]:
+        """按作品页顺序读取适合快速预览的图片地址。"""
+        pages = _sequence(
+            await self._transport.get_body(
+                f"/ajax/illust/{artwork_id}/pages",
+                cookie=cookie,
+            )
+        )
+        preview_urls: list[str] = []
+        for raw_page in pages:
+            urls = _mapping(_mapping(raw_page).get("urls"))
+            preview_url = _text(urls.get("regular")) or _text(urls.get("small"))
+            if preview_url:
+                preview_urls.append(preview_url)
+        return preview_urls
+
     async def discover_user(
         self,
         user_id: int,

@@ -47,6 +47,14 @@ const discoveryResponseSchema = z.object({
   nextPage: z.number().int().nonnegative().nullable(),
 })
 
+const recommendationsResponseSchema = z.object({
+  items: z.array(discoveryItemSchema),
+})
+
+const artworkPreviewResponseSchema = z.object({
+  urls: z.array(z.string().startsWith('/api/pixiv-images?url=')),
+})
+
 const jobStateSchema = z.enum([
   'queued',
   'running',
@@ -101,6 +109,17 @@ export type DiscoveryRequest =
 
 export async function discover(request: DiscoveryRequest) {
   return discoveryResponseSchema.parse(await api.post<unknown>('/api/discovery', request))
+}
+
+export async function listRecommendations() {
+  return recommendationsResponseSchema.parse(
+    await api.get<unknown>('/api/discovery/recommendations'),
+  ).items
+}
+
+export async function listArtworkPreviewUrls(artworkId: number) {
+  const path = `/api/discovery/artworks/${encodeURIComponent(String(artworkId))}/preview`
+  return artworkPreviewResponseSchema.parse(await api.get<unknown>(path)).urls
 }
 
 export async function listSelectableUserArtworkIds(userId: number) {

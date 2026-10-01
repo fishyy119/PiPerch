@@ -124,6 +124,14 @@ class DiscoveryResponse(ApiModel):
     next_page: int | None
 
 
+class RecommendationsResponse(ApiModel):
+    items: list[DiscoveryItem]
+
+
+class ArtworkPreviewResponse(ApiModel):
+    urls: list[str]
+
+
 class UserArtworkIdsResponse(ApiModel):
     artwork_ids: list[int]
 

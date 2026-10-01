@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, Path
 from piperch.api.dependencies import get_container
 from piperch.api.models import (
     ArtworkDiscoveryRequest,
+    ArtworkPreviewResponse,
     BookmarkArtworkIdsRequest,
     BookmarkDiscoveryRequest,
     BookmarkFolderResponse,
@@ -15,14 +16,35 @@ from piperch.api.models import (
     DiscoveryResponse,
     FollowedUserResponse,
     FollowedUsersResponse,
+    RecommendationsResponse,
     UserArtworkIdsResponse,
     UserDiscoveryRequest,
 )
 from piperch.api.pixiv_images import proxied_image_url
 from piperch.container import AppContainer
-from piperch.domain import BookmarkFolderReference
+from piperch.domain import BookmarkFolderReference, DiscoveryCandidate
 
 router = APIRouter(prefix="/discovery", tags=["discovery"])
+
+
+def _discovery_items(
+    candidates: list[DiscoveryCandidate],
+    existing_ids: set[int],
+) -> list[DiscoveryItem]:
+    return [
+        DiscoveryItem(
+            artwork_id=item.artwork_id,
+            title=item.title,
+            author_name=item.author_name,
+            artwork_type=item.artwork_type,
+            page_count=item.page_count,
+            x_restrict=item.x_restrict,
+            is_ai=item.is_ai,
+            thumbnail_url=proxied_image_url(item.thumbnail_url),
+            in_library=item.artwork_id in existing_ids,
+        )
+        for item in candidates
+    ]
 
 
 @router.post("", response_model=DiscoveryResponse)
@@ -61,23 +83,39 @@ async def discover(
         [item.artwork_id for item in candidates],
     )
     return DiscoveryResponse(
-        items=[
-            DiscoveryItem(
-                artwork_id=item.artwork_id,
-                title=item.title,
-                author_name=item.author_name,
-                artwork_type=item.artwork_type,
-                page_count=item.page_count,
-                x_restrict=item.x_restrict,
-                is_ai=item.is_ai,
-                thumbnail_url=proxied_image_url(item.thumbnail_url),
-                in_library=item.artwork_id in existing_ids,
-            )
-            for item in candidates
-        ],
+        items=_discovery_items(candidates, existing_ids),
         page=request.page,
         next_page=next_page,
     )
+
+
+@router.get("/recommendations", response_model=RecommendationsResponse)
+async def recommendations(
+    container: AppContainer = Depends(get_container),
+) -> RecommendationsResponse:
+    settings = await to_thread.run_sync(container.settings.get)
+    candidates = await container.pixiv.discover_recommended_artworks(settings.pixiv_cookie)
+    existing_ids = await to_thread.run_sync(
+        container.artworks.find_existing_ids,
+        [item.artwork_id for item in candidates],
+    )
+    return RecommendationsResponse(items=_discovery_items(candidates, existing_ids))
+
+
+@router.get(
+    "/artworks/{artwork_id}/preview",
+    response_model=ArtworkPreviewResponse,
+)
+async def artwork_preview(
+    artwork_id: int = Path(gt=0),
+    container: AppContainer = Depends(get_container),
+) -> ArtworkPreviewResponse:
+    settings = await to_thread.run_sync(container.settings.get)
+    urls = await container.pixiv.list_artwork_preview_urls(
+        artwork_id,
+        settings.pixiv_cookie,
+    )
+    return ArtworkPreviewResponse(urls=[url for item in urls if (url := proxied_image_url(item)) is not None])
 
 
 @router.get("/bookmark-folders", response_model=BookmarkFoldersResponse)

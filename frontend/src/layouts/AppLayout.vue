@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Download, Images, Menu, Settings, X } from '@lucide/vue'
+import { Compass, Download, Images, Menu, Settings, X } from '@lucide/vue'
 import { computed, ref } from 'vue'
 import { RouterLink, RouterView, useRoute } from 'vue-router'
 
@@ -10,6 +10,7 @@ const pageTitle = computed(() =>
 )
 const showPageTitle = computed(() => route.meta.hideTitle !== true)
 const navigation = [
+  { to: '/discover', label: '发现', icon: Compass },
   { to: '/downloads', label: '下载', icon: Download },
   { to: '/gallery', label: '图库', icon: Images },
   { to: '/settings', label: '设置', icon: Settings },

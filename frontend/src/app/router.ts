@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 
 import AppLayout from '@/layouts/AppLayout.vue'
 import ArtworkDetailPage from '@/pages/artworks/ArtworkDetailPage.vue'
+import DiscoverPage from '@/pages/discover/DiscoverPage.vue'
 import DownloadPage from '@/pages/downloads/DownloadPage.vue'
 import GalleryPage from '@/pages/gallery/GalleryPage.vue'
 import SettingsPage from '@/pages/settings/SettingsPage.vue'
@@ -14,6 +15,7 @@ export const router = createRouter({
       component: AppLayout,
       children: [
         { path: '', redirect: '/gallery' },
+        { path: 'discover', component: DiscoverPage, meta: { title: '发现' } },
         { path: 'downloads', component: DownloadPage, meta: { title: '下载工作台' } },
         {
           path: 'gallery',
