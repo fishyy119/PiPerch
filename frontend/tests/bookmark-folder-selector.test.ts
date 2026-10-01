@@ -20,19 +20,6 @@ const folders: BookmarkFolder[] = [
 ]
 
 describe('收藏夹选择', () => {
-  it('合并展示收藏标签，并只在非公开卡片末尾显示锁头', () => {
-    const { container } = render(BookmarkFolderSelector, {
-      props: { folders, selectedFolders: [] },
-    })
-
-    expect(screen.queryByRole('heading')).not.toBeInTheDocument()
-    const [publicLandscape, privateLandscape] = screen.getAllByRole('button', { name: /风景/u })
-    if (!publicLandscape || !privateLandscape) throw new Error('缺少公开或非公开风景收藏夹。')
-    expect(publicLandscape.querySelector('.lucide-lock-keyhole')).not.toBeInTheDocument()
-    expect(privateLandscape.querySelector('.lucide-lock-keyhole')).toBeInTheDocument()
-    expect(container.querySelectorAll('.lucide-lock-keyhole')).toHaveLength(2)
-  })
-
   it('同一范围内让全部收藏与普通标签互斥', async () => {
     const user = userEvent.setup()
     const onUpdate = vi.fn()

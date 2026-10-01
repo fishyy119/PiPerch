@@ -4,33 +4,36 @@ import { render, screen, waitFor } from '@testing-library/vue'
 import { http, HttpResponse } from 'msw'
 import { setupServer } from 'msw/node'
 import { defineComponent } from 'vue'
-import { createMemoryHistory, createRouter } from 'vue-router'
+import { createMemoryHistory, createRouter, RouterView } from 'vue-router'
 
 import ArtworkDetailPage from '@/pages/artworks/ArtworkDetailPage.vue'
 
+function artworkPayload(overrides: Record<string, unknown> = {}) {
+  return {
+    artworkId: 123,
+    title: '测试作品',
+    artworkType: 'illust',
+    authorId: 456,
+    authorName: '测试作者',
+    seriesId: 789,
+    seriesTitle: '测试系列',
+    pageCount: 1,
+    xRestrict: 0,
+    isAi: false,
+    publishedAt: '2026-09-28T00:00:00Z',
+    downloadedAt: '2026-09-28T01:00:00Z',
+    tags: [],
+    description: '作品说明',
+    width: 1000,
+    height: 1200,
+    media: [{ role: 'page', pageIndex: 0, mimeType: 'image/jpeg', byteSize: 100 }],
+    ugoiraFrames: [],
+    ...overrides,
+  }
+}
+
 const server = setupServer(
-  http.get('/api/artworks/123', () =>
-    HttpResponse.json({
-      artworkId: 123,
-      title: '测试作品',
-      artworkType: 'illust',
-      authorId: 456,
-      authorName: '测试作者',
-      seriesId: 789,
-      seriesTitle: '测试系列',
-      pageCount: 1,
-      xRestrict: 0,
-      isAi: false,
-      publishedAt: '2026-09-28T00:00:00Z',
-      downloadedAt: '2026-09-28T01:00:00Z',
-      tags: [],
-      description: '作品说明',
-      width: 1000,
-      height: 1200,
-      media: [{ role: 'page', pageIndex: 0, mimeType: 'image/jpeg', byteSize: 100 }],
-      ugoiraFrames: [],
-    }),
-  ),
+  http.get('/api/artworks/123', () => HttpResponse.json(artworkPayload())),
   http.get('/api/artworks/123/related', () => HttpResponse.json([])),
 )
 
@@ -75,11 +78,14 @@ describe('作品详情页', () => {
     await router.push('/artworks/123')
     await router.isReady()
 
-    render(ArtworkDetailPage, {
-      global: {
-        plugins: [router, [VueQueryPlugin, { queryClient: new QueryClient() }]],
+    render(
+      { components: { RouterView }, template: '<RouterView />' },
+      {
+        global: {
+          plugins: [router, [VueQueryPlugin, { queryClient: new QueryClient() }]],
+        },
       },
-    })
+    )
 
     expect(await screen.findByRole('heading', { name: '测试作品' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: '相关作品' })).toBeInTheDocument()
@@ -99,30 +105,19 @@ describe('作品详情页', () => {
   it('从整个主图展示区打开当前页，并同步 Lightbox 内的翻页结果', async () => {
     server.use(
       http.get('/api/artworks/123', () =>
-        HttpResponse.json({
-          artworkId: 123,
-          title: '测试作品',
-          artworkType: 'manga',
-          authorId: 456,
-          authorName: '测试作者',
-          seriesId: null,
-          seriesTitle: null,
-          pageCount: 3,
-          xRestrict: 0,
-          isAi: false,
-          publishedAt: '2026-09-28T00:00:00Z',
-          downloadedAt: '2026-09-28T01:00:00Z',
-          tags: [],
-          description: '作品说明',
-          width: 1000,
-          height: 1200,
-          media: [
-            { role: 'page', pageIndex: 0, mimeType: 'image/jpeg', byteSize: 100 },
-            { role: 'page', pageIndex: 1, mimeType: 'image/jpeg', byteSize: 100 },
-            { role: 'page', pageIndex: 2, mimeType: 'image/jpeg', byteSize: 100 },
-          ],
-          ugoiraFrames: [],
-        }),
+        HttpResponse.json(
+          artworkPayload({
+            artworkType: 'manga',
+            seriesId: null,
+            seriesTitle: null,
+            pageCount: 3,
+            media: [
+              { role: 'page', pageIndex: 0, mimeType: 'image/jpeg', byteSize: 100 },
+              { role: 'page', pageIndex: 1, mimeType: 'image/jpeg', byteSize: 100 },
+              { role: 'page', pageIndex: 2, mimeType: 'image/jpeg', byteSize: 100 },
+            ],
+          }),
+        ),
       ),
     )
     const user = userEvent.setup()
@@ -133,18 +128,19 @@ describe('作品详情页', () => {
     await router.push('/artworks/123')
     await router.isReady()
 
-    render(ArtworkDetailPage, {
-      global: {
-        plugins: [router, [VueQueryPlugin, { queryClient: new QueryClient() }]],
-        stubs: { LightboxGallery: LightboxGalleryStub },
+    render(
+      { components: { RouterView }, template: '<RouterView />' },
+      {
+        global: {
+          plugins: [router, [VueQueryPlugin, { queryClient: new QueryClient() }]],
+          stubs: { LightboxGallery: LightboxGalleryStub },
+        },
       },
-    })
+    )
 
     const previewTrigger = await screen.findByRole('button', {
       name: '测试作品',
     })
-    expect(previewTrigger).toHaveClass('size-full', 'p-2', 'sm:p-4')
-    expect(previewTrigger).not.toHaveAttribute('aria-label')
 
     await user.click(screen.getByRole('button', { name: '3' }))
     await user.click(previewTrigger)

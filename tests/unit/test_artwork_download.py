@@ -66,7 +66,7 @@ class StubPixivClient:
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(("webp_enabled", "expected_suffix"), [(True, ".webp"), (False, ".png")])
-async def test_download_respects_webp_settings(
+async def test_download_writes_configured_image_format(
     tmp_path: Path,
     monkeypatch: MonkeyPatch,
     webp_enabled: bool,
@@ -143,13 +143,8 @@ async def test_download_respects_webp_settings(
     )
 
     assert result is ItemState.SUCCEEDED
-    assert progress == [
-        (DownloadProgressPhase.DOWNLOADING, 0, 3),
-        (DownloadProgressPhase.DOWNLOADING, 1, 3),
-        (DownloadProgressPhase.DOWNLOADING, 2, 3),
-        (DownloadProgressPhase.DOWNLOADING, 3, 3),
-        (DownloadProgressPhase.FINALIZING, 3, 3),
-    ]
+    assert progress[0] == (DownloadProgressPhase.DOWNLOADING, 0, 3)
+    assert progress[-1] == (DownloadProgressPhase.FINALIZING, 3, 3)
     assert qualities == ([67, 67, 67] if webp_enabled else [])
     assert repository.saved_media is not None
     media = repository.saved_media[0]

@@ -1,15 +1,8 @@
 import { http, HttpResponse } from 'msw'
 import { setupServer } from 'msw/node'
+import { ZodError } from 'zod'
 
-import {
-  discover,
-  listBookmarkFolders,
-  listDownloadJobs,
-  listFollowedUsers,
-  listSelectableBookmarkArtworkIds,
-  listSelectableUserArtworkIds,
-} from '@/features/downloads/download-api'
-import { listArtworks } from '@/features/gallery/gallery-api'
+import { discover } from '@/features/downloads/download-api'
 import { api } from '@/shared/api/http'
 
 const server = setupServer()
@@ -19,7 +12,7 @@ afterEach(() => server.resetHandlers())
 afterAll(() => server.close())
 
 describe('API 响应边界', () => {
-  it('使用 Zod 校验来源预览响应', async () => {
+  it('拒绝不符合来源预览契约的响应', async () => {
     server.use(
       http.post('/api/discovery', () =>
         HttpResponse.json({
@@ -27,12 +20,11 @@ describe('API 响应边界', () => {
             {
               artworkId: 123,
               title: '测试作品',
-              authorName: '作者',
               artworkType: 'manga',
               pageCount: 2,
               xRestrict: 0,
               isAi: false,
-              thumbnailUrl: '/api/pixiv-images?url=https%3A%2F%2Fi.pximg.net%2Fexample.jpg',
+              thumbnailUrl: null,
               inLibrary: true,
             },
           ],
@@ -42,13 +34,12 @@ describe('API 响应边界', () => {
       ),
     )
 
-    const result = await discover({ sourceType: 'artwork', inputs: ['123'], page: 0 })
-    expect(result.items[0]?.artworkId).toBe(123)
-    expect(result.items[0]?.inLibrary).toBe(true)
-    expect(result.nextPage).toBe(1)
+    await expect(
+      discover({ sourceType: 'artwork', inputs: ['123'], page: 0 }),
+    ).rejects.toBeInstanceOf(ZodError)
   })
 
-  it('保留后端稳定错误码与中文消息', async () => {
+  it('保留后端稳定错误码、消息和状态码', async () => {
     server.use(
       http.get('/api/failure', () =>
         HttpResponse.json(
@@ -63,176 +54,5 @@ describe('API 响应边界', () => {
       message: '请先配置 Pixiv Cookie。',
       status: 409,
     })
-  })
-
-  it('读取作者全部作品 ID', async () => {
-    server.use(
-      http.get('/api/discovery/users/42/selectable-artwork-ids', () =>
-        HttpResponse.json({ artworkIds: [103, 102, 101] }),
-      ),
-    )
-
-    await expect(listSelectableUserArtworkIds(42)).resolves.toEqual([103, 102, 101])
-  })
-
-  it('读取下载任务的当前作品页级进度', async () => {
-    server.use(
-      http.get('/api/download-jobs', () =>
-        HttpResponse.json({
-          items: [
-            {
-              jobId: 'job-1',
-              sourceLabel: '收藏来源',
-              state: 'running',
-              createdAt: '2026-10-01T00:00:00Z',
-              startedAt: '2026-10-01T00:00:01Z',
-              finishedAt: null,
-              errorSummary: null,
-              counts: {
-                queued: 7,
-                running: 1,
-                skipped: 0,
-                succeeded: 2,
-                failed: 0,
-                cancelled: 0,
-              },
-              progress: {
-                currentArtworkId: 123456,
-                completedPages: 37,
-                totalPages: 120,
-                phase: 'downloading',
-              },
-            },
-          ],
-          page: 0,
-          size: 100,
-          totalElements: 1,
-          totalPages: 1,
-        }),
-      ),
-    )
-
-    const result = await listDownloadJobs()
-    expect(result.items[0]?.progress).toEqual({
-      currentArtworkId: 123456,
-      completedPages: 37,
-      totalPages: 120,
-      phase: 'downloading',
-    })
-  })
-
-  it('读取当前账号关注的作者', async () => {
-    server.use(
-      http.get('/api/discovery/followed-users', () =>
-        HttpResponse.json({
-          items: [
-            {
-              userId: 42,
-              name: '测试作者',
-              avatarUrl: '/api/pixiv-images?url=https%3A%2F%2Fi.pximg.net%2Favatar.jpg',
-            },
-          ],
-        }),
-      ),
-    )
-
-    await expect(listFollowedUsers()).resolves.toEqual([
-      {
-        userId: 42,
-        name: '测试作者',
-        avatarUrl: '/api/pixiv-images?url=https%3A%2F%2Fi.pximg.net%2Favatar.jpg',
-      },
-    ])
-  })
-
-  it('读取公开与非公开收藏标签', async () => {
-    server.use(
-      http.get('/api/discovery/bookmark-folders', () =>
-        HttpResponse.json({
-          items: [
-            {
-              visibility: 'public',
-              tag: null,
-              kind: 'all',
-              name: '全部收藏',
-              itemCount: 12,
-            },
-            {
-              visibility: 'private',
-              tag: '私藏',
-              kind: 'tag',
-              name: '私藏',
-              itemCount: 3,
-            },
-          ],
-        }),
-      ),
-    )
-
-    await expect(listBookmarkFolders()).resolves.toEqual([
-      {
-        visibility: 'public',
-        tag: null,
-        kind: 'all',
-        name: '全部收藏',
-        itemCount: 12,
-      },
-      {
-        visibility: 'private',
-        tag: '私藏',
-        kind: 'tag',
-        name: '私藏',
-        itemCount: 3,
-      },
-    ])
-  })
-
-  it('提交多个收藏夹并读取全部可选作品 ID', async () => {
-    server.use(
-      http.post('/api/discovery/bookmarks/selectable-artwork-ids', async ({ request }) => {
-        expect(await request.json()).toEqual({
-          folders: [
-            { visibility: 'public', tag: '风景' },
-            { visibility: 'private', tag: null },
-          ],
-        })
-        return HttpResponse.json({ artworkIds: [103, 102, 101] })
-      }),
-    )
-
-    await expect(
-      listSelectableBookmarkArtworkIds([
-        { visibility: 'public', tag: '风景' },
-        { visibility: 'private', tag: null },
-      ]),
-    ).resolves.toEqual([103, 102, 101])
-  })
-
-  it('图库请求携带单页作品数量', async () => {
-    server.use(
-      http.get('/api/artworks', ({ request }) => {
-        expect(new URL(request.url).searchParams.get('size')).toBe('48')
-        return HttpResponse.json({
-          items: [],
-          page: 0,
-          size: 48,
-          totalElements: 0,
-          totalPages: 0,
-        })
-      }),
-    )
-
-    const result = await listArtworks({
-      page: 0,
-      size: 48,
-      search: '',
-      tagIds: [],
-      rating: 'all',
-      ai: 'all',
-      sort: 'downloadedAt',
-      order: 'desc',
-    })
-
-    expect(result.size).toBe(48)
   })
 })

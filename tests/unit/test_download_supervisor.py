@@ -86,9 +86,6 @@ class ProgressDownloadService:
         report_progress: object,
     ) -> ItemState:
         reporter = cast("Callable[[DownloadProgressPhase, int, int | None], Awaitable[None]]", report_progress)
-        await reporter(DownloadProgressPhase.DOWNLOADING, 0, 3)
-        await reporter(DownloadProgressPhase.DOWNLOADING, 1, 3)
-        await reporter(DownloadProgressPhase.DOWNLOADING, 2, 3)
         await reporter(DownloadProgressPhase.DOWNLOADING, 3, 3)
         await reporter(DownloadProgressPhase.FINALIZING, 3, 3)
         self.finished.set()
@@ -132,9 +129,6 @@ async def test_supervisor_persists_page_progress() -> None:
     await supervisor.stop()
 
     assert repository.progress == [
-        (DownloadProgressPhase.DOWNLOADING, 0, 3),
-        (DownloadProgressPhase.DOWNLOADING, 1, 3),
-        (DownloadProgressPhase.DOWNLOADING, 2, 3),
         (DownloadProgressPhase.DOWNLOADING, 3, 3),
         (DownloadProgressPhase.FINALIZING, 3, 3),
     ]

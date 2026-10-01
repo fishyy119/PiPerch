@@ -1,23 +1,13 @@
 import { createPinia, setActivePinia } from 'pinia'
 
-import type { DiscoveryItem } from '@/features/downloads/download-api'
 import { useDownloadSelection } from '@/features/downloads/download-selection'
 
-const first: DiscoveryItem = {
-  artworkId: 100,
-  title: '第一张图',
-  authorName: '作者',
-  artworkType: 'illust',
-  pageCount: 1,
-  xRestrict: 0,
-  isAi: false,
-  thumbnailUrl: null,
-  inLibrary: false,
-}
+import { discoveryItem } from './fixtures'
 
-const second: DiscoveryItem = { ...first, artworkId: 200, title: '第二张图' }
-const third: DiscoveryItem = { ...first, artworkId: 300, title: '第三张图' }
-const fourth: DiscoveryItem = { ...first, artworkId: 400, title: '第四张图' }
+const first = discoveryItem(100, { title: '第一张图' })
+const second = discoveryItem(200, { title: '第二张图' })
+const third = discoveryItem(300, { title: '第三张图' })
+const fourth = discoveryItem(400, { title: '第四张图' })
 
 describe('下载候选选择', () => {
   beforeEach(() => setActivePinia(createPinia()))

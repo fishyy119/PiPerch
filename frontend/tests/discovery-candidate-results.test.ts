@@ -2,20 +2,15 @@ import userEvent from '@testing-library/user-event'
 import { render, screen } from '@testing-library/vue'
 import { vi } from 'vitest'
 
-import type { DiscoveryItem } from '@/features/downloads/download-api'
 import DiscoveryCandidateResults from '@/pages/downloads/DiscoveryCandidateResults.vue'
 
-const candidate: DiscoveryItem = {
-  artworkId: 123,
+import { discoveryItem } from './fixtures'
+
+const candidate = discoveryItem(123, {
   title: '测试作品',
-  authorName: '测试作者',
-  artworkType: 'illust',
-  pageCount: 1,
-  xRestrict: 0,
-  isAi: false,
   thumbnailUrl: '/api/pixiv-images?url=https%3A%2F%2Fi.pximg.net%2Fexample.jpg',
   inLibrary: true,
-}
+})
 
 describe('候选作品显示', () => {
   it('仅允许勾选尚未入库的候选作品', async () => {
