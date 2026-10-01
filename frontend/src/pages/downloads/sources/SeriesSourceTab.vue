@@ -30,7 +30,6 @@ const { candidates, page, nextPage, emptyMessage, mutation, loadPage } = useDisc
     :empty-message="emptyMessage"
     @load-page="loadPage"
   >
-    <template #tabs><slot name="tabs" /></template>
     <template #source>
       <form class="flex flex-col gap-3 sm:flex-row" @submit.prevent="loadPage(0)">
         <Input v-model="sourceInput" class="flex-1" placeholder="插画系列 ID" />

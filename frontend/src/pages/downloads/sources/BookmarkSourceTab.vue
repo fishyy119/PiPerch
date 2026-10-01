@@ -237,7 +237,6 @@ onBeforeUnmount(() => {
     :empty-message="emptyMessage"
     @load-page="bookmarkPageMutation.mutate"
   >
-    <template #tabs><slot name="tabs" /></template>
     <template #source>
       <div v-if="showFolders">
         <p

@@ -163,12 +163,12 @@ describe('收藏下载来源', () => {
       },
     })
 
-    await user.click(screen.getByRole('button', { name: '收藏' }))
+    await user.click(screen.getByRole('tab', { name: '收藏' }))
     expect(await screen.findByRole('button', { name: /风景/u })).toBeInTheDocument()
     expect(bookmarkFolderRequests).toBe(1)
 
-    await user.click(screen.getByRole('button', { name: '用户' }))
-    await user.click(screen.getByRole('button', { name: '收藏' }))
+    await user.click(screen.getByRole('tab', { name: '用户' }))
+    await user.click(screen.getByRole('tab', { name: '收藏' }))
     expect(await screen.findByRole('button', { name: /风景/u })).toBeInTheDocument()
     expect(bookmarkFolderRequests).toBe(1)
 
@@ -188,9 +188,15 @@ describe('收藏下载来源', () => {
     })
 
     const sourceTabs = ['作品', '用户', '收藏', '系列'].map((name) =>
-      screen.getByRole('button', { name }),
+      screen.getByRole('tab', { name }),
     )
     expect(sourceTabs.map((button) => button.textContent)).toEqual(['作品', '用户', '收藏', '系列'])
+    const artworkTab = sourceTabs[0]
+    const userTab = sourceTabs[1]
+    if (!artworkTab || !userTab) throw new Error('缺少作品或用户来源标签。')
+    artworkTab.focus()
+    await user.keyboard('{ArrowRight}')
+    expect(userTab).toHaveAttribute('aria-selected', 'true')
 
     const bookmarkTab = sourceTabs[2]
     if (!bookmarkTab) throw new Error('缺少收藏来源标签。')

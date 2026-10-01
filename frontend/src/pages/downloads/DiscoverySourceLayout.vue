@@ -39,7 +39,6 @@ function togglePage() {
 <template>
   <div class="space-y-4">
     <Card class="p-5">
-      <slot name="tabs" />
       <slot name="source" />
     </Card>
 

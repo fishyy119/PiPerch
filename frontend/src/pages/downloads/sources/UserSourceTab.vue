@@ -105,7 +105,6 @@ function toggleAllWorks() {
     :empty-message="emptyMessage"
     @load-page="loadPage"
   >
-    <template #tabs><slot name="tabs" /></template>
     <template #source>
       <form class="flex flex-col gap-3 sm:flex-row" @submit.prevent="preview">
         <Input v-model="sourceInput" class="flex-1" placeholder="用户 ID" />
