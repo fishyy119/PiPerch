@@ -25,6 +25,22 @@ export const followedUserSchema = z.object({
 })
 export type FollowedUser = z.infer<typeof followedUserSchema>
 
+export const bookmarkVisibilitySchema = z.enum(['public', 'private'])
+export type BookmarkVisibility = z.infer<typeof bookmarkVisibilitySchema>
+
+export const bookmarkFolderReferenceSchema = z.object({
+  visibility: bookmarkVisibilitySchema,
+  tag: z.string().nullable(),
+})
+export type BookmarkFolderReference = z.infer<typeof bookmarkFolderReferenceSchema>
+
+export const bookmarkFolderSchema = bookmarkFolderReferenceSchema.extend({
+  kind: z.enum(['all', 'uncategorized', 'tag']),
+  name: z.string(),
+  itemCount: z.number().int().nonnegative(),
+})
+export type BookmarkFolder = z.infer<typeof bookmarkFolderSchema>
+
 const discoveryResponseSchema = z.object({
   items: z.array(discoveryItemSchema),
   page: z.number().int().nonnegative(),
@@ -72,6 +88,7 @@ const jobPageSchema = z.object({
 export type DiscoveryRequest =
   | { sourceType: 'artwork'; inputs: string[]; page: number }
   | { sourceType: 'user'; userId: number; page: number }
+  | { sourceType: 'bookmark'; folder: BookmarkFolderReference; page: number }
   | { sourceType: 'series'; seriesId: number; page: number }
 
 export async function discover(request: DiscoveryRequest) {
@@ -87,6 +104,18 @@ export async function listSelectableUserArtworkIds(userId: number) {
 export async function listFollowedUsers() {
   const schema = z.object({ items: z.array(followedUserSchema) })
   return schema.parse(await api.get<unknown>('/api/discovery/followed-users')).items
+}
+
+export async function listBookmarkFolders() {
+  const schema = z.object({ items: z.array(bookmarkFolderSchema) })
+  return schema.parse(await api.get<unknown>('/api/discovery/bookmark-folders')).items
+}
+
+export async function listSelectableBookmarkArtworkIds(folders: BookmarkFolderReference[]) {
+  const schema = z.object({ artworkIds: z.array(z.number().int().positive()) })
+  return schema.parse(
+    await api.post<unknown>('/api/discovery/bookmarks/selectable-artwork-ids', { folders }),
+  ).artworkIds
 }
 
 export async function createDownloadJob(artworkIds: number[], sourceLabel: string) {

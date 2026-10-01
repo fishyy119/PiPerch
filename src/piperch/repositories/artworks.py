@@ -65,9 +65,13 @@ class ArtworkRepository:
         unique_ids = tuple(dict.fromkeys(artwork_ids))
         if not unique_ids:
             return set()
+        existing_ids: set[int] = set()
         with self._database.connect() as connection:
-            rows = connection.scalars(select(artworks.c.id).where(artworks.c.id.in_(unique_ids)))
-            return {int(artwork_id) for artwork_id in rows}
+            for start in range(0, len(unique_ids), 900):
+                batch = unique_ids[start : start + 900]
+                rows = connection.scalars(select(artworks.c.id).where(artworks.c.id.in_(batch)))
+                existing_ids.update(int(artwork_id) for artwork_id in rows)
+        return existing_ids
 
     def is_complete(self, artwork_id: int, library_root: Path) -> bool:
         with self._database.connect() as connection:

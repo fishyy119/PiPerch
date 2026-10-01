@@ -4,7 +4,7 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from piperch.domain import ArtworkType, ItemState, JobState
+from piperch.domain import ArtworkType, BookmarkFolderKind, BookmarkVisibility, ItemState, JobState
 from piperch.utils.urls import normalize_proxy_url
 
 
@@ -83,8 +83,19 @@ class SeriesDiscoveryRequest(ApiModel):
     page: int = Field(default=0, ge=0)
 
 
+class BookmarkFolderReference(ApiModel):
+    visibility: BookmarkVisibility
+    tag: str | None = Field(default=None, max_length=100)
+
+
+class BookmarkDiscoveryRequest(ApiModel):
+    source_type: Literal["bookmark"]
+    folder: BookmarkFolderReference
+    page: int = Field(default=0, ge=0)
+
+
 DiscoveryRequest = Annotated[
-    ArtworkDiscoveryRequest | UserDiscoveryRequest | SeriesDiscoveryRequest,
+    ArtworkDiscoveryRequest | UserDiscoveryRequest | SeriesDiscoveryRequest | BookmarkDiscoveryRequest,
     Field(discriminator="source_type"),
 ]
 
@@ -109,6 +120,31 @@ class DiscoveryResponse(ApiModel):
 
 class UserArtworkIdsResponse(ApiModel):
     artwork_ids: list[int]
+
+
+class BookmarkFolderResponse(BookmarkFolderReference):
+    kind: BookmarkFolderKind
+    name: str
+    item_count: int
+
+
+class BookmarkFoldersResponse(ApiModel):
+    items: list[BookmarkFolderResponse]
+
+
+class BookmarkArtworkIdsRequest(ApiModel):
+    folders: list[BookmarkFolderReference] = Field(min_length=1, max_length=1000)
+
+    @field_validator("folders")
+    @classmethod
+    def deduplicate_folders(
+        cls,
+        folders: list[BookmarkFolderReference],
+    ) -> list[BookmarkFolderReference]:
+        unique: dict[tuple[BookmarkVisibility, str | None], BookmarkFolderReference] = {}
+        for folder in folders:
+            unique.setdefault((folder.visibility, folder.tag), folder)
+        return list(unique.values())
 
 
 class FollowedUserResponse(ApiModel):

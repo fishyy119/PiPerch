@@ -4,7 +4,18 @@ from typing import TYPE_CHECKING
 
 import httpx
 
-from piperch.domain import ArtworkType, DiscoveryCandidate, FollowedUser, RemoteArtwork, TagRecord, UgoiraFrame
+from piperch.domain import (
+    ArtworkType,
+    BookmarkFolder,
+    BookmarkFolderKind,
+    BookmarkFolderReference,
+    BookmarkVisibility,
+    DiscoveryCandidate,
+    FollowedUser,
+    RemoteArtwork,
+    TagRecord,
+    UgoiraFrame,
+)
 from piperch.errors import UpstreamError
 from piperch.pixiv.parsing import (
     artwork_type as _artwork_type,
@@ -33,7 +44,7 @@ from piperch.pixiv.parsing import (
 from piperch.pixiv.transport import PixivTransport
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    from collections.abc import Mapping, Sequence
     from pathlib import Path
 
 
@@ -173,6 +184,153 @@ class PixivClient:
             else:
                 raise UpstreamError("following_too_many_pages", "关注作者分页数量超出安全上限。")
         return list(followed.values())
+
+    async def list_bookmark_folders(self, cookie: str | None) -> list[BookmarkFolder]:
+        """读取当前账号公开与非公开的插画收藏标签。"""
+        user_id = self._require_current_user_id(cookie)
+        tag_groups = _mapping(
+            await self._transport.get_body(
+                f"/ajax/user/{user_id}/illusts/bookmark/tags",
+                cookie=cookie,
+                params={"lang": "zh"},
+            )
+        )
+        folders: list[BookmarkFolder] = []
+        for visibility in (BookmarkVisibility.PUBLIC, BookmarkVisibility.PRIVATE):
+            body = await self._bookmark_page(
+                user_id,
+                BookmarkFolderReference(visibility, None),
+                0,
+                1,
+                cookie,
+            )
+            folders.append(
+                BookmarkFolder(
+                    reference=BookmarkFolderReference(visibility, None),
+                    kind=BookmarkFolderKind.ALL,
+                    name="全部收藏",
+                    item_count=max(0, _integer(body.get("total"))),
+                )
+            )
+
+            tags: list[tuple[str, int]] = []
+            group_name = "public" if visibility is BookmarkVisibility.PUBLIC else "private"
+            for raw_tag in _sequence(tag_groups.get(group_name)):
+                tag = _mapping(raw_tag)
+                name = _text(tag.get("tag")) or _text(tag.get("name"))
+                if name:
+                    count = _integer(tag.get("cnt"), _integer(tag.get("count")))
+                    tags.append((name, max(0, count)))
+
+            uncategorized = next(
+                ((name, count) for name, count in tags if name in {"未分類", "未分类"}),
+                ("未分類", 0),
+            )
+            folders.append(
+                BookmarkFolder(
+                    reference=BookmarkFolderReference(visibility, uncategorized[0]),
+                    kind=BookmarkFolderKind.UNCATEGORIZED,
+                    name="未分类",
+                    item_count=uncategorized[1],
+                )
+            )
+            folders.extend(
+                BookmarkFolder(
+                    reference=BookmarkFolderReference(visibility, name),
+                    kind=BookmarkFolderKind.TAG,
+                    name=name,
+                    item_count=count,
+                )
+                for name, count in tags
+                if name not in {"未分類", "未分类"}
+            )
+        return folders
+
+    async def discover_bookmarks(
+        self,
+        folder: BookmarkFolderReference,
+        page: int,
+        cookie: str | None,
+        *,
+        page_size: int = 48,
+    ) -> tuple[list[DiscoveryCandidate], int | None]:
+        """按收藏标签读取当前账号的一页插画收藏。"""
+        user_id = self._require_current_user_id(cookie)
+        offset = page * page_size
+        body = await self._bookmark_page(user_id, folder, offset, page_size, cookie)
+        works = _sequence(body.get("works"))
+        candidates = [
+            candidate_from_mapping(work)
+            for raw_work in works
+            if (work := _mapping(raw_work)) and _integer(work.get("id")) > 0
+        ]
+        total = max(0, _integer(body.get("total")))
+        next_page = page + 1 if works and (not total or offset + len(works) < total) else None
+        return candidates, next_page
+
+    async def list_bookmark_artwork_ids(
+        self,
+        folders: Sequence[BookmarkFolderReference],
+        cookie: str | None,
+        *,
+        page_size: int = 100,
+    ) -> list[int]:
+        """按收藏夹顺序读取全部作品 ID，并在跨标签时去重。"""
+        user_id = self._require_current_user_id(cookie)
+        artwork_ids: dict[int, None] = {}
+        for folder in folders:
+            offset = 0
+            for _ in range(1000):
+                body = await self._bookmark_page(user_id, folder, offset, page_size, cookie)
+                works = _sequence(body.get("works"))
+                for raw_work in works:
+                    artwork_id = _integer(_mapping(raw_work).get("id"))
+                    if artwork_id > 0:
+                        artwork_ids.setdefault(artwork_id, None)
+                total = max(0, _integer(body.get("total")))
+                offset += len(works)
+                if not works or (total > 0 and offset >= total):
+                    break
+            else:
+                raise UpstreamError(
+                    "bookmark_too_many_pages",
+                    "收藏分页数量超出安全上限。",
+                )
+        return list(artwork_ids)
+
+    @staticmethod
+    def _require_current_user_id(cookie: str | None) -> int:
+        user_id = parse_pixiv_user_id(cookie)
+        if user_id is None:
+            raise UpstreamError(
+                "pixiv_cookie_required",
+                "请先在设置中保存包含 PHPSESSID 的 Pixiv Cookie。",
+                401,
+            )
+        return user_id
+
+    async def _bookmark_page(
+        self,
+        user_id: int,
+        folder: BookmarkFolderReference,
+        offset: int,
+        limit: int,
+        cookie: str | None,
+    ) -> Mapping[str, object]:
+        rest = "show" if folder.visibility is BookmarkVisibility.PUBLIC else "hide"
+        return _mapping(
+            await self._transport.get_body(
+                f"/ajax/user/{user_id}/illusts/bookmarks",
+                cookie=cookie,
+                params={
+                    "tag": folder.tag or "",
+                    "offset": max(0, offset),
+                    "limit": max(1, min(100, limit)),
+                    "rest": rest,
+                    "lang": "zh",
+                },
+            )
+        )
 
     async def discover_series(
         self,

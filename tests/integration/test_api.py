@@ -4,7 +4,18 @@ import json
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from piperch.domain import ArtworkType, DiscoveryCandidate, FollowedUser, MediaRecord, RemoteArtwork, TagRecord
+from piperch.domain import (
+    ArtworkType,
+    BookmarkFolder,
+    BookmarkFolderKind,
+    BookmarkFolderReference,
+    BookmarkVisibility,
+    DiscoveryCandidate,
+    FollowedUser,
+    MediaRecord,
+    RemoteArtwork,
+    TagRecord,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -63,6 +74,138 @@ def test_followed_users_returns_safe_author_fields(
             }
         ]
     }
+
+
+def test_bookmark_folders_keep_visibility_and_special_kind(
+    app_client: tuple[ApiTestClient, AppContainer],
+    monkeypatch: MonkeyPatch,
+) -> None:
+    client, container = app_client
+
+    async def list_bookmark_folders(cookie: str | None) -> list[BookmarkFolder]:
+        assert cookie is None
+        return [
+            BookmarkFolder(
+                BookmarkFolderReference(BookmarkVisibility.PUBLIC, None),
+                BookmarkFolderKind.ALL,
+                "全部收藏",
+                12,
+            ),
+            BookmarkFolder(
+                BookmarkFolderReference(BookmarkVisibility.PRIVATE, "私藏"),
+                BookmarkFolderKind.TAG,
+                "私藏",
+                3,
+            ),
+        ]
+
+    monkeypatch.setattr(container.pixiv, "list_bookmark_folders", list_bookmark_folders)
+
+    response = client.get("/api/discovery/bookmark-folders")
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "items": [
+            {
+                "visibility": "public",
+                "tag": None,
+                "kind": "all",
+                "name": "全部收藏",
+                "itemCount": 12,
+            },
+            {
+                "visibility": "private",
+                "tag": "私藏",
+                "kind": "tag",
+                "name": "私藏",
+                "itemCount": 3,
+            },
+        ]
+    }
+
+
+def test_bookmark_discovery_marks_existing_artworks(
+    app_client: tuple[ApiTestClient, AppContainer],
+    monkeypatch: MonkeyPatch,
+) -> None:
+    client, container = app_client
+
+    async def discover_bookmarks(
+        folder: BookmarkFolderReference,
+        page: int,
+        cookie: str | None,
+    ) -> tuple[list[DiscoveryCandidate], int | None]:
+        assert folder == BookmarkFolderReference(BookmarkVisibility.PRIVATE, "私藏")
+        assert page == 0
+        assert cookie is None
+        return (
+            [
+                DiscoveryCandidate(101, "已有作品", "作者", ArtworkType.ILLUST, 1, 0, False, None),
+                DiscoveryCandidate(102, "收藏作品", "作者", ArtworkType.MANGA, 2, 0, False, None),
+            ],
+            1,
+        )
+
+    def find_existing_ids(artwork_ids: Sequence[int]) -> set[int]:
+        assert artwork_ids == [101, 102]
+        return {101}
+
+    monkeypatch.setattr(container.pixiv, "discover_bookmarks", discover_bookmarks)
+    monkeypatch.setattr(container.artworks, "find_existing_ids", find_existing_ids)
+
+    response = client.post(
+        "/api/discovery",
+        json={
+            "sourceType": "bookmark",
+            "folder": {"visibility": "private", "tag": "私藏"},
+            "page": 0,
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["page"] == 0
+    assert payload["nextPage"] == 1
+    assert [item["inLibrary"] for item in payload["items"]] == [True, False]
+
+
+def test_selectable_bookmark_artwork_ids_deduplicates_request_and_excludes_existing(
+    app_client: tuple[ApiTestClient, AppContainer],
+    monkeypatch: MonkeyPatch,
+) -> None:
+    client, container = app_client
+
+    async def list_bookmark_artwork_ids(
+        folders: Sequence[BookmarkFolderReference],
+        cookie: str | None,
+    ) -> list[int]:
+        assert folders == [
+            BookmarkFolderReference(BookmarkVisibility.PUBLIC, "风景"),
+            BookmarkFolderReference(BookmarkVisibility.PRIVATE, None),
+        ]
+        assert cookie is None
+        return [103, 102, 101]
+
+    def find_existing_bookmark_ids(artwork_ids: Sequence[int]) -> set[int]:
+        assert artwork_ids == [103, 102, 101]
+        return {102}
+
+    monkeypatch.setattr(container.pixiv, "list_bookmark_artwork_ids", list_bookmark_artwork_ids)
+    monkeypatch.setattr(container.artworks, "find_existing_ids", find_existing_bookmark_ids)
+
+    response = client.post(
+        "/api/discovery/bookmarks/selectable-artwork-ids",
+        json={
+            "folders": [
+                {"visibility": "public", "tag": "风景"},
+                {"visibility": "public", "tag": "风景"},
+                {"visibility": "private", "tag": None},
+            ]
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {"artworkIds": [103, 101]}
 
 
 def test_discovery_marks_artwork_already_in_library(

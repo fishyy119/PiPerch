@@ -3,7 +3,9 @@ import { setupServer } from 'msw/node'
 
 import {
   discover,
+  listBookmarkFolders,
   listFollowedUsers,
+  listSelectableBookmarkArtworkIds,
   listSelectableUserArtworkIds,
 } from '@/features/downloads/download-api'
 import { listArtworks } from '@/features/gallery/gallery-api'
@@ -94,6 +96,69 @@ describe('API 响应边界', () => {
         avatarUrl: '/api/pixiv-images?url=https%3A%2F%2Fi.pximg.net%2Favatar.jpg',
       },
     ])
+  })
+
+  it('读取公开与非公开收藏标签', async () => {
+    server.use(
+      http.get('/api/discovery/bookmark-folders', () =>
+        HttpResponse.json({
+          items: [
+            {
+              visibility: 'public',
+              tag: null,
+              kind: 'all',
+              name: '全部收藏',
+              itemCount: 12,
+            },
+            {
+              visibility: 'private',
+              tag: '私藏',
+              kind: 'tag',
+              name: '私藏',
+              itemCount: 3,
+            },
+          ],
+        }),
+      ),
+    )
+
+    await expect(listBookmarkFolders()).resolves.toEqual([
+      {
+        visibility: 'public',
+        tag: null,
+        kind: 'all',
+        name: '全部收藏',
+        itemCount: 12,
+      },
+      {
+        visibility: 'private',
+        tag: '私藏',
+        kind: 'tag',
+        name: '私藏',
+        itemCount: 3,
+      },
+    ])
+  })
+
+  it('提交多个收藏夹并读取全部可选作品 ID', async () => {
+    server.use(
+      http.post('/api/discovery/bookmarks/selectable-artwork-ids', async ({ request }) => {
+        expect(await request.json()).toEqual({
+          folders: [
+            { visibility: 'public', tag: '风景' },
+            { visibility: 'private', tag: null },
+          ],
+        })
+        return HttpResponse.json({ artworkIds: [103, 102, 101] })
+      }),
+    )
+
+    await expect(
+      listSelectableBookmarkArtworkIds([
+        { visibility: 'public', tag: '风景' },
+        { visibility: 'private', tag: null },
+      ]),
+    ).resolves.toEqual([103, 102, 101])
   })
 
   it('图库请求携带单页作品数量', async () => {

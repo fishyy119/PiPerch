@@ -14,6 +14,17 @@ class ArtworkType(StrEnum):
     UGOIRA = "ugoira"
 
 
+class BookmarkVisibility(StrEnum):
+    PUBLIC = "public"
+    PRIVATE = "private"
+
+
+class BookmarkFolderKind(StrEnum):
+    ALL = "all"
+    UNCATEGORIZED = "uncategorized"
+    TAG = "tag"
+
+
 class JobState(StrEnum):
     QUEUED = "queued"
     RUNNING = "running"
@@ -106,6 +117,20 @@ class FollowedUser:
     user_id: int
     name: str
     avatar_url: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class BookmarkFolderReference:
+    visibility: BookmarkVisibility
+    tag: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class BookmarkFolder:
+    reference: BookmarkFolderReference
+    kind: BookmarkFolderKind
+    name: str
+    item_count: int
 
 
 @dataclass(frozen=True, slots=True)

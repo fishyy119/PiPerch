@@ -6,6 +6,7 @@ import httpx
 import pytest
 import respx
 
+from piperch.domain import BookmarkFolderKind, BookmarkFolderReference, BookmarkVisibility
 from piperch.errors import UpstreamError
 from piperch.pixiv import PixivClient, parse_artwork_ids, parse_pixiv_user_id
 
@@ -242,6 +243,213 @@ async def test_list_followed_users_requires_phpsessid() -> None:
     try:
         with pytest.raises(UpstreamError, match="PHPSESSID"):
             await client.list_followed_users("foo=bar")
+    finally:
+        await client.close()
+
+
+@pytest.mark.asyncio
+async def test_list_bookmark_folders_keeps_public_and_private_tags_separate() -> None:
+    common_params = {"tag": "", "offset": 0, "limit": 1, "lang": "zh"}
+    with respx.mock(assert_all_called=True) as router:
+        router.get(
+            "https://www.pixiv.net/ajax/user/42/illusts/bookmark/tags",
+            params={"lang": "zh"},
+        ).mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "error": False,
+                    "body": {
+                        "public": [
+                            {"tag": "未分類", "cnt": 1},
+                            {"tag": "风景", "cnt": 2},
+                        ],
+                        "private": [{"tag": "私藏", "cnt": 2}],
+                    },
+                },
+            )
+        )
+        router.get(
+            "https://www.pixiv.net/ajax/user/42/illusts/bookmarks",
+            params={**common_params, "rest": "show"},
+        ).mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "error": False,
+                    "body": {
+                        "total": 3,
+                        "works": [],
+                    },
+                },
+            )
+        )
+        router.get(
+            "https://www.pixiv.net/ajax/user/42/illusts/bookmarks",
+            params={**common_params, "rest": "hide"},
+        ).mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "error": False,
+                    "body": {
+                        "total": 2,
+                        "works": [],
+                    },
+                },
+            )
+        )
+        client = PixivClient(proxy_url=None, request_interval_ms=0)
+        try:
+            folders = await client.list_bookmark_folders("PHPSESSID=42_secret")
+        finally:
+            await client.close()
+
+    assert [folder.reference.visibility for folder in folders] == [
+        BookmarkVisibility.PUBLIC,
+        BookmarkVisibility.PUBLIC,
+        BookmarkVisibility.PUBLIC,
+        BookmarkVisibility.PRIVATE,
+        BookmarkVisibility.PRIVATE,
+        BookmarkVisibility.PRIVATE,
+    ]
+    assert [(folder.kind, folder.name, folder.item_count) for folder in folders] == [
+        (BookmarkFolderKind.ALL, "全部收藏", 3),
+        (BookmarkFolderKind.UNCATEGORIZED, "未分类", 1),
+        (BookmarkFolderKind.TAG, "风景", 2),
+        (BookmarkFolderKind.ALL, "全部收藏", 2),
+        (BookmarkFolderKind.UNCATEGORIZED, "未分类", 0),
+        (BookmarkFolderKind.TAG, "私藏", 2),
+    ]
+
+
+@pytest.mark.asyncio
+async def test_discover_bookmarks_uses_visibility_tag_and_page() -> None:
+    with respx.mock(assert_all_called=True) as router:
+        route = router.get(
+            "https://www.pixiv.net/ajax/user/42/illusts/bookmarks",
+            params={
+                "tag": "风景",
+                "offset": 2,
+                "limit": 2,
+                "rest": "hide",
+                "lang": "zh",
+            },
+        ).mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "error": False,
+                    "body": {
+                        "total": 5,
+                        "works": [
+                            {
+                                "id": "103",
+                                "title": "收藏作品",
+                                "illustType": 1,
+                                "pageCount": 3,
+                                "xRestrict": 1,
+                                "aiType": 2,
+                                "userName": "作者",
+                                "url": "https://i.pximg.net/103.jpg",
+                            },
+                            {"id": "102", "title": "另一作品", "userName": "作者"},
+                        ],
+                    },
+                },
+            )
+        )
+        client = PixivClient(proxy_url=None, request_interval_ms=0)
+        try:
+            candidates, next_page = await client.discover_bookmarks(
+                BookmarkFolderReference(BookmarkVisibility.PRIVATE, "风景"),
+                1,
+                "PHPSESSID=42_secret",
+                page_size=2,
+            )
+        finally:
+            await client.close()
+
+    assert route.call_count == 1
+    assert [candidate.artwork_id for candidate in candidates] == [103, 102]
+    assert candidates[0].page_count == 3
+    assert candidates[0].is_ai is True
+    assert next_page == 2
+
+
+@pytest.mark.asyncio
+async def test_list_bookmark_artwork_ids_pages_and_deduplicates_folders() -> None:
+    common_url = "https://www.pixiv.net/ajax/user/42/illusts/bookmarks"
+    with respx.mock(assert_all_called=True) as router:
+        router.get(
+            common_url,
+            params={"tag": "风景", "offset": 0, "limit": 2, "rest": "show", "lang": "zh"},
+        ).mock(
+            return_value=httpx.Response(
+                200,
+                json={"error": False, "body": {"total": 3, "works": [{"id": "3"}, {"id": "2"}]}},
+            )
+        )
+        router.get(
+            common_url,
+            params={"tag": "风景", "offset": 2, "limit": 2, "rest": "show", "lang": "zh"},
+        ).mock(
+            return_value=httpx.Response(
+                200,
+                json={"error": False, "body": {"total": 3, "works": [{"id": "1"}]}},
+            )
+        )
+        router.get(
+            common_url,
+            params={"tag": "私藏", "offset": 0, "limit": 2, "rest": "hide", "lang": "zh"},
+        ).mock(
+            return_value=httpx.Response(
+                200,
+                json={"error": False, "body": {"total": 2, "works": [{"id": "2"}, {"id": "4"}]}},
+            )
+        )
+        client = PixivClient(proxy_url=None, request_interval_ms=0)
+        try:
+            artwork_ids = await client.list_bookmark_artwork_ids(
+                [
+                    BookmarkFolderReference(BookmarkVisibility.PUBLIC, "风景"),
+                    BookmarkFolderReference(BookmarkVisibility.PRIVATE, "私藏"),
+                ],
+                "PHPSESSID=42_secret",
+                page_size=2,
+            )
+        finally:
+            await client.close()
+
+    assert artwork_ids == [3, 2, 1, 4]
+
+
+@pytest.mark.asyncio
+async def test_bookmark_operations_require_phpsessid() -> None:
+    client = PixivClient(proxy_url=None, request_interval_ms=0)
+    try:
+        with pytest.raises(UpstreamError, match="PHPSESSID"):
+            await client.list_bookmark_folders("foo=bar")
+    finally:
+        await client.close()
+
+
+@pytest.mark.asyncio
+async def test_list_bookmark_artwork_ids_rejects_more_than_safety_limit(
+    monkeypatch: MonkeyPatch,
+) -> None:
+    async def endless_page(*_args: object, **_kwargs: object) -> dict[str, object]:
+        return {"total": 100_001, "works": [{"id": "1"}]}
+
+    client = PixivClient(proxy_url=None, request_interval_ms=0)
+    monkeypatch.setattr(client, "_bookmark_page", endless_page)
+    try:
+        with pytest.raises(UpstreamError, match="安全上限"):
+            await client.list_bookmark_artwork_ids(
+                [BookmarkFolderReference(BookmarkVisibility.PUBLIC, None)],
+                "PHPSESSID=42_secret",
+                page_size=100,
+            )
     finally:
         await client.close()
 
