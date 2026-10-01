@@ -142,6 +142,7 @@ async function loadBookmarkPage(targetPage: number) {
     if (currentPreviewVersion !== previewVersion.value) return
     stream.nextPage = result.nextPage
     streamCursor.value = (streamIndex + 1) % streams.value.length
+    selection.remember(result.items)
     selection.removeAll(result.items.filter((item) => item.inLibrary))
 
     const nextSeenIds = new Set(seenIds.value)

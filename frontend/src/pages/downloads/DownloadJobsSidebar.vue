@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { Download, RefreshCw } from '@lucide/vue'
+import { ChevronDown, ChevronUp, Download, ImageOff, LoaderCircle, RefreshCw, X } from '@lucide/vue'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query'
-import { onBeforeUnmount, ref } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 
 import {
   cancelDownloadJob,
   createDownloadJob,
+  discover,
   type DownloadJob,
   listDownloadJobs,
   retryDownloadJob,
@@ -20,6 +21,74 @@ const queryClient = useQueryClient()
 const selection = useDownloadSelection()
 const notice = ref('')
 const submissionError = ref('')
+const previewExpanded = ref(false)
+const previewGrid = ref<HTMLElement | null>(null)
+
+const PREVIEW_ITEM_WIDTH_PX = 78
+const PREVIEW_GAP_PX = 8
+const PREVIEW_ROW_COUNT = 4
+const previewLimit = ref(0)
+const previewEntries = computed(() => selection.selectedEntries.slice(0, previewLimit.value))
+const hiddenPreviewCount = computed(() =>
+  previewLimit.value === 0 ? 0 : Math.max(selection.selectedIds.length - previewLimit.value, 0),
+)
+const missingPreviewIds = computed(() =>
+  previewEntries.value.filter((entry) => entry.item === null).map((entry) => entry.artworkId),
+)
+
+watch(
+  previewGrid,
+  (element, _previous, onCleanup) => {
+    if (element === null) return
+
+    const updateLimit = (width: number) => {
+      if (width <= 0) return
+      const columns = Math.max(
+        1,
+        Math.floor((width + PREVIEW_GAP_PX) / (PREVIEW_ITEM_WIDTH_PX + PREVIEW_GAP_PX)),
+      )
+      previewLimit.value = columns * PREVIEW_ROW_COUNT
+    }
+    updateLimit(element.clientWidth)
+
+    const observer = new ResizeObserver((entries) => {
+      const entry = entries[0]
+      if (entry !== undefined) updateLimit(entry.contentRect.width)
+    })
+    observer.observe(element)
+    onCleanup(() => observer.disconnect())
+  },
+  { flush: 'post' },
+)
+
+const previewQuery = useQuery({
+  queryKey: computed(() => ['download-selection-preview', missingPreviewIds.value]),
+  queryFn: async () => {
+    const result = await discover({
+      sourceType: 'artwork',
+      inputs: missingPreviewIds.value.map(String),
+      page: 0,
+    })
+    return result.items
+  },
+  enabled: computed(() => previewExpanded.value && missingPreviewIds.value.length > 0),
+  retry: false,
+})
+
+watch(
+  () => previewQuery.data.value,
+  (items) => {
+    if (items !== undefined) selection.remember(items)
+  },
+)
+
+watch(
+  () => selection.selectedIds.length,
+  (count) => {
+    if (count !== 0) return
+    previewExpanded.value = false
+  },
+)
 
 const jobsQuery = useQuery({
   queryKey: ['download-jobs'],
@@ -92,7 +161,9 @@ events.addEventListener('job-updated', () => {
 events.addEventListener('error', () => {
   void queryClient.invalidateQueries({ queryKey: ['download-jobs'] })
 })
-onBeforeUnmount(() => events.close())
+onBeforeUnmount(() => {
+  events.close()
+})
 
 function stateLabel(state: string) {
   const labels: Record<string, string> = {
@@ -138,7 +209,74 @@ function progressLabel(job: DownloadJob) {
   <aside class="space-y-4">
     <Card class="sticky top-20 p-5">
       <h2 class="font-semibold">提交下载</h2>
-      <p class="app-muted mt-1 text-sm">已选择 {{ selection.selectedIds.length }} 项</p>
+      <div class="mt-1 flex items-center justify-between gap-3">
+        <p class="app-muted text-sm">已选择 {{ selection.selectedIds.length }} 项</p>
+        <button
+          v-if="selection.selectedIds.length"
+          type="button"
+          class="inline-flex cursor-pointer items-center gap-1 text-xs text-muted-foreground transition hover:text-foreground"
+          @click="previewExpanded = !previewExpanded"
+        >
+          {{ previewExpanded ? '收起预览' : '展开预览' }}
+          <ChevronUp v-if="previewExpanded" :size="14" />
+          <ChevronDown v-else :size="14" />
+        </button>
+      </div>
+      <div v-if="previewExpanded && selection.selectedIds.length" class="mt-4">
+        <div
+          ref="previewGrid"
+          class="grid grid-cols-[repeat(auto-fill,79.5px)] justify-between gap-2"
+        >
+          <div
+            v-for="entry in previewEntries"
+            :key="entry.artworkId"
+            class="relative aspect-square overflow-hidden rounded-lg bg-muted"
+            :title="entry.item?.title ?? `作品 ${String(entry.artworkId)}`"
+          >
+            <LoaderCircle
+              v-if="entry.item === null && previewQuery.isFetching.value"
+              class="absolute inset-0 m-auto animate-spin text-muted-foreground"
+              :size="20"
+            />
+            <template v-else>
+              <ImageOff class="absolute inset-0 m-auto text-muted-foreground" :size="20" />
+              <img
+                v-if="entry.item?.thumbnailUrl"
+                class="relative size-full bg-muted object-cover"
+                :src="entry.item.thumbnailUrl"
+                alt=""
+                loading="lazy"
+                @error="($event.currentTarget as HTMLImageElement).remove()"
+              />
+            </template>
+            <button
+              type="button"
+              :class="[
+                'absolute top-1 right-1 inline-flex size-6 cursor-pointer items-center justify-center rounded-full',
+                'bg-background/85 text-foreground shadow-sm backdrop-blur-sm transition',
+                'hover:bg-destructive hover:text-destructive-foreground',
+              ]"
+              :title="`从队列移除作品 ${String(entry.artworkId)}`"
+              @click="selection.removeIds([entry.artworkId])"
+            >
+              <X :size="14" />
+            </button>
+          </div>
+        </div>
+        <p v-if="previewQuery.isFetching.value" class="app-muted mt-2 text-xs">正在加载作品预览…</p>
+        <div
+          v-else-if="previewQuery.error.value && missingPreviewIds.length"
+          class="mt-2 flex items-center justify-between gap-2"
+        >
+          <p class="text-xs text-destructive">
+            {{ errorMessage(previewQuery.error.value) }}
+          </p>
+          <Button variant="ghost" size="small" @click="previewQuery.refetch()">重试</Button>
+        </div>
+        <p v-if="hiddenPreviewCount" class="app-muted mt-2 text-xs">
+          另有 {{ hiddenPreviewCount }} 项未展示
+        </p>
+      </div>
       <Button
         class="mt-4 w-full"
         :disabled="selection.selectedIds.length === 0 || createMutation.isPending.value"
