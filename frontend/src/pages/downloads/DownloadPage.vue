@@ -322,7 +322,7 @@ function jobProgress(job: DownloadJob) {
             <UsersRound :size="18" />
             {{ followedUsersMutation.isPending.value ? '获取中…' : '获取已关注作者' }}
           </Button>
-          <Button type="submit" :disabled="discoveryMutation.isPending.value">
+          <Button type="submit" class="sm:self-start" :disabled="discoveryMutation.isPending.value">
             <Search :size="18" />
             {{ discoveryMutation.isPending.value ? '加载中…' : '预览' }}
           </Button>
