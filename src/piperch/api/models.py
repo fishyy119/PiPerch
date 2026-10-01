@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from piperch.domain import ArtworkType, BookmarkFolderKind, BookmarkVisibility, ItemState, JobState
 from piperch.utils.urls import normalize_proxy_url
@@ -42,19 +42,25 @@ class SettingsResponse(ApiModel):
     webp_quality: int
 
 
-class SettingsUpdate(ApiModel):
-    pixiv_cookie: str | None
+class SettingsPatch(ApiModel):
+    pixiv_cookie: str | None = None
     proxy_url: str | None = None
-    library_root: str = Field(min_length=1)
-    download_concurrency: int = Field(ge=1, le=8)
-    request_interval_ms: int = Field(ge=0, le=60_000)
-    webp_enabled: bool
-    webp_quality: int = Field(ge=1, le=100)
+    library_root: str = Field(default=".", min_length=1)
+    download_concurrency: int = Field(default=3, ge=1, le=8)
+    request_interval_ms: int = Field(default=500, ge=0, le=60_000)
+    webp_enabled: bool = True
+    webp_quality: int = Field(default=85, ge=1, le=100)
 
     @field_validator("proxy_url")
     @classmethod
     def validate_proxy(cls, value: str | None) -> str | None:
         return normalize_proxy_url(value)
+
+    @model_validator(mode="after")
+    def require_change(self) -> SettingsPatch:
+        if not self.model_fields_set:
+            raise ValueError("至少需要提供一个设置项。")
+        return self
 
 
 class CookieValidationRequest(ApiModel):

@@ -13,6 +13,7 @@ const props = withDefaults(
 )
 
 const model = defineModel<number>({ default: 0 })
+const emit = defineEmits<{ commit: [value: number] }>()
 const values = computed<number[]>({
   get: () => [model.value],
   set: (nextValues) => {
@@ -20,6 +21,11 @@ const values = computed<number[]>({
     if (nextValue !== undefined) model.value = nextValue
   },
 })
+
+function commitValue(nextValues: number[] | undefined) {
+  const nextValue = nextValues?.[0]
+  if (nextValue !== undefined) emit('commit', nextValue)
+}
 </script>
 
 <template>
@@ -30,6 +36,7 @@ const values = computed<number[]>({
     :max="props.max"
     :step="props.step"
     :disabled="props.disabled"
+    @value-commit="commitValue"
   >
     <SliderTrack class="relative h-1.5 grow overflow-hidden rounded-full bg-muted">
       <SliderRange class="absolute h-full bg-primary" />

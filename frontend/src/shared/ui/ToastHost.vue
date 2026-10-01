@@ -48,8 +48,8 @@ const toastOptions = {
   <Toaster
     theme="system"
     position="top-right"
-    expand
-    :visible-toasts="8"
+    :duration="5000"
+    :visible-toasts="4"
     :toast-options="toastOptions"
     :style="{ fontFamily: 'inherit' }"
   />

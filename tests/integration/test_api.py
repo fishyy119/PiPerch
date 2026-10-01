@@ -284,18 +284,9 @@ def test_health_and_settings_return_cookie(
     assert client.get("/api/health").json() == {"status": "ok", "database": "ok"}
 
     cookie = "PHPSESSID=123_secret-value"
-    current = container.settings.get()
-    response = client.put(
+    response = client.patch(
         "/api/settings",
-        json={
-            "pixivCookie": cookie,
-            "proxyUrl": current.proxy_url,
-            "libraryRoot": str(current.library_root),
-            "downloadConcurrency": current.download_concurrency,
-            "requestIntervalMs": current.request_interval_ms,
-            "webpEnabled": current.webp_enabled,
-            "webpQuality": current.webp_quality,
-        },
+        json={"pixivCookie": cookie},
     )
     assert response.status_code == 200
     assert response.json()["pixivCookie"] == cookie
@@ -306,17 +297,9 @@ def test_health_and_settings_return_cookie(
     assert settings.status_code == 200
     assert settings.json()["pixivCookie"] == cookie
 
-    cleared = client.put(
+    cleared = client.patch(
         "/api/settings",
-        json={
-            "pixivCookie": None,
-            "proxyUrl": current.proxy_url,
-            "libraryRoot": str(current.library_root),
-            "downloadConcurrency": current.download_concurrency,
-            "requestIntervalMs": current.request_interval_ms,
-            "webpEnabled": current.webp_enabled,
-            "webpQuality": current.webp_quality,
-        },
+        json={"pixivCookie": None},
     )
     assert cleared.status_code == 200
     assert cleared.json()["pixivCookie"] is None
@@ -325,52 +308,65 @@ def test_health_and_settings_return_cookie(
     assert client.get("/api/settings").json()["pixivCookie"] is None
 
 
-def test_settings_update_and_proxy_redaction(
+def test_settings_patch_and_proxy_redaction(
     app_client: tuple[ApiTestClient, AppContainer],
     tmp_path: Path,
 ) -> None:
     client, container = app_client
     library = tmp_path / "library"
-    response = client.put(
+    response = client.patch(
         "/api/settings",
-        json={
-            "pixivCookie": None,
-            "proxyUrl": "http://user:password@127.0.0.1:7890",
-            "libraryRoot": str(library),
-            "downloadConcurrency": 4,
-            "requestIntervalMs": 800,
-            "webpEnabled": False,
-            "webpQuality": 90,
-        },
+        json={"proxyUrl": "http://user:password@127.0.0.1:7890"},
     )
 
     assert response.status_code == 200
     payload = response.json()
     assert payload["proxyUrl"] == "http://user:***@127.0.0.1:7890"
-    assert payload["downloadConcurrency"] == 4
-    assert payload["webpEnabled"] is False
-    assert payload["webpQuality"] == 90
-    assert Path(payload["libraryRoot"]) == library.resolve()
     persisted = json.loads(container.paths.settings.read_text(encoding="utf-8"))
     assert persisted["proxy_url"] == "http://user:password@127.0.0.1:7890"
-    assert persisted["library_root"] == str(library.resolve())
-    assert persisted["webp_enabled"] is False
-    assert persisted["webp_quality"] == 90
 
-    repeated = client.put(
+    library_response = client.patch("/api/settings", json={"libraryRoot": str(library)})
+    assert library_response.status_code == 200
+    assert Path(library_response.json()["libraryRoot"]) == library.resolve()
+    persisted = json.loads(container.paths.settings.read_text(encoding="utf-8"))
+    assert persisted["library_root"] == str(library.resolve())
+
+    repeated = client.patch(
         "/api/settings",
-        json={
-            "pixivCookie": None,
-            "proxyUrl": payload["proxyUrl"],
-            "libraryRoot": payload["libraryRoot"],
-            "downloadConcurrency": 4,
-            "requestIntervalMs": 800,
-            "webpEnabled": False,
-            "webpQuality": 90,
-        },
+        json={"proxyUrl": payload["proxyUrl"]},
     )
     assert repeated.status_code == 200
     assert container.settings.get().proxy_url == "http://user:password@127.0.0.1:7890"
+
+
+def test_settings_patch_updates_only_requested_fields(
+    app_client: tuple[ApiTestClient, AppContainer],
+) -> None:
+    client, container = app_client
+    current = container.settings.get()
+
+    concurrency = client.patch("/api/settings", json={"downloadConcurrency": 6})
+    assert concurrency.status_code == 200
+    assert concurrency.json()["downloadConcurrency"] == 6
+    assert concurrency.json()["requestIntervalMs"] == current.request_interval_ms
+
+    disabled = client.patch("/api/settings", json={"webpEnabled": False})
+    assert disabled.status_code == 200
+    assert disabled.json()["downloadConcurrency"] == 6
+    assert disabled.json()["webpEnabled"] is False
+
+    persisted = json.loads(container.paths.settings.read_text(encoding="utf-8"))
+    assert persisted["download_concurrency"] == 6
+    assert persisted["webp_enabled"] is False
+
+
+def test_settings_patch_rejects_empty_or_invalid_changes(
+    app_client: tuple[ApiTestClient, AppContainer],
+) -> None:
+    client, _ = app_client
+
+    assert client.patch("/api/settings", json={}).status_code == 422
+    assert client.patch("/api/settings", json={"downloadConcurrency": 9}).status_code == 422
 
 
 def test_settings_rejects_invalid_proxy_without_persisting(
@@ -380,17 +376,9 @@ def test_settings_rejects_invalid_proxy_without_persisting(
     current = container.settings.get()
     persisted = container.paths.settings.read_text(encoding="utf-8")
 
-    response = client.put(
+    response = client.patch(
         "/api/settings",
-        json={
-            "pixivCookie": current.pixiv_cookie,
-            "proxyUrl": "http://127.0.0.1:invalid",
-            "libraryRoot": str(current.library_root),
-            "downloadConcurrency": current.download_concurrency,
-            "requestIntervalMs": current.request_interval_ms,
-            "webpEnabled": current.webp_enabled,
-            "webpQuality": current.webp_quality,
-        },
+        json={"proxyUrl": "http://127.0.0.1:invalid"},
     )
 
     assert response.status_code == 422

@@ -82,23 +82,18 @@ class SettingsManager:
         with self._lock:
             return self._to_domain(self._require_current())
 
-    def update(
-        self,
-        *,
-        pixiv_cookie: str | None,
-        proxy_url: str | None,
-        library_root: Path,
-        download_concurrency: int,
-        request_interval_ms: int,
-        webp_enabled: bool,
-        webp_quality: int,
-    ) -> AppSettings:
+    def patch(self, **changes: object) -> AppSettings:
         with self._lock:
             current = self._require_current()
-            if proxy_url == redact_url_password(current.proxy_url):
-                proxy_url = current.proxy_url
-            resolved_root = library_root.expanduser().resolve()
-            if resolved_root != current.library_root.resolve():
+            unexpected = changes.keys() - StoredSettings.model_fields.keys()
+            if unexpected:
+                names = ", ".join(sorted(unexpected))
+                raise ValueError(f"Unknown settings: {names}")
+            if "proxy_url" in changes and changes["proxy_url"] == redact_url_password(current.proxy_url):
+                changes["proxy_url"] = current.proxy_url
+
+            updated = StoredSettings.model_validate({**current.model_dump(mode="python"), **changes})
+            if updated.library_root.resolve() != current.library_root.resolve():
                 with self._database.connect() as connection:
                     count = connection.scalar(select(func.count()).select_from(artworks)) or 0
                 if count:
@@ -106,19 +101,7 @@ class SettingsManager:
                         "library_not_empty",
                         "图库中已有作品，首版不支持直接迁移下载目录。",
                     )
-            resolved_root.mkdir(parents=True, exist_ok=True)
-            updated = StoredSettings.model_validate(
-                {
-                    **current.model_dump(mode="python"),
-                    "pixiv_cookie": pixiv_cookie,
-                    "proxy_url": proxy_url,
-                    "library_root": resolved_root,
-                    "download_concurrency": download_concurrency,
-                    "request_interval_ms": request_interval_ms,
-                    "webp_enabled": webp_enabled,
-                    "webp_quality": webp_quality,
-                }
-            )
+            updated.library_root.mkdir(parents=True, exist_ok=True)
             self._save(updated)
             self._current = updated
             return self._to_domain(updated)

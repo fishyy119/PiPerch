@@ -75,7 +75,7 @@ const navigation = [
           :class="showPageTitle ? 'ml-auto justify-end' : 'justify-start'"
         />
       </header>
-      <main class="w-full p-4 md:p-6">
+      <main :class="route.meta.flushContent === true ? 'w-full' : 'w-full p-4 md:p-6'">
         <RouterView />
       </main>
     </div>

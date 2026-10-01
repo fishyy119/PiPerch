@@ -12,6 +12,7 @@ export const settingsSchema = z.object({
   webpQuality: z.number().int().min(1).max(100),
 })
 export type Settings = z.infer<typeof settingsSchema>
+export type SettingsPatch = Partial<Settings>
 
 const cookieValidationSchema = z.object({ valid: z.boolean() })
 
@@ -19,8 +20,8 @@ export async function getSettings() {
   return settingsSchema.parse(await api.get<unknown>('/api/settings'))
 }
 
-export async function updateSettings(settings: Settings) {
-  return settingsSchema.parse(await api.put<unknown>('/api/settings', settings))
+export async function patchSettings(settings: SettingsPatch) {
+  return settingsSchema.parse(await api.patch<unknown>('/api/settings', settings))
 }
 
 export async function validatePixivCookie(value: string) {

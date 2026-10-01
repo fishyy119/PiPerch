@@ -38,7 +38,11 @@ export const router = createRouter({
           component: ArtworkDetailPage,
           meta: { title: '作品详情' },
         },
-        { path: 'settings', component: SettingsPage, meta: { title: '设置' } },
+        {
+          path: 'settings',
+          component: SettingsPage,
+          meta: { title: '设置', flushContent: true },
+        },
       ],
     },
     { path: '/:pathMatch(.*)*', redirect: '/gallery' },
