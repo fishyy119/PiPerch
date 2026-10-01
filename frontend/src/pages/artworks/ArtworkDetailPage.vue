@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Download, ExternalLink, Images, Maximize2, Trash2, UserRound, X } from '@lucide/vue'
+import { Download, ExternalLink, Images, Trash2, UserRound } from '@lucide/vue'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query'
 import { computed, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
@@ -9,6 +9,7 @@ import SafeHtml from '@/pages/artworks/SafeHtml.vue'
 import Button from '@ui/Button.vue'
 import Card from '@ui/Card.vue'
 import ConfirmDialog from '@ui/ConfirmDialog.vue'
+import LightboxGallery, { type LightboxItem } from '@ui/LightboxGallery.vue'
 import SmartCropImage from '@ui/SmartCropImage.vue'
 
 const route = useRoute()
@@ -16,7 +17,6 @@ const router = useRouter()
 const queryClient = useQueryClient()
 const artworkId = computed(() => Number(route.params.artworkId))
 const selectedPage = ref<number | null>(null)
-const lightboxOpen = ref(false)
 const deleteOpen = ref(false)
 
 const artworkQuery = useQuery({
@@ -51,14 +51,35 @@ const previewUrl = computed(() => {
   }
   return currentPage.value === null ? '' : mediaUrl(currentPage.value)
 })
+const lightboxItems = computed<LightboxItem[]>(() => {
+  const artwork = artworkQuery.data.value
+  if (!artwork) return []
+  if (artwork.artworkType === 'ugoira') {
+    return [{ src: previewUrl.value, alt: artwork.title }]
+  }
+  return pageIndexes.value.map((page, index) => ({
+    src: mediaUrl(page),
+    alt:
+      pageIndexes.value.length > 1 ? `${artwork.title} 第 ${String(index + 1)} 页` : artwork.title,
+  }))
+})
+const lightboxInitialIndex = computed(() => {
+  if (artworkQuery.data.value?.artworkType === 'ugoira' || currentPage.value === null) return 0
+  return Math.max(pageIndexes.value.indexOf(currentPage.value), 0)
+})
 
 watch(artworkId, () => {
   selectedPage.value = null
-  lightboxOpen.value = false
 })
 
 function mediaUrl(page: number) {
   return `/api/artworks/${String(artworkId.value)}/pages/${String(page)}`
+}
+
+function handleLightboxIndexChange(index: number) {
+  if (artworkQuery.data.value?.artworkType === 'ugoira') return
+  const page = pageIndexes.value[index]
+  if (page !== undefined) selectedPage.value = page
 }
 
 function filterByTag(tagId: number) {
@@ -99,28 +120,26 @@ function typeLabel(type: string) {
     <div class="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_20rem]">
       <div class="min-w-0 space-y-5">
         <Card as="section" class="overflow-hidden">
-          <div class="h-80 bg-muted p-2 sm:h-120 sm:p-4">
-            <button
-              type="button"
-              class="group relative flex size-full items-center justify-center"
-              @click="lightboxOpen = true"
-            >
-              <img
-                class="block h-auto max-h-full w-auto max-w-full object-contain"
-                :src="previewUrl"
-                :alt="artworkQuery.data.value.title"
-              />
-              <span
-                :class="[
-                  'absolute right-3 bottom-3 grid size-10 place-items-center rounded-full',
-                  'bg-overlay/60 text-overlay-foreground opacity-0 backdrop-blur-sm transition',
-                  'group-hover:opacity-100 group-focus-visible:opacity-100',
-                ]"
+          <LightboxGallery
+            :key="artworkId"
+            v-slot="{ open }"
+            :items="lightboxItems"
+            @change="handleLightboxIndexChange"
+          >
+            <div class="h-80 bg-muted sm:h-120">
+              <button
+                type="button"
+                class="flex size-full items-center justify-center p-2 sm:p-4"
+                @click="open(lightboxInitialIndex)"
               >
-                <Maximize2 :size="18" />
-              </span>
-            </button>
-          </div>
+                <img
+                  class="block h-auto max-h-full w-auto max-w-full object-contain"
+                  :src="previewUrl"
+                  :alt="artworkQuery.data.value.title"
+                />
+              </button>
+            </div>
+          </LightboxGallery>
 
           <div
             v-if="artworkQuery.data.value.artworkType !== 'ugoira' && pageIndexes.length > 1"
@@ -358,25 +377,6 @@ function typeLabel(type: string) {
           </dl>
         </Card>
       </aside>
-    </div>
-
-    <div
-      v-if="lightboxOpen"
-      class="fixed inset-0 z-50 grid place-items-center bg-overlay/92 p-3 sm:p-6"
-      @click.self="lightboxOpen = false"
-    >
-      <button
-        type="button"
-        class="absolute top-4 right-4 grid size-11 place-items-center rounded-full bg-overlay-foreground/15 text-overlay-foreground hover:bg-overlay-foreground/25"
-        @click="lightboxOpen = false"
-      >
-        <X />
-      </button>
-      <img
-        class="max-h-full max-w-full object-contain"
-        :src="previewUrl"
-        :alt="artworkQuery.data.value.title"
-      />
     </div>
 
     <ConfirmDialog
