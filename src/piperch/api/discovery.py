@@ -16,6 +16,7 @@ from piperch.api.models import (
     DiscoveryItem,
     DiscoveryRequest,
     DiscoveryResponse,
+    FollowUpdatesDiscoveryRequest,
     RecommendationsResponse,
     RecommendedUserResponse,
     RecommendedUsersResponse,
@@ -71,6 +72,11 @@ async def discover(
     elif isinstance(request, BookmarkDiscoveryRequest):
         candidates, next_page = await container.pixiv.discover_bookmarks(
             BookmarkFolderReference(request.folder.visibility, request.folder.tag),
+            request.page,
+            settings.pixiv_cookie,
+        )
+    elif isinstance(request, FollowUpdatesDiscoveryRequest):
+        candidates, next_page = await container.pixiv.discover_follow_updates(
             request.page,
             settings.pixiv_cookie,
         )

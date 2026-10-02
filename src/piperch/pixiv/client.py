@@ -132,6 +132,36 @@ class PixivClient:
                 ordered.setdefault(artwork_id, candidate)
         return list(ordered.values())
 
+    async def discover_follow_updates(
+        self,
+        page: int,
+        cookie: str | None,
+    ) -> tuple[list[DiscoveryCandidate], int | None]:
+        """按 Pixiv 返回顺序读取关注作者的最近更新。"""
+        self._require_current_user_id(cookie)
+        body = _mapping(
+            await self._transport.get_body(
+                "/ajax/follow_latest/illust",
+                cookie=cookie,
+                params={"p": page + 1, "mode": "all", "lang": "zh"},
+            )
+        )
+        thumbnails = _mapping(body.get("thumbnails"))
+        candidates: dict[int, DiscoveryCandidate] = {}
+        for raw_thumbnail in _sequence(thumbnails.get("illust")):
+            thumbnail = _mapping(raw_thumbnail)
+            artwork_id = _integer(thumbnail.get("id"))
+            if artwork_id <= 0:
+                continue
+            candidates.setdefault(
+                artwork_id,
+                candidate_from_mapping(thumbnail, default_artwork_id=artwork_id),
+            )
+
+        is_last_page = _mapping(body.get("page")).get("isLastPage")
+        next_page = page + 1 if candidates and is_last_page is False else None
+        return list(candidates.values()), next_page
+
     async def discover_recommended_users(
         self,
         cookie: str | None,

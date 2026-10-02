@@ -101,6 +101,11 @@ class UserDiscoveryRequest(ApiModel):
     page: int = Field(default=0, ge=0)
 
 
+class FollowUpdatesDiscoveryRequest(ApiModel):
+    source_type: Literal["followUpdates"]
+    page: int = Field(default=0, ge=0)
+
+
 class SeriesDiscoveryRequest(ApiModel):
     source_type: Literal["series"]
     series_id: int = Field(gt=0)
@@ -119,7 +124,11 @@ class BookmarkDiscoveryRequest(ApiModel):
 
 
 DiscoveryRequest = Annotated[
-    ArtworkDiscoveryRequest | UserDiscoveryRequest | SeriesDiscoveryRequest | BookmarkDiscoveryRequest,
+    ArtworkDiscoveryRequest
+    | UserDiscoveryRequest
+    | FollowUpdatesDiscoveryRequest
+    | SeriesDiscoveryRequest
+    | BookmarkDiscoveryRequest,
     Field(discriminator="source_type"),
 ]
 

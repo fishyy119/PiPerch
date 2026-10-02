@@ -107,6 +107,61 @@ async def test_discovery_recommendations_follow_recommended_ids_and_ignore_missi
 
 
 @pytest.mark.asyncio
+async def test_follow_updates_reads_ordered_pages_and_stops_at_last_page() -> None:
+    with respx.mock(assert_all_called=True) as router:
+        first_route = router.get(
+            "https://www.pixiv.net/ajax/follow_latest/illust",
+            params={"p": 1, "mode": "all", "lang": "zh"},
+        ).mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "error": False,
+                    "body": {
+                        "page": {"isLastPage": False},
+                        "thumbnails": {
+                            "illust": [
+                                {"id": "103", "title": "最新作品", "userName": "作者甲"},
+                                {"id": "102", "title": "稍早作品", "userName": "作者乙"},
+                                {"id": "103", "title": "重复作品", "userName": "作者甲"},
+                                {"id": "invalid"},
+                            ]
+                        },
+                    },
+                },
+            )
+        )
+        last_route = router.get(
+            "https://www.pixiv.net/ajax/follow_latest/illust",
+            params={"p": 2, "mode": "all", "lang": "zh"},
+        ).mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "error": False,
+                    "body": {
+                        "page": {"isLastPage": True},
+                        "thumbnails": {"illust": [{"id": "101", "title": "末页作品", "userName": "作者丙"}]},
+                    },
+                },
+            )
+        )
+        client = PixivClient(proxy_url=None, request_interval_ms=0)
+        try:
+            first_page, first_next_page = await client.discover_follow_updates(0, "PHPSESSID=42_secret")
+            last_page, last_next_page = await client.discover_follow_updates(1, "PHPSESSID=42_secret")
+        finally:
+            await client.close()
+
+    assert first_route.call_count == 1
+    assert last_route.call_count == 1
+    assert [item.artwork_id for item in first_page] == [103, 102]
+    assert first_next_page == 1
+    assert [item.artwork_id for item in last_page] == [101]
+    assert last_next_page is None
+
+
+@pytest.mark.asyncio
 async def test_cookie_validation_does_not_retry_forbidden_response() -> None:
     with respx.mock(assert_all_called=True) as router:
         route = router.get(
