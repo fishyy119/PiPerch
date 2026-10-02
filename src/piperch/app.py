@@ -6,12 +6,15 @@ import asyncio
 import logging
 from collections.abc import AsyncGenerator, Awaitable
 from contextlib import asynccontextmanager
+from importlib.resources import files
+from mimetypes import guess_type
+from pathlib import PurePosixPath
 
 from fastapi import FastAPI, Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import JSONResponse, Response
 from sqlalchemy import text
 from starlette.exceptions import HTTPException
 
@@ -71,6 +74,7 @@ async def shutdown_resources(
 
 def create_app(paths: AppPaths | None = None) -> FastAPI:
     resolved_paths = paths or AppPaths.from_data_dir()
+    frontend_dist = files("piperch").joinpath("frontend")
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
@@ -194,17 +198,21 @@ def create_app(paths: AppPaths | None = None) -> FastAPI:
     application.include_router(gallery.router, prefix="/api")
 
     @application.get("/{full_path:path}", include_in_schema=False)
-    def spa(full_path: str) -> FileResponse:
+    def spa(full_path: str) -> Response:
         if full_path == "api" or full_path.startswith("api/"):
             raise NotFoundError("API 接口不存在。")
-        requested = (resolved_paths.frontend_dist / full_path).resolve()
-        dist = resolved_paths.frontend_dist.resolve()
-        if full_path and dist in requested.parents and requested.is_file():
-            return FileResponse(requested)
-        index = dist / "index.html"
+        relative_path = PurePosixPath(full_path)
+        if full_path and "\\" not in full_path and not relative_path.is_absolute() and ".." not in relative_path.parts:
+            requested = frontend_dist.joinpath(*relative_path.parts)
+            if requested.is_file():
+                return Response(
+                    content=requested.read_bytes(),
+                    media_type=guess_type(requested.name)[0] or "application/octet-stream",
+                )
+        index = frontend_dist.joinpath("index.html")
         if index.is_file():
-            return FileResponse(index)
-        raise NotFoundError("前端尚未构建，请在 frontend 目录运行 pnpm run build。")
+            return Response(content=index.read_bytes(), media_type="text/html")
+        raise NotFoundError("安装包不包含前端资源，请重新安装 PiPerch。")
 
     return application
 

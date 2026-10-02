@@ -34,8 +34,8 @@ lint = ["pyright>=1.1.390,<2", "ruff>=0.9,<1"]
 dev = [{ include-group = "test" }, { include-group = "lint" }]
 
 [tool.hatch.build.targets.wheel]
-# TODO: 发布非 editable 安装包前，将 Alembic 迁移与前端构建产物改为包内资源并通过 importlib.resources 读取。
 packages = ["src/piperch"]
+artifacts = ["/src/piperch/frontend/**"]
 
 [tool.ruff]
 target-version = "py312"
@@ -64,7 +64,7 @@ ignore = ["ANN401"]
 allowed-confusables = ["，"]
 
 [tool.ruff.lint.per-file-ignores]
-"alembic/**" = ["ANN", "E501"]
+"src/piperch/database/migrations/**" = ["ANN", "E501"]
 "src/piperch/api/**" = ["B008", "TC001", "TC003"]
 "src/piperch/app.py" = ["TC003"]
 "tests/**" = ["S101"]
@@ -77,7 +77,7 @@ docstring-code-format = true
 
 [tool.pyright]
 include = ["src", "tests"]
-exclude = ["frontend", "alembic"]
+exclude = ["frontend", "src/piperch/database/migrations"]
 pythonVersion = "3.12"
 typeCheckingMode = "strict"
 reportMissingTypeStubs = "none"

@@ -16,6 +16,7 @@ build/
 frontend/node_modules/
 frontend/dist/
 frontend/coverage/
+src/piperch/frontend/
 
 .piperch/
 *.sqlite3

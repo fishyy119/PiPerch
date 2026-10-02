@@ -12,12 +12,10 @@ class AppPaths:
     default_library: Path
     thumbnails: Path
     staging: Path
-    frontend_dist: Path
 
     @classmethod
     def from_data_dir(cls, data_dir: Path | None = None) -> AppPaths:
         root = (data_dir or Path.home() / ".piperch").expanduser().resolve()
-        project_root = Path(__file__).resolve().parents[2]
         return cls(
             data_dir=root,
             database=root / "piperch.sqlite3",
@@ -25,7 +23,6 @@ class AppPaths:
             default_library=root / "library",
             thumbnails=root / "cache" / "thumbnails",
             staging=root / "staging",
-            frontend_dist=project_root / "frontend" / "dist",
         )
 
     def ensure_directories(self) -> None:

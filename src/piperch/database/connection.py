@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from contextlib import contextmanager
-from pathlib import Path
+from importlib.resources import as_file, files
 from typing import TYPE_CHECKING, Protocol, cast
 
 from alembic import command
@@ -11,6 +11,7 @@ from sqlalchemy.engine import URL, Connection
 
 if TYPE_CHECKING:
     from collections.abc import Generator
+    from pathlib import Path
 
     from piperch.paths import AppPaths
 
@@ -20,11 +21,13 @@ def sqlite_url(path: Path) -> URL:
 
 
 def run_migrations(paths: AppPaths) -> None:
-    config_path = Path(__file__).resolve().parents[3] / "alembic.ini"
-    config = Config(str(config_path))
-    migration_url = sqlite_url(paths.database).render_as_string(False).replace("%", "%%")
-    config.set_main_option("sqlalchemy.url", migration_url)
-    command.upgrade(config, "head")
+    migration_scripts = files("piperch.database").joinpath("migrations")
+    with as_file(migration_scripts) as migration_path:
+        config = Config()
+        config.set_main_option("script_location", str(migration_path))
+        migration_url = sqlite_url(paths.database).render_as_string(False).replace("%", "%%")
+        config.set_main_option("sqlalchemy.url", migration_url)
+        command.upgrade(config, "head")
 
 
 class Database:

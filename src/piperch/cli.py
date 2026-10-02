@@ -73,7 +73,7 @@ def _parser() -> argparse.ArgumentParser:
     commands = parser.add_subparsers(dest="command", required=True)
 
     serve = commands.add_parser("serve", help="迁移数据库并启动本地服务")
-    serve.add_argument("--port", type=int, default=6999)
+    serve.add_argument("--port", type=int, default=9303)
     serve.add_argument("--data-dir", type=Path)
 
     database = commands.add_parser("db", help="数据库管理")

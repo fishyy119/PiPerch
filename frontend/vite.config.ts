@@ -15,7 +15,11 @@ export default defineConfig({
   server: {
     host: '127.0.0.1',
     port: 5173,
-    proxy: { '/api': 'http://127.0.0.1:6999' },
+    proxy: { '/api': 'http://127.0.0.1:9303' },
   },
-  build: { target: 'es2022' },
+  build: {
+    target: 'es2022',
+    outDir: '../src/piperch/frontend',
+    emptyOutDir: true,
+  },
 })
