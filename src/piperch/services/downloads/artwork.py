@@ -14,6 +14,7 @@ from PIL import Image, ImageOps
 
 from piperch.domain import ArtworkType, DownloadProgressPhase, ItemState, MediaRecord, RemoteArtwork
 from piperch.errors import UpstreamError
+from piperch.services.thumbnails import ArtworkThumbnailCache
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable, Sequence
@@ -24,7 +25,6 @@ if TYPE_CHECKING:
     from piperch.settings import SettingsManager
 
 _IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp"}
-_THUMBNAIL_WEBP_QUALITY = 75
 
 
 class DownloadCancelledError(Exception):
@@ -38,11 +38,13 @@ class ArtworkDownloadService:
         settings: SettingsManager,
         artworks: ArtworkRepository,
         pixiv: PixivClient,
+        thumbnails: ArtworkThumbnailCache | None = None,
     ) -> None:
         self._paths = paths
         self._settings = settings
         self._artworks = artworks
         self._pixiv = pixiv
+        self._thumbnails = thumbnails or ArtworkThumbnailCache(paths)
 
     async def download_artwork(
         self,
@@ -114,7 +116,7 @@ class ArtworkDownloadService:
             )
             try:
                 await to_thread.run_sync(self._artworks.save_download, artwork, final_media)
-                await to_thread.run_sync(self._create_thumbnail, artwork_id, final_dir, final_media)
+                await to_thread.run_sync(self._create_thumbnails, artwork_id, final_dir, final_media)
             except Exception:
                 await to_thread.run_sync(self._rollback_swap, final_dir, backup)
                 raise
@@ -440,7 +442,7 @@ class ArtworkDownloadService:
         if backup is not None and backup.exists():
             backup.replace(final_dir)
 
-    def _create_thumbnail(
+    def _create_thumbnails(
         self,
         artwork_id: int,
         final_dir: Path,
@@ -453,12 +455,5 @@ class ArtworkDownloadService:
         if source_record is None:
             return
         source = final_dir / Path(source_record.relative_path).name
-        target = self._paths.thumbnails / f"{artwork_id}.webp"
-        temporary = target.with_suffix(".webp.part")
-        target.parent.mkdir(parents=True, exist_ok=True)
-        with Image.open(source) as image:
-            image.thumbnail((512, 512))
-            if image.mode not in {"RGB", "RGBA"}:
-                image = image.convert("RGB")
-            image.save(temporary, "WEBP", quality=_THUMBNAIL_WEBP_QUALITY)
-        temporary.replace(target)
+        self._thumbnails.create_cover_thumbnail(artwork_id, source)
+        self._thumbnails.create_page_thumbnails(artwork_id, final_dir, media)

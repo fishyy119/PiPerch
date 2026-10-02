@@ -29,6 +29,7 @@ from piperch.services.downloads import (
     DownloadSupervisor,
 )
 from piperch.services.library import LibraryService
+from piperch.services.thumbnails import ArtworkThumbnailCache
 from piperch.settings import SettingsManager
 
 logger = logging.getLogger(__name__)
@@ -88,17 +89,20 @@ def create_app(paths: AppPaths | None = None) -> FastAPI:
         artwork_repository = ArtworkRepository(database)
         download_repository = DownloadRepository(database)
         events = DownloadEventBroker()
+        thumbnail_cache = ArtworkThumbnailCache(resolved_paths)
         download_service = ArtworkDownloadService(
             resolved_paths,
             settings_manager,
             artwork_repository,
             pixiv,
+            thumbnail_cache,
         )
         supervisor = DownloadSupervisor(download_repository, download_service, events)
         library_service = LibraryService(
             resolved_paths,
             settings_manager,
             artwork_repository,
+            thumbnail_cache,
         )
         library_service.recover_pending_deletes()
         container = AppContainer(
@@ -111,6 +115,7 @@ def create_app(paths: AppPaths | None = None) -> FastAPI:
             supervisor=supervisor,
             events=events,
             library=library_service,
+            thumbnails=thumbnail_cache,
         )
         app.state.container = container
         await supervisor.start()

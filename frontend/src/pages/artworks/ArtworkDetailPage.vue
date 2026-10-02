@@ -1,5 +1,13 @@
 <script setup lang="ts">
-import { Download, ExternalLink, Images, Trash2, UserRound } from '@lucide/vue'
+import {
+  ChevronDown,
+  ChevronUp,
+  Download,
+  ExternalLink,
+  Images,
+  Trash2,
+  UserRound,
+} from '@lucide/vue'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query'
 import { computed, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
@@ -12,11 +20,17 @@ import ConfirmDialog from '@ui/ConfirmDialog.vue'
 import LightboxGallery, { type LightboxItem } from '@ui/LightboxGallery.vue'
 import SmartCropImage from '@ui/SmartCropImage.vue'
 
+const PAGE_SELECTOR_ITEM_SIZE_PX = 80
+const PAGE_SELECTOR_GAP_PX = 8
+
 const route = useRoute()
 const router = useRouter()
 const queryClient = useQueryClient()
 const artworkId = computed(() => Number(route.params.artworkId))
 const selectedPage = ref<number | null>(null)
+const pageSelectorExpanded = ref(false)
+const pageSelectorGrid = ref<HTMLElement | null>(null)
+const pageSelectorColumns = ref(Number.POSITIVE_INFINITY)
 const deleteOpen = ref(false)
 
 const artworkQuery = useQuery({
@@ -59,6 +73,7 @@ const lightboxItems = computed<LightboxItem[]>(() => {
   }
   return pageIndexes.value.map((page, index) => ({
     src: mediaUrl(page),
+    thumbnailSrc: mediaThumbnailUrl(page),
     alt:
       pageIndexes.value.length > 1 ? `${artwork.title} 第 ${String(index + 1)} 页` : artwork.title,
   }))
@@ -67,13 +82,54 @@ const lightboxInitialIndex = computed(() => {
   if (artworkQuery.data.value?.artworkType === 'ugoira' || currentPage.value === null) return 0
   return Math.max(pageIndexes.value.indexOf(currentPage.value), 0)
 })
+const visiblePageIndexes = computed(() =>
+  pageSelectorExpanded.value
+    ? pageIndexes.value
+    : pageIndexes.value.slice(0, pageSelectorColumns.value),
+)
+const pageSelectorCanExpand = computed(
+  () =>
+    Number.isFinite(pageSelectorColumns.value) &&
+    pageIndexes.value.length > pageSelectorColumns.value,
+)
 
 watch(artworkId, () => {
   selectedPage.value = null
+  pageSelectorExpanded.value = false
 })
+
+watch(
+  pageSelectorGrid,
+  (element, _previous, onCleanup) => {
+    if (element === null) return
+
+    const updateColumns = (width: number) => {
+      if (width <= 0) return
+      pageSelectorColumns.value = Math.max(
+        1,
+        Math.floor(
+          (width + PAGE_SELECTOR_GAP_PX) / (PAGE_SELECTOR_ITEM_SIZE_PX + PAGE_SELECTOR_GAP_PX),
+        ),
+      )
+    }
+    updateColumns(element.clientWidth)
+
+    const observer = new ResizeObserver((entries) => {
+      const entry = entries[0]
+      if (entry !== undefined) updateColumns(entry.contentRect.width)
+    })
+    observer.observe(element)
+    onCleanup(() => observer.disconnect())
+  },
+  { flush: 'post' },
+)
 
 function mediaUrl(page: number) {
   return `/api/artworks/${String(artworkId.value)}/pages/${String(page)}`
+}
+
+function mediaThumbnailUrl(page: number) {
+  return `${mediaUrl(page)}/thumbnail`
 }
 
 function handleLightboxIndexChange(index: number) {
@@ -136,6 +192,7 @@ function typeLabel(type: string) {
                   class="block h-auto max-h-full w-auto max-w-full object-contain"
                   :src="previewUrl"
                   :alt="artworkQuery.data.value.title"
+                  decoding="async"
                 />
               </button>
             </div>
@@ -143,23 +200,45 @@ function typeLabel(type: string) {
 
           <div
             v-if="artworkQuery.data.value.artworkType !== 'ugoira' && pageIndexes.length > 1"
-            class="flex gap-2 overflow-x-auto border-t p-3"
+            class="border-t p-3"
           >
-            <button
-              v-for="page in pageIndexes"
-              :key="page"
-              type="button"
-              class="relative size-20 shrink-0 overflow-hidden rounded-lg bg-muted ring-primary transition"
-              :class="currentPage === page ? 'ring-2' : 'opacity-65 hover:opacity-100'"
-              @click="selectedPage = page"
+            <div
+              ref="pageSelectorGrid"
+              class="grid grid-cols-[repeat(auto-fill,5rem)] justify-between gap-2"
             >
-              <img class="size-full object-cover" :src="mediaUrl(page)" alt="" loading="lazy" />
-              <span
-                class="absolute right-1 bottom-1 rounded bg-overlay/65 px-1.5 text-xs text-overlay-foreground"
+              <button
+                v-for="page in visiblePageIndexes"
+                :key="page"
+                type="button"
+                class="relative size-20 overflow-hidden rounded-lg bg-muted ring-primary transition"
+                :class="currentPage === page ? 'ring-2' : 'opacity-65 hover:opacity-100'"
+                @click="selectedPage = page"
               >
-                {{ page + 1 }}
-              </span>
-            </button>
+                <img
+                  class="size-full object-cover"
+                  :src="mediaThumbnailUrl(page)"
+                  alt=""
+                  loading="lazy"
+                  decoding="async"
+                />
+                <span
+                  class="absolute right-1 bottom-1 rounded bg-overlay/65 px-1.5 text-xs text-overlay-foreground"
+                >
+                  {{ page + 1 }}
+                </span>
+              </button>
+            </div>
+            <div v-if="pageSelectorCanExpand" class="mt-2 flex justify-center">
+              <Button
+                variant="ghost"
+                size="small"
+                @click="pageSelectorExpanded = !pageSelectorExpanded"
+              >
+                <ChevronUp v-if="pageSelectorExpanded" :size="15" />
+                <ChevronDown v-else :size="15" />
+                {{ pageSelectorExpanded ? '收起' : '展开全部' }}
+              </Button>
+            </div>
           </div>
 
           <div class="flex flex-wrap items-center justify-between gap-3 border-t p-3 sm:p-4">

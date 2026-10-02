@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import json
+from io import BytesIO
 from pathlib import Path
 from typing import TYPE_CHECKING
+
+from PIL import Image
 
 from piperch.domain import (
     ArtworkType,
@@ -412,8 +415,50 @@ def test_gallery_rejects_invalid_artwork_ids(
 
     assert client.get("/api/artworks/0").status_code == 422
     assert client.get("/api/artworks/1/pages/-1").status_code == 422
+    assert client.get("/api/artworks/1/pages/-1/thumbnail").status_code == 422
     assert client.get("/api/artworks?tagId=0").status_code == 422
     assert client.post("/api/artworks/bulk-delete", json={"artworkIds": [1, 0]}).status_code == 422
+
+
+def test_artwork_page_thumbnail_is_created_for_existing_media(
+    app_client: tuple[ApiTestClient, AppContainer],
+) -> None:
+    client, container = app_client
+    artwork = RemoteArtwork(
+        artwork_id=101,
+        artwork_type=ArtworkType.ILLUST,
+        title="已有作品",
+        description="",
+        author_id=201,
+        author_name="测试作者",
+        author_account=None,
+        author_avatar_url=None,
+        series_id=None,
+        series_title=None,
+        page_count=1,
+        width=640,
+        height=320,
+        x_restrict=0,
+        is_ai=False,
+        published_at=None,
+        original_urls=("https://i.pximg.net/101.jpg",),
+        thumbnail_url=None,
+    )
+    source = container.settings.get().library_root / "201" / "101" / "101_p0.jpg"
+    source.parent.mkdir(parents=True)
+    Image.new("RGB", (640, 320), (30, 120, 210)).save(source, "JPEG")
+    container.artworks.save_download(
+        artwork,
+        [MediaRecord("page", "201/101/101_p0.jpg", "image/jpeg", source.stat().st_size, 0)],
+    )
+
+    response = client.get("/api/artworks/101/pages/0/thumbnail")
+
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "image/webp"
+    with Image.open(BytesIO(response.content)) as thumbnail:
+        assert thumbnail.format == "WEBP"
+        assert thumbnail.size == (256, 128)
 
 
 def test_download_job_list_uses_summary_and_detail_includes_items(

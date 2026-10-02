@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 from uuid import uuid4
 
 from piperch.errors import AppError, NotFoundError
+from piperch.services.thumbnails import ArtworkThumbnailCache
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -21,10 +22,12 @@ class LibraryService:
         paths: AppPaths,
         settings: SettingsManager,
         artworks: ArtworkRepository,
+        thumbnails: ArtworkThumbnailCache | None = None,
     ) -> None:
         self._paths = paths
         self._settings = settings
         self._artworks = artworks
+        self._thumbnails = thumbnails or ArtworkThumbnailCache(paths)
 
     def delete_artworks(self, artwork_ids: Sequence[int]) -> int:
         root = self._settings.get().library_root.resolve()
@@ -60,7 +63,7 @@ class LibraryService:
         for _, target in staged:
             shutil.rmtree(target, ignore_errors=True)
         for artwork_id in artwork_ids:
-            (self._paths.thumbnails / f"{artwork_id}.webp").unlink(missing_ok=True)
+            self._thumbnails.delete_artwork(artwork_id)
         return deleted
 
     def recover_pending_deletes(self) -> None:

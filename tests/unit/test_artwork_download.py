@@ -156,3 +156,6 @@ async def test_download_writes_configured_image_format(
         assert image.format == ("WEBP" if webp_enabled else "PNG")
         assert "A" in image.getbands()
         assert image.getpixel((0, 0))[3] == 128
+    assert (paths.thumbnails / "123.webp").is_file()
+    page_thumbnails = sorted((paths.thumbnails / "pages" / "123").glob("*.webp"))
+    assert [path.name for path in page_thumbnails] == ["0.webp", "1.webp", "2.webp"]

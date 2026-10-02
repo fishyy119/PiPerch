@@ -51,13 +51,21 @@ describe('LightboxGallery', () => {
     viewMock.mockReset()
   })
 
-  it('按指定索引打开、同步页码并在卸载时清理', async () => {
+  it('按指定索引打开、关闭时同步页码并在卸载时清理', async () => {
     const onChange = vi.fn()
     const view = render(LightboxGallery, {
       props: {
         items: [
-          { src: '/api/artworks/123/pages/0', alt: '测试作品 第 1 页' },
-          { src: '/api/artworks/123/pages/1', alt: '测试作品 第 2 页' },
+          {
+            src: '/api/artworks/123/pages/0',
+            thumbnailSrc: '/api/artworks/123/pages/0/thumbnail',
+            alt: '测试作品 第 1 页',
+          },
+          {
+            src: '/api/artworks/123/pages/1',
+            thumbnailSrc: '/api/artworks/123/pages/1/thumbnail',
+            alt: '测试作品 第 2 页',
+          },
         ],
         onChange,
       },
@@ -71,10 +79,27 @@ describe('LightboxGallery', () => {
     expect(viewMock).toHaveBeenCalledWith(1)
 
     const options = getOptions()
+    expect(options.navbar).toEqual({ show: true, size: 'large' })
+    expect(options.url).toBe('data-original-src')
+    expect(view.container.querySelector('img')).toHaveAttribute(
+      'src',
+      '/api/artworks/123/pages/0/thumbnail',
+    )
+    expect(view.container.querySelector('img')).toHaveAttribute(
+      'data-original-src',
+      '/api/artworks/123/pages/0',
+    )
     const image = document.createElement('img')
     options.viewed?.(
       new CustomEvent('viewed', {
         detail: { image, index: 1, originalImage: image, originalEvent: null },
+      }),
+    )
+
+    expect(onChange).not.toHaveBeenCalled()
+    options.hidden?.(
+      new CustomEvent('hidden', {
+        detail: { originalEvent: null },
       }),
     )
 

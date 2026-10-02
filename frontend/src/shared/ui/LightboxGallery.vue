@@ -1,6 +1,7 @@
 <script lang="ts">
 export interface LightboxItem {
   src: string
+  thumbnailSrc?: string
   alt: string
 }
 </script>
@@ -29,6 +30,8 @@ const galleryElement = ref<HTMLElement>()
 
 let instance: Viewer | undefined
 let instanceHasMultipleItems = false
+let pendingIndex = 0
+let syncOnHidden = false
 
 function normalizedIndex(index: number) {
   if (!Number.isInteger(index)) return 0
@@ -76,11 +79,15 @@ function destroyViewer() {
   const currentInstance = instance
   instance = undefined
   instanceHasMultipleItems = false
+  syncOnHidden = false
   currentInstance?.destroy()
 }
 
 function openLightbox(index = 0) {
   if (props.items.length === 0) return
+
+  pendingIndex = normalizedIndex(index)
+  syncOnHidden = true
 
   if (instance === undefined) {
     const element = galleryElement.value
@@ -117,16 +124,22 @@ function openLightbox(index = 0) {
       scalable: false,
       magnifier: false,
       tooltip: false,
+      url: 'data-original-src',
       minZoomRatio: (_image, imageData) => initialImageRatio(imageData, coverage) * 0.5,
       maxZoomRatio: (_image, imageData) => initialImageRatio(imageData, coverage) * 4,
       viewed: (event) => {
+        pendingIndex = event.detail.index
         updateBoundaryNavigation(event)
-        emit('change', event.detail.index)
+      },
+      hidden: () => {
+        if (!syncOnHidden) return
+        syncOnHidden = false
+        emit('change', pendingIndex)
       },
     })
   }
 
-  instance.view(normalizedIndex(index))
+  instance.view(pendingIndex)
 }
 
 watch(
@@ -142,7 +155,7 @@ watch(
 
     instance.update()
   },
-  { deep: true, flush: 'post' },
+  { flush: 'post' },
 )
 
 onBeforeUnmount(() => {
@@ -153,7 +166,15 @@ onBeforeUnmount(() => {
 <template>
   <slot :open="openLightbox" />
   <div ref="galleryElement" hidden>
-    <img v-for="item in items" :key="item.src" :src="item.src" :alt="item.alt" loading="lazy" />
+    <img
+      v-for="item in items"
+      :key="item.src"
+      :src="item.thumbnailSrc ?? item.src"
+      :data-original-src="item.src"
+      :alt="item.alt"
+      loading="lazy"
+      decoding="async"
+    />
   </div>
 </template>
 

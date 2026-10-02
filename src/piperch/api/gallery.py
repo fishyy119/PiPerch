@@ -101,6 +101,19 @@ def get_artwork_page(
     return FileResponse(_safe_media_path(root, media.relative_path), media_type=media.mime_type)
 
 
+@router.get("/artworks/{artwork_id}/pages/{page_index}/thumbnail", response_class=FileResponse)
+def get_artwork_page_thumbnail(
+    artwork_id: int = PathParameter(gt=0),
+    page_index: int = PathParameter(ge=0),
+    container: AppContainer = Depends(get_container),
+) -> FileResponse:
+    media = container.artworks.get_media(artwork_id, "page", page_index)
+    root = container.settings.get().library_root
+    source = _safe_media_path(root, media.relative_path)
+    thumbnail = container.thumbnails.ensure_page_thumbnail(artwork_id, page_index, source)
+    return FileResponse(thumbnail, media_type="image/webp")
+
+
 @router.get("/artworks/{artwork_id}/ugoira", response_class=FileResponse)
 def get_ugoira(
     artwork_id: int = PathParameter(gt=0),
