@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query'
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
+import { usePreference } from '@/app/usePreference'
 import {
   bulkDeleteArtworks,
   type GalleryFilters,
@@ -11,11 +12,6 @@ import {
   listNamed,
   listTags,
 } from '@/features/gallery/gallery-api'
-import {
-  GALLERY_PAGE_SIZE_OPTIONS,
-  loadGalleryPreferences,
-  saveGalleryPreferences,
-} from '@/features/gallery/gallery-preferences'
 import LibraryArtworkCard from '@/features/gallery/LibraryArtworkCard.vue'
 import GalleryFilterPopup from '@/pages/gallery/GalleryFilterPopup.vue'
 import TopbarActions from '@/pages/gallery/TopbarActions.vue'
@@ -38,9 +34,9 @@ const filterOpen = ref(false)
 const selectionMode = ref(false)
 const authorFilterSearch = ref('')
 const seriesFilterSearch = ref('')
-const initialPreferences = loadGalleryPreferences()
-const preferredCardWidth = ref(initialPreferences.cardWidth)
-const preferredPageSize = ref(initialPreferences.pageSize)
+const preferredCardWidth = usePreference('gallery.cardWidth')
+const preferredPageSize = usePreference('gallery.pageSize')
+const GALLERY_PAGE_SIZE_OPTIONS = [24, 48, 96] as const
 const pageSizeOptions = GALLERY_PAGE_SIZE_OPTIONS.map((size) => ({
   value: String(size),
   label: `${String(size)} 项`,
@@ -202,20 +198,7 @@ function setPageSize(value: string) {
   const selected = GALLERY_PAGE_SIZE_OPTIONS.find((size) => size === parsed)
   if (selected === undefined) return
   preferredPageSize.value = selected
-  saveGalleryPreferences({
-    cardWidth: preferredCardWidth.value,
-    pageSize: preferredPageSize.value,
-  })
   replaceQuery({})
-}
-
-function setCardWidth(value: number) {
-  if (!Number.isSafeInteger(value) || value < 140 || value > 360 || value % 10 !== 0) return
-  preferredCardWidth.value = value
-  saveGalleryPreferences({
-    cardWidth: preferredCardWidth.value,
-    pageSize: preferredPageSize.value,
-  })
 }
 
 function toggleSelection(id: number) {
@@ -285,12 +268,11 @@ const deleteMutation = useMutation({
             <p class="text-sm font-medium">卡片大小</p>
             <div class="flex items-center gap-3">
               <Slider
+                v-model="preferredCardWidth"
                 class="flex-1"
                 :min="140"
                 :max="360"
                 :step="10"
-                :model-value="preferredCardWidth"
-                @update:model-value="setCardWidth"
               />
               <output class="w-11 text-right text-xs tabular-nums">
                 {{ preferredCardWidth }}px

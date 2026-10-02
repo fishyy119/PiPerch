@@ -1,19 +1,15 @@
 <script setup lang="ts">
 import { RefreshCw } from '@lucide/vue'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query'
-import { computed, reactive, ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 
+import { usePreference } from '@/app/usePreference'
 import {
   followUser,
   listRecommendations,
   listRecommendedUsers,
   type RecommendedUser,
 } from '@/features/discovery/discovery-api'
-import {
-  DISCOVERY_AUTHOR_COLUMN_OPTIONS,
-  loadDiscoveryPreferences,
-  saveDiscoveryPreferences,
-} from '@/features/discovery/discovery-preferences'
 import DiscoveryArtworkCard from '@/features/discovery/DiscoveryArtworkCard.vue'
 import { useDownloadSelection } from '@/features/downloads/download-selection'
 import DiscoverAuthorCard from '@/pages/discover/DiscoverAuthorCard.vue'
@@ -31,7 +27,9 @@ type DiscoveryView = 'artworks' | 'authors'
 const selection = useDownloadSelection()
 const queryClient = useQueryClient()
 const activeView = ref<DiscoveryView>('artworks')
-const preferences = reactive(loadDiscoveryPreferences())
+const cardWidth = usePreference('discovery.cardWidth')
+const authorColumns = usePreference('discovery.authorColumns')
+const DISCOVERY_AUTHOR_COLUMN_OPTIONS = [1, 2, 3] as const
 const authorColumnOptions = DISCOVERY_AUTHOR_COLUMN_OPTIONS.map((columns) => ({
   value: String(columns),
   label: `${String(columns)} 栏`,
@@ -50,10 +48,10 @@ const cachedQueryOptions = {
   retry: false,
 } as const
 const artworkGridStyle = computed(() => ({
-  gridTemplateColumns: `repeat(auto-fill, minmax(min(100%, ${String(preferences.cardWidth)}px), 1fr))`,
+  gridTemplateColumns: `repeat(auto-fill, minmax(min(100%, ${String(cardWidth.value)}px), 1fr))`,
 }))
 const authorGridStyle = computed(() => ({
-  gridTemplateColumns: `repeat(${String(preferences.authorColumns)}, minmax(0, 1fr))`,
+  gridTemplateColumns: `repeat(${String(authorColumns.value)}, minmax(0, 1fr))`,
 }))
 const recommendationsQuery = useQuery({
   queryKey: ['recommendations'],
@@ -120,18 +118,11 @@ function refreshCurrentView() {
   else void refreshRecommendedUsers()
 }
 
-function setCardWidth(value: number) {
-  if (!Number.isSafeInteger(value) || value < 140 || value > 360 || value % 10 !== 0) return
-  preferences.cardWidth = value
-  saveDiscoveryPreferences(preferences)
-}
-
 function setAuthorColumns(value: string) {
   const parsed = Number(value)
   const selected = DISCOVERY_AUTHOR_COLUMN_OPTIONS.find((columns) => columns === parsed)
   if (selected === undefined) return
-  preferences.authorColumns = selected
-  saveDiscoveryPreferences(preferences)
+  authorColumns.value = selected
 }
 </script>
 
@@ -147,17 +138,8 @@ function setAuthorColumns(value: string) {
           <div v-if="activeView === 'artworks'" class="space-y-2">
             <p class="text-sm font-medium">卡片大小</p>
             <div class="flex items-center gap-3">
-              <Slider
-                class="flex-1"
-                :min="140"
-                :max="360"
-                :step="10"
-                :model-value="preferences.cardWidth"
-                @update:model-value="setCardWidth"
-              />
-              <output class="w-11 text-right text-xs tabular-nums">
-                {{ preferences.cardWidth }}px
-              </output>
+              <Slider v-model="cardWidth" class="flex-1" :min="140" :max="360" :step="10" />
+              <output class="w-11 text-right text-xs tabular-nums"> {{ cardWidth }}px </output>
             </div>
           </div>
           <div v-else class="flex items-center justify-between gap-3">
@@ -165,7 +147,7 @@ function setAuthorColumns(value: string) {
             <Select
               size="small"
               :options="authorColumnOptions"
-              :model-value="String(preferences.authorColumns)"
+              :model-value="String(authorColumns)"
               @update:model-value="setAuthorColumns"
             />
           </div>

@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { Check, ChevronLeft, ChevronRight, X } from '@lucide/vue'
-import { computed } from 'vue'
+import { computed, type Ref } from 'vue'
 
+import { usePreference } from '@/app/usePreference'
 import type { DiscoveryItem } from '@/features/discovery/discovery-api'
-import { useDownloadCandidatePreferences } from '@/features/downloads/download-candidate-preferences'
 import { useDownloadSelection } from '@/features/downloads/download-selection'
 import DiscoveryCandidateResults from '@/pages/downloads/DiscoveryCandidateResults.vue'
 import Button from '@ui/Button.vue'
@@ -24,12 +24,15 @@ const emit = defineEmits<{
   loadPage: [page: number]
 }>()
 
-const selection = useDownloadSelection()
-const preferences = useDownloadCandidatePreferences()
 const viewStyleOptions = [
   { value: 'list', label: '列表' },
   { value: 'artwork', label: '作品' },
 ] as const
+type DownloadCandidateViewStyle = (typeof viewStyleOptions)[number]['value']
+
+const selection = useDownloadSelection()
+const viewStyle = usePreference('downloadCandidates.viewStyle') as Ref<DownloadCandidateViewStyle>
+const cardWidth = usePreference('downloadCandidates.cardWidth')
 const pageFullySelected = computed(() => {
   const selectable = props.candidates.filter((item) => !item.inLibrary)
   return (
@@ -47,7 +50,7 @@ function togglePage() {
 function setViewStyle(value: string) {
   const selected = viewStyleOptions.find((option) => option.value === value)
   if (selected === undefined) return
-  preferences.setViewStyle(selected.value)
+  viewStyle.value = selected.value
 }
 </script>
 
@@ -82,24 +85,15 @@ function setViewStyle(value: string) {
                 <Select
                   size="small"
                   :options="viewStyleOptions"
-                  :model-value="preferences.viewStyle"
+                  :model-value="viewStyle"
                   @update:model-value="setViewStyle"
                 />
               </div>
-              <div v-if="preferences.viewStyle === 'artwork'" class="space-y-2">
+              <div v-if="viewStyle === 'artwork'" class="space-y-2">
                 <p class="text-sm font-medium">卡片大小</p>
                 <div class="flex items-center gap-3">
-                  <Slider
-                    class="flex-1"
-                    :min="140"
-                    :max="360"
-                    :step="10"
-                    :model-value="preferences.cardWidth"
-                    @update:model-value="preferences.setCardWidth"
-                  />
-                  <output class="w-11 text-right text-xs tabular-nums">
-                    {{ preferences.cardWidth }}px
-                  </output>
+                  <Slider v-model="cardWidth" class="flex-1" :min="140" :max="360" :step="10" />
+                  <output class="w-11 text-right text-xs tabular-nums"> {{ cardWidth }}px </output>
                 </div>
               </div>
             </div>
@@ -111,8 +105,8 @@ function setViewStyle(value: string) {
         v-if="candidates.length"
         :candidates="candidates"
         :selected-ids="selection.selectedIds"
-        :view-style="preferences.viewStyle"
-        :card-width="preferences.cardWidth"
+        :view-style="viewStyle"
+        :card-width="cardWidth"
         @toggle="selection.toggle"
       />
       <p v-else class="app-muted p-10 text-center">{{ emptyMessage }}</p>

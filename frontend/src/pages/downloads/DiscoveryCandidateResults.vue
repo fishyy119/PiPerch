@@ -4,14 +4,13 @@ import { computed, ref } from 'vue'
 
 import type { DiscoveryItem } from '@/features/discovery/discovery-api'
 import DiscoveryArtworkCard from '@/features/discovery/DiscoveryArtworkCard.vue'
-import type { DownloadCandidateViewStyle } from '@/features/downloads/download-candidate-preferences'
 import Checkbox from '@ui/Checkbox.vue'
 
 const props = withDefaults(
   defineProps<{
     candidates: readonly DiscoveryItem[]
     selectedIds: readonly number[]
-    viewStyle?: DownloadCandidateViewStyle
+    viewStyle?: 'list' | 'artwork'
     cardWidth?: number
   }>(),
   { viewStyle: 'list', cardWidth: 220 },
