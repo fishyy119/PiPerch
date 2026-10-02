@@ -2,7 +2,7 @@
 import { ImageOff, Images } from '@lucide/vue'
 import { computed, ref } from 'vue'
 
-import DiscoveryArtworkCard from '@/features/downloads/DiscoveryArtworkCard.vue'
+import DiscoveryArtworkCard from '@/features/discovery/DiscoveryArtworkCard.vue'
 import type { DiscoveryItem } from '@/features/downloads/download-api'
 import type { DownloadCandidateViewStyle } from '@/features/downloads/download-candidate-preferences'
 import Checkbox from '@ui/Checkbox.vue'

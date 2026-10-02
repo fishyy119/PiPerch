@@ -16,7 +16,7 @@ import {
   loadGalleryPreferences,
   saveGalleryPreferences,
 } from '@/features/gallery/gallery-preferences'
-import ArtworkGridItem from '@/pages/gallery/ArtworkGridItem.vue'
+import LibraryArtworkCard from '@/features/gallery/LibraryArtworkCard.vue'
 import GalleryFilterPopup from '@/pages/gallery/GalleryFilterPopup.vue'
 import TopbarActions from '@/pages/gallery/TopbarActions.vue'
 import Button from '@ui/Button.vue'
@@ -377,7 +377,7 @@ const deleteMutation = useMutation({
       class="gallery-grid"
       :style="artworkGridStyle"
     >
-      <ArtworkGridItem
+      <LibraryArtworkCard
         v-for="artwork in artworksQuery.data.value.items"
         :key="artwork.artworkId"
         :artwork="artwork"

@@ -8,7 +8,7 @@ import {
   loadDiscoveryPreferences,
   saveDiscoveryPreferences,
 } from '@/features/discovery/discovery-preferences'
-import DiscoveryArtworkCard from '@/features/downloads/DiscoveryArtworkCard.vue'
+import DiscoveryArtworkCard from '@/features/discovery/DiscoveryArtworkCard.vue'
 import {
   followUser,
   listRecommendations,
