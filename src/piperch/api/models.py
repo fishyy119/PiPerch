@@ -128,6 +128,19 @@ class RecommendationsResponse(ApiModel):
     items: list[DiscoveryItem]
 
 
+class RecommendedUserResponse(ApiModel):
+    user_id: int
+    name: str
+    comment: str
+    avatar_url: str | None
+    is_followed: bool
+    artworks: list[DiscoveryItem]
+
+
+class RecommendedUsersResponse(ApiModel):
+    items: list[RecommendedUserResponse]
+
+
 class ArtworkPreviewResponse(ApiModel):
     urls: list[str]
 

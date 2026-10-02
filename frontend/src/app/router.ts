@@ -15,25 +15,16 @@ export const router = createRouter({
       component: AppLayout,
       children: [
         { path: '', redirect: '/gallery' },
-        { path: 'discover', component: DiscoverPage, meta: { title: '发现' } },
-        { path: 'downloads', component: DownloadPage, meta: { title: '下载工作台' } },
+        { path: 'discover', component: DiscoverPage, meta: { title: '发现', hideTitle: true } },
+        {
+          path: 'downloads',
+          component: DownloadPage,
+          meta: { title: '下载工作台', hideTitle: true },
+        },
         {
           path: 'gallery',
           component: GalleryPage,
-          props: { view: 'artworks' },
           meta: { title: '本地图库', hideTitle: true },
-        },
-        {
-          path: 'gallery/authors',
-          component: GalleryPage,
-          props: { view: 'authors' },
-          meta: { title: '作者', hideTitle: true },
-        },
-        {
-          path: 'gallery/series',
-          component: GalleryPage,
-          props: { view: 'series' },
-          meta: { title: '系列', hideTitle: true },
         },
         {
           path: 'artworks/:artworkId(\\d+)',

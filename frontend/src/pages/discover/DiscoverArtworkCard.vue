@@ -7,10 +7,14 @@ import { type DiscoveryItem, listArtworkPreviewUrls } from '@/features/downloads
 import HoverCard from '@ui/HoverCard.vue'
 import SmartCropImage from '@ui/SmartCropImage.vue'
 
-const props = defineProps<{
-  artwork: DiscoveryItem
-  selected: boolean
-}>()
+const props = withDefaults(
+  defineProps<{
+    artwork: DiscoveryItem
+    selected: boolean
+    showAuthor?: boolean
+  }>(),
+  { showAuthor: true },
+)
 
 const emit = defineEmits<{
   toggle: [item: DiscoveryItem]
@@ -196,7 +200,7 @@ function hidePreviewOnFocusOut(event: FocusEvent) {
       >
         {{ artwork.title }}
       </a>
-      <span class="app-muted mt-0.5 block truncate text-xs">
+      <span v-if="showAuthor" class="app-muted mt-0.5 block truncate text-xs">
         {{ artwork.authorName }}
       </span>
     </div>

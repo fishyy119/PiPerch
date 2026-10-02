@@ -24,7 +24,7 @@ watch(sourceType, (value) => {
 </script>
 
 <template>
-  <Tabs v-model="sourceType" :items="sourceOptions">
+  <Tabs v-model="sourceType" :items="sourceOptions" teleport-to="#topbar-actions">
     <template #artwork>
       <ArtworkSourceTab />
     </template>

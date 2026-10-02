@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import mimetypes
 import time
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 from email.utils import parsedate_to_datetime
+from html.parser import HTMLParser
 from typing import TYPE_CHECKING, cast
 from urllib.parse import urlparse
 
@@ -24,6 +26,55 @@ _PIXIV_API_HOST = "www.pixiv.net"
 _MAX_THUMBNAIL_BYTES = 16 * 1024 * 1024
 
 
+class _PixivAuthPageParser(HTMLParser):
+    """提取 Pixiv 登录页中两种常见的认证数据载体。"""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.global_data: str | None = None
+        self.next_data_parts: list[str] = []
+        self._in_next_data = False
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        attributes = dict(attrs)
+        if tag == "meta" and attributes.get("name") == "global-data":
+            self.global_data = attributes.get("content")
+        elif tag == "script" and attributes.get("id") == "__NEXT_DATA__":
+            self._in_next_data = True
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag == "script" and self._in_next_data:
+            self._in_next_data = False
+
+    def handle_data(self, data: str) -> None:
+        if self._in_next_data:
+            self.next_data_parts.append(data)
+
+
+def _json_mapping(value: str) -> Mapping[str, object]:
+    try:
+        return as_mapping(cast("object", json.loads(value)))
+    except (json.JSONDecodeError, TypeError):
+        return {}
+
+
+def _csrf_token_from_html(document: str) -> str | None:
+    parser = _PixivAuthPageParser()
+    parser.feed(document)
+
+    if parser.global_data:
+        token = as_text(_json_mapping(parser.global_data).get("token"))
+        if token:
+            return token
+
+    next_data = _json_mapping("".join(parser.next_data_parts))
+    page_props = as_mapping(as_mapping(next_data.get("props")).get("pageProps"))
+    serialized_state = page_props.get("serverSerializedPreloadedState")
+    state = _json_mapping(serialized_state) if isinstance(serialized_state, str) else as_mapping(serialized_state)
+    token = as_text(as_mapping(state.get("api")).get("token"))
+    return token or None
+
+
 class PixivTransport:
     """集中处理 HTTPX 生命周期、限速、重试和下载主机校验。"""
 
@@ -37,6 +88,8 @@ class PixivTransport:
         self._active_requests = 0
         self._reconfiguring = False
         self._last_metadata_request = 0.0
+        self._csrf_cookie: str | None = None
+        self._cached_csrf_token: str | None = None
 
     @staticmethod
     def _build_client(proxy_url: str | None) -> httpx.AsyncClient:
@@ -118,6 +171,89 @@ class PixivTransport:
         if not isinstance(body, (dict, list)):
             raise UpstreamError("invalid_pixiv_response", "Pixiv 返回的数据结构无效。")
         return cast("Mapping[str, object] | Sequence[object]", body)
+
+    async def post_form(
+        self,
+        path: str,
+        *,
+        cookie: str | None,
+        data: Mapping[str, str | int],
+    ) -> None:
+        """携带当前会话的 CSRF token 提交 Pixiv 表单写请求。"""
+        if not cookie:
+            raise UpstreamError(
+                "pixiv_cookie_required",
+                "请先在设置中保存包含 PHPSESSID 的 Pixiv Cookie。",
+                401,
+            )
+
+        for attempt in range(2):
+            token = await self._get_csrf_token(cookie, force_refresh=attempt > 0)
+            try:
+                async with self._metadata_lock:
+                    remaining = self._request_interval - (time.monotonic() - self._last_metadata_request)
+                    if remaining > 0:
+                        await asyncio.sleep(remaining)
+                    response = await self._request(
+                        "POST",
+                        f"https://{_PIXIV_API_HOST}{path}",
+                        cookie=cookie,
+                        data=data,
+                        headers={
+                            "Origin": f"https://{_PIXIV_API_HOST}",
+                            "X-CSRF-TOKEN": token,
+                        },
+                    )
+                    self._last_metadata_request = time.monotonic()
+            except UpstreamError as error:
+                if error.status_code == 403 and attempt == 0:
+                    self._invalidate_csrf_token(cookie)
+                    continue
+                raise
+
+            try:
+                payload = cast("object", response.json())
+            except ValueError as error:
+                raise UpstreamError("invalid_pixiv_response", "Pixiv 返回的数据结构无效。") from error
+            root = as_mapping(payload)
+            if root.get("error") is True:
+                message = as_text(root.get("message")) or "Pixiv 返回了错误。"
+                raise UpstreamError("pixiv_error", message)
+            return
+
+        raise UpstreamError("pixiv_http_error", "Pixiv 拒绝了当前请求，请检查 Cookie 和访问频率。", 403)
+
+    async def _get_csrf_token(self, cookie: str, *, force_refresh: bool = False) -> str:
+        if not force_refresh and cookie == self._csrf_cookie and self._cached_csrf_token:
+            return self._cached_csrf_token
+
+        async with self._metadata_lock:
+            if not force_refresh and cookie == self._csrf_cookie and self._cached_csrf_token:
+                return self._cached_csrf_token
+            remaining = self._request_interval - (time.monotonic() - self._last_metadata_request)
+            if remaining > 0:
+                await asyncio.sleep(remaining)
+            response = await self._request(
+                "GET",
+                f"https://{_PIXIV_API_HOST}/",
+                cookie=cookie,
+            )
+            self._last_metadata_request = time.monotonic()
+
+        token = _csrf_token_from_html(response.text)
+        if token is None:
+            raise UpstreamError(
+                "pixiv_csrf_unavailable",
+                "无法从 Pixiv 页面读取关注操作所需的安全令牌。",
+            )
+        self._csrf_cookie = cookie
+        self._cached_csrf_token = token
+        return token
+
+    def _invalidate_csrf_token(self, cookie: str) -> None:
+        if cookie == self._csrf_cookie:
+            self._csrf_cookie = None
+            self._cached_csrf_token = None
 
     async def fetch_thumbnail(self, url: str, cookie: str | None) -> tuple[bytes, str]:
         """读取受信任的 pximg 缩略图，并限制响应类型和大小。"""
@@ -219,15 +355,21 @@ class PixivTransport:
         *,
         cookie: str | None,
         params: httpx.QueryParams | Mapping[str, str | int] | None = None,
+        data: Mapping[str, str | int] | None = None,
+        headers: Mapping[str, str] | None = None,
     ) -> httpx.Response:
         for attempt in range(3):
             try:
+                request_headers = self._cookie_headers(cookie)
+                if headers is not None:
+                    request_headers.update(headers)
                 async with self._use_client() as client:
                     response = await client.request(
                         method,
                         url,
                         params=params,
-                        headers=self._cookie_headers(cookie),
+                        data=data,
+                        headers=request_headers,
                     )
                 self._validate_api_url(str(response.url))
                 await self._raise_for_status(response)

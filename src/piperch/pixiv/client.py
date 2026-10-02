@@ -12,6 +12,7 @@ from piperch.domain import (
     BookmarkVisibility,
     DiscoveryCandidate,
     FollowedUser,
+    RecommendedUser,
     RemoteArtwork,
     TagRecord,
     UgoiraFrame,
@@ -129,6 +130,79 @@ class PixivClient:
             if candidate is not None:
                 ordered.setdefault(artwork_id, candidate)
         return list(ordered.values())
+
+    async def discover_recommended_users(
+        self,
+        cookie: str | None,
+    ) -> list[RecommendedUser]:
+        """读取当前账号的推荐作者，并关联作者资料与近期插画。"""
+        self._require_current_user_id(cookie)
+        body = _mapping(
+            await self._transport.get_body(
+                "/ajax/discovery/users",
+                cookie=cookie,
+                params={"limit": 20, "lang": "zh"},
+            )
+        )
+
+        users_by_id: dict[int, Mapping[str, object]] = {}
+        for raw_user in _sequence(body.get("users")):
+            user = _mapping(raw_user)
+            user_id = _integer(user.get("userId"))
+            if user_id > 0:
+                users_by_id.setdefault(user_id, user)
+
+        artworks_by_id: dict[int, DiscoveryCandidate] = {}
+        thumbnails = _mapping(body.get("thumbnails"))
+        for raw_thumbnail in _sequence(thumbnails.get("illust")):
+            thumbnail = _mapping(raw_thumbnail)
+            artwork_id = _integer(thumbnail.get("id"))
+            if artwork_id > 0:
+                artworks_by_id.setdefault(
+                    artwork_id,
+                    candidate_from_mapping(thumbnail, default_artwork_id=artwork_id),
+                )
+
+        recommended: dict[int, RecommendedUser] = {}
+        for raw_recommendation in _sequence(body.get("recommendedUsers")):
+            recommendation = _mapping(raw_recommendation)
+            user_id = _integer(recommendation.get("userId"))
+            user = users_by_id.get(user_id)
+            if user_id <= 0 or user is None:
+                continue
+            artworks = tuple(
+                artwork
+                for raw_artwork_id in _sequence(recommendation.get("recentIllustIds"))
+                if (artwork := artworks_by_id.get(_integer(raw_artwork_id))) is not None
+            )
+            recommended.setdefault(
+                user_id,
+                RecommendedUser(
+                    user_id=user_id,
+                    name=_text(user.get("name")) or f"用户 {user_id}",
+                    comment=_text(user.get("comment")),
+                    avatar_url=_text(user.get("imageBig")) or _text(user.get("image")) or None,
+                    is_followed=user.get("isFollowed") is True,
+                    artworks=artworks,
+                ),
+            )
+        return list(recommended.values())
+
+    async def follow_user(self, user_id: int, cookie: str | None) -> None:
+        """使用当前账号公开关注指定作者。"""
+        self._require_current_user_id(cookie)
+        await self._transport.post_form(
+            "/bookmark_add.php",
+            cookie=cookie,
+            data={
+                "mode": "add",
+                "type": "user",
+                "user_id": user_id,
+                "tag": "",
+                "restrict": 0,
+                "format": "json",
+            },
+        )
 
     async def list_artwork_preview_urls(
         self,

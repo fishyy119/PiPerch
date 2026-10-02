@@ -119,6 +119,16 @@ class DiscoveryCandidate:
 
 
 @dataclass(frozen=True, slots=True)
+class RecommendedUser:
+    user_id: int
+    name: str
+    comment: str
+    avatar_url: str | None
+    is_followed: bool
+    artworks: tuple[DiscoveryCandidate, ...]
+
+
+@dataclass(frozen=True, slots=True)
 class FollowedUser:
     user_id: int
     name: str

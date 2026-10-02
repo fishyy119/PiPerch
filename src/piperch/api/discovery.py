@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
+
 from anyio import to_thread
-from fastapi import APIRouter, Depends, Path
+from fastapi import APIRouter, Depends, Path, Response, status
 
 from piperch.api.dependencies import get_container
 from piperch.api.models import (
@@ -17,6 +19,8 @@ from piperch.api.models import (
     FollowedUserResponse,
     FollowedUsersResponse,
     RecommendationsResponse,
+    RecommendedUserResponse,
+    RecommendedUsersResponse,
     UserArtworkIdsResponse,
     UserDiscoveryRequest,
 )
@@ -28,7 +32,7 @@ router = APIRouter(prefix="/discovery", tags=["discovery"])
 
 
 def _discovery_items(
-    candidates: list[DiscoveryCandidate],
+    candidates: Sequence[DiscoveryCandidate],
     existing_ids: set[int],
 ) -> list[DiscoveryItem]:
     return [
@@ -100,6 +104,41 @@ async def recommendations(
         [item.artwork_id for item in candidates],
     )
     return RecommendationsResponse(items=_discovery_items(candidates, existing_ids))
+
+
+@router.get("/recommended-users", response_model=RecommendedUsersResponse)
+async def recommended_users(
+    container: AppContainer = Depends(get_container),
+) -> RecommendedUsersResponse:
+    settings = await to_thread.run_sync(container.settings.get)
+    users = await container.pixiv.discover_recommended_users(settings.pixiv_cookie)
+    existing_ids = await to_thread.run_sync(
+        container.artworks.find_existing_ids,
+        [artwork.artwork_id for user in users for artwork in user.artworks],
+    )
+    return RecommendedUsersResponse(
+        items=[
+            RecommendedUserResponse(
+                user_id=user.user_id,
+                name=user.name,
+                comment=user.comment,
+                avatar_url=proxied_image_url(user.avatar_url),
+                is_followed=user.is_followed,
+                artworks=_discovery_items(user.artworks, existing_ids),
+            )
+            for user in users
+        ]
+    )
+
+
+@router.post("/users/{user_id}/follow", status_code=status.HTTP_204_NO_CONTENT)
+async def follow_user(
+    user_id: int = Path(gt=0),
+    container: AppContainer = Depends(get_container),
+) -> Response:
+    settings = await to_thread.run_sync(container.settings.get)
+    await container.pixiv.follow_user(user_id, settings.pixiv_cookie)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.get(

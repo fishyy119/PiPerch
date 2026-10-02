@@ -18,6 +18,16 @@ export const discoveryItemSchema = z.object({
 })
 export type DiscoveryItem = z.infer<typeof discoveryItemSchema>
 
+export const recommendedUserSchema = z.object({
+  userId: z.number().int().positive(),
+  name: z.string(),
+  comment: z.string(),
+  avatarUrl: z.string().startsWith('/api/pixiv-images?url=').nullable(),
+  isFollowed: z.boolean(),
+  artworks: z.array(discoveryItemSchema),
+})
+export type RecommendedUser = z.infer<typeof recommendedUserSchema>
+
 export const followedUserSchema = z.object({
   userId: z.number().int().positive(),
   name: z.string(),
@@ -49,6 +59,10 @@ const discoveryResponseSchema = z.object({
 
 const recommendationsResponseSchema = z.object({
   items: z.array(discoveryItemSchema),
+})
+
+const recommendedUsersResponseSchema = z.object({
+  items: z.array(recommendedUserSchema),
 })
 
 const artworkPreviewResponseSchema = z.object({
@@ -115,6 +129,17 @@ export async function listRecommendations() {
   return recommendationsResponseSchema.parse(
     await api.get<unknown>('/api/discovery/recommendations'),
   ).items
+}
+
+export async function listRecommendedUsers() {
+  return recommendedUsersResponseSchema.parse(
+    await api.get<unknown>('/api/discovery/recommended-users'),
+  ).items
+}
+
+export async function followUser(userId: number) {
+  const path = `/api/discovery/users/${encodeURIComponent(String(userId))}/follow`
+  await api.post<undefined>(path)
 }
 
 export async function listArtworkPreviewUrls(artworkId: number) {

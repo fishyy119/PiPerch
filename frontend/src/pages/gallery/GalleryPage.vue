@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { CheckSquare, ChevronLeft, ChevronRight, RotateCcw, Trash2 } from '@lucide/vue'
+import { CheckSquare, ChevronLeft, ChevronRight, Trash2 } from '@lucide/vue'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query'
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
@@ -12,8 +12,6 @@ import {
   listTags,
 } from '@/features/gallery/gallery-api'
 import {
-  clearGalleryPreferences,
-  DEFAULT_GALLERY_PREFERENCES,
   GALLERY_PAGE_SIZE_OPTIONS,
   loadGalleryPreferences,
   saveGalleryPreferences,
@@ -29,7 +27,6 @@ import SearchInput from '@ui/SearchInput.vue'
 import Select from '@ui/Select.vue'
 import Slider from '@ui/Slider.vue'
 
-const props = defineProps<{ view: 'artworks' | 'authors' | 'series' }>()
 const route = useRoute()
 const router = useRouter()
 const queryClient = useQueryClient()
@@ -93,26 +90,18 @@ function artworkFilters(): GalleryFilters {
 const artworksQuery = useQuery({
   queryKey: computed(() => ['artworks', artworkFilters()]),
   queryFn: () => listArtworks(artworkFilters()),
-  enabled: computed(() => props.view === 'artworks'),
-})
-
-const namedQuery = useQuery({
-  queryKey: computed(() => [props.view, route.fullPath]),
-  queryFn: () =>
-    listNamed(props.view === 'authors' ? 'authors' : 'series', pageNumber(), singleQuery('search')),
-  enabled: computed(() => props.view !== 'artworks'),
 })
 
 const tagsQuery = useQuery({ queryKey: ['tags'], queryFn: () => listTags() })
 const filterAuthorsQuery = useQuery({
   queryKey: computed(() => ['filter-authors', authorFilterSearch.value]),
   queryFn: () => listNamed('authors', 0, authorFilterSearch.value),
-  enabled: computed(() => props.view === 'artworks' && filterOpen.value),
+  enabled: computed(() => filterOpen.value),
 })
 const filterSeriesQuery = useQuery({
   queryKey: computed(() => ['filter-series', seriesFilterSearch.value]),
   queryFn: () => listNamed('series', 0, seriesFilterSearch.value),
-  enabled: computed(() => props.view === 'artworks' && filterOpen.value),
+  enabled: computed(() => filterOpen.value),
 })
 const activeFilterCount = computed(() => {
   const scalarFilters = [
@@ -138,12 +127,6 @@ const visibleFullySelected = computed(() => {
 const artworkGridStyle = computed(() => ({
   '--gallery-card-width': `${String(preferredCardWidth.value)}px`,
 }))
-const preferencesAreDefault = computed(
-  () =>
-    preferredCardWidth.value === DEFAULT_GALLERY_PREFERENCES.cardWidth &&
-    preferredPageSize.value === DEFAULT_GALLERY_PREFERENCES.pageSize,
-)
-
 watch(
   () => route.query.search,
   () => {
@@ -234,13 +217,6 @@ function setCardWidth(value: number) {
   })
 }
 
-function resetGalleryPreferences() {
-  clearGalleryPreferences()
-  preferredCardWidth.value = DEFAULT_GALLERY_PREFERENCES.cardWidth
-  preferredPageSize.value = DEFAULT_GALLERY_PREFERENCES.pageSize
-  replaceQuery({})
-}
-
 function toggleSelection(id: number) {
   selected.value = selected.value.includes(id)
     ? selected.value.filter((item) => item !== id)
@@ -269,13 +245,6 @@ const deleteMutation = useMutation({
     await queryClient.invalidateQueries({ queryKey: ['tags'] })
   },
 })
-
-function openNamed(itemId: number) {
-  void router.push({
-    path: '/gallery',
-    query: { [props.view === 'authors' ? 'authorId' : 'seriesId']: String(itemId) },
-  })
-}
 </script>
 
 <template>
@@ -287,14 +256,13 @@ function openNamed(itemId: number) {
       <SearchInput
         v-model="searchInput"
         class="max-w-xl min-w-40 flex-1"
-        :placeholder="view === 'artworks' ? '搜索作品标题或画师…' : '搜索名称…'"
+        placeholder="搜索作品标题或画师…"
         clearable
         submit-button
         @clear="clearSearch"
       />
 
       <FilterButton
-        v-if="view === 'artworks'"
         :active-count="activeFilterCount"
         hide-label-until-large
         @toggle="filterOpen = !filterOpen"
@@ -302,7 +270,6 @@ function openNamed(itemId: number) {
       />
 
       <Button
-        v-if="view === 'artworks'"
         :variant="selectionMode ? 'primary' : 'secondary'"
         class="hidden shrink-0 md:inline-flex"
         @click="toggleSelectionMode"
@@ -313,7 +280,6 @@ function openNamed(itemId: number) {
   </TopbarActions>
 
   <GalleryFilterPopup
-    v-if="view === 'artworks'"
     :open="filterOpen"
     :tags="tagsQuery.data.value ?? []"
     :authors="filterAuthorsQuery.data.value?.items ?? []"
@@ -336,9 +302,9 @@ function openNamed(itemId: number) {
     @update-series-search="seriesFilterSearch = $event"
   />
 
-  <div :class="selectionMode && view === 'artworks' ? 'pb-40 sm:pb-28' : ''">
+  <div :class="selectionMode ? 'pb-40 sm:pb-28' : ''">
     <div class="mb-5 grid gap-3 sm:hidden">
-      <div v-if="view === 'artworks'" class="flex gap-2">
+      <div class="flex gap-2">
         <FilterButton
           :active-count="activeFilterCount"
           @toggle="filterOpen = !filterOpen"
@@ -353,7 +319,7 @@ function openNamed(itemId: number) {
         <SearchInput
           v-model="searchInput"
           class="w-full"
-          :placeholder="view === 'artworks' ? '搜索作品标题或画师…' : '搜索名称…'"
+          placeholder="搜索作品标题或画师…"
           clearable
           submit-button
           @clear="clearSearch"
@@ -361,100 +327,60 @@ function openNamed(itemId: number) {
       </form>
     </div>
 
-    <section v-if="view === 'artworks'">
-      <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <div class="min-w-0">
-          <p class="app-muted text-sm">{{ resultRange }}</p>
-          <p v-if="singleQuery('search')" class="app-muted mt-0.5 truncate text-xs">
-            搜索“{{ singleQuery('search') }}”
-          </p>
-        </div>
-        <div class="flex flex-wrap items-center gap-3">
-          <label class="app-muted flex items-center gap-2 text-xs">
-            <span>卡片</span>
-            <Slider
-              class="w-28 sm:w-36"
-              :min="140"
-              :max="360"
-              :step="10"
-              :model-value="preferredCardWidth"
-              @update:model-value="setCardWidth"
-            />
-            <output class="w-11 text-right tabular-nums">{{ preferredCardWidth }}px</output>
-          </label>
-          <label class="app-muted flex items-center gap-2 text-xs">
-            <span>每页</span>
-            <Select
-              size="small"
-              :options="pageSizeOptions"
-              :model-value="String(preferredPageSize)"
-              @update:model-value="setPageSize"
-            />
-          </label>
-          <Button
-            variant="ghost"
-            :disabled="preferencesAreDefault"
-            @click="resetGalleryPreferences"
-          >
-            <RotateCcw :size="15" />重置
-          </Button>
-        </div>
-      </div>
-
-      <div v-if="artworksQuery.isPending.value" class="app-muted py-20 text-center">
-        正在读取图库…
-      </div>
-      <div v-else-if="artworksQuery.error.value" class="py-20 text-center text-destructive">
-        {{ artworksQuery.error.value.message }}
-      </div>
-      <div
-        v-else-if="artworksQuery.data.value?.items.length"
-        class="gallery-grid"
-        :style="artworkGridStyle"
-      >
-        <ArtworkGridItem
-          v-for="artwork in artworksQuery.data.value.items"
-          :key="artwork.artworkId"
-          :artwork="artwork"
-          :selected="selected.includes(artwork.artworkId)"
-          :selection-mode="selectionMode"
-          @toggle-selection="toggleSelection"
-          @filter-author="replaceQuery({ authorId: String($event) })"
-        />
-      </div>
-      <Card v-else class="app-muted py-20 text-center"> 图库中没有符合条件的作品。 </Card>
-    </section>
-
-    <section v-else>
-      <div class="mb-4 flex items-center justify-between gap-3">
-        <p class="app-muted text-sm">
-          共 {{ namedQuery.data.value?.totalElements ?? 0 }} 个{{
-            view === 'authors' ? '作者' : '系列'
-          }}
+    <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+      <div class="min-w-0">
+        <p class="app-muted text-sm">{{ resultRange }}</p>
+        <p v-if="singleQuery('search')" class="app-muted mt-0.5 truncate text-xs">
+          搜索“{{ singleQuery('search') }}”
         </p>
       </div>
-      <div v-if="namedQuery.isPending.value" class="app-muted py-20 text-center">正在读取…</div>
-      <div
-        v-else-if="namedQuery.data.value?.items.length"
-        class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
-      >
-        <Card
-          v-for="item in namedQuery.data.value.items"
-          :key="item.itemId"
-          as="button"
-          type="button"
-          class="cursor-pointer p-5 text-left transition hover:-translate-y-0.5 hover:border-primary hover:shadow-sm"
-          @click="openNamed(item.itemId)"
-        >
-          <strong class="block truncate">{{ item.name }}</strong>
-          <span v-if="item.subtitle" class="app-muted mt-1 block truncate text-sm">
-            {{ item.subtitle }}
-          </span>
-          <span class="mt-4 block text-sm text-primary">{{ item.count }} 个作品</span>
-        </Card>
+      <div class="flex flex-wrap items-center gap-3">
+        <label class="app-muted flex items-center gap-2 text-xs">
+          <span>卡片</span>
+          <Slider
+            class="w-28 sm:w-36"
+            :min="140"
+            :max="360"
+            :step="10"
+            :model-value="preferredCardWidth"
+            @update:model-value="setCardWidth"
+          />
+          <output class="w-11 text-right tabular-nums">{{ preferredCardWidth }}px</output>
+        </label>
+        <label class="app-muted flex items-center gap-2 text-xs">
+          <span>每页</span>
+          <Select
+            size="small"
+            :options="pageSizeOptions"
+            :model-value="String(preferredPageSize)"
+            @update:model-value="setPageSize"
+          />
+        </label>
       </div>
-      <Card v-else class="app-muted py-20 text-center">暂无数据。</Card>
-    </section>
+    </div>
+
+    <div v-if="artworksQuery.isPending.value" class="app-muted py-20 text-center">
+      正在读取图库…
+    </div>
+    <div v-else-if="artworksQuery.error.value" class="py-20 text-center text-destructive">
+      {{ artworksQuery.error.value.message }}
+    </div>
+    <div
+      v-else-if="artworksQuery.data.value?.items.length"
+      class="gallery-grid"
+      :style="artworkGridStyle"
+    >
+      <ArtworkGridItem
+        v-for="artwork in artworksQuery.data.value.items"
+        :key="artwork.artworkId"
+        :artwork="artwork"
+        :selected="selected.includes(artwork.artworkId)"
+        :selection-mode="selectionMode"
+        @toggle-selection="toggleSelection"
+        @filter-author="replaceQuery({ authorId: String($event) })"
+      />
+    </div>
+    <Card v-else class="app-muted py-20 text-center"> 图库中没有符合条件的作品。 </Card>
 
     <nav class="mt-8 flex items-center justify-center gap-3">
       <Button variant="secondary" :disabled="pageNumber() === 0" @click="setPage(pageNumber() - 1)">
@@ -462,24 +388,12 @@ function openNamed(itemId: number) {
       </Button>
       <span class="app-muted text-sm">
         第 {{ pageNumber() + 1 }} /
-        {{
-          Math.max(
-            1,
-            view === 'artworks'
-              ? (artworksQuery.data.value?.totalPages ?? 1)
-              : (namedQuery.data.value?.totalPages ?? 1),
-          )
-        }}
+        {{ Math.max(1, artworksQuery.data.value?.totalPages ?? 1) }}
         页
       </span>
       <Button
         variant="secondary"
-        :disabled="
-          pageNumber() + 1 >=
-          (view === 'artworks'
-            ? (artworksQuery.data.value?.totalPages ?? 0)
-            : (namedQuery.data.value?.totalPages ?? 0))
-        "
+        :disabled="pageNumber() + 1 >= (artworksQuery.data.value?.totalPages ?? 0)"
         @click="setPage(pageNumber() + 1)"
       >
         下一页<ChevronRight :size="17" />
@@ -496,7 +410,7 @@ function openNamed(itemId: number) {
     leave-to-class="translate-y-3 opacity-0"
   >
     <div
-      v-if="selectionMode && view === 'artworks'"
+      v-if="selectionMode"
       class="pointer-events-none fixed right-0 bottom-4 left-0 z-20 px-4 lg:left-60 lg:px-6"
     >
       <Card
