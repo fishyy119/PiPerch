@@ -12,6 +12,7 @@ import {
 import DiscoveryArtworkCard from '@/features/discovery/DiscoveryArtworkCard.vue'
 import { useDownloadSelection } from '@/features/downloads/download-selection'
 import DiscoverAuthorCard from '@/pages/discover/DiscoverAuthorCard.vue'
+import DiscoverDownloadButton from '@/pages/discover/DiscoverDownloadButton.vue'
 import { errorMessage } from '@/shared/errors'
 import Button from '@ui/Button.vue'
 import Card from '@ui/Card.vue'
@@ -216,4 +217,5 @@ function updateAuthorFollowState(userId: number, followed: boolean) {
       </Card>
     </template>
   </Tabs>
+  <DiscoverDownloadButton />
 </template>

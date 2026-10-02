@@ -6,12 +6,12 @@ import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { discover } from '@/features/discovery/discovery-api'
 import {
   cancelDownloadJob,
-  createDownloadJob,
   type DownloadJob,
   listDownloadJobs,
   retryDownloadJob,
 } from '@/features/downloads/download-api'
 import { useDownloadSelection } from '@/features/downloads/download-selection'
+import { useDownloadSubmissionStore } from '@/features/downloads/download-submission'
 import { errorMessage } from '@/shared/errors'
 import Button from '@ui/Button.vue'
 import Card from '@ui/Card.vue'
@@ -96,55 +96,7 @@ const jobsQuery = useQuery({
   refetchInterval: 15_000,
 })
 
-const createMutation = useMutation({
-  mutationFn: async () => {
-    const artworkIds = [...selection.selectedIds]
-    const batches = Array.from({ length: Math.ceil(artworkIds.length / 1000) }, (_, index) =>
-      artworkIds.slice(index * 1000, (index + 1) * 1000),
-    )
-    const submittedArtworkIds: number[] = []
-    let createdJobCount = 0
-    let failedError: unknown = null
-    for (const [index, batch] of batches.entries()) {
-      try {
-        const batchSuffix =
-          batches.length > 1 ? `，第 ${String(index + 1)}/${String(batches.length)} 批` : ''
-        await createDownloadJob(
-          batch,
-          `${props.sourceLabel}来源（${String(artworkIds.length)} 项${batchSuffix}）`,
-        )
-        submittedArtworkIds.push(...batch)
-        createdJobCount += 1
-      } catch (error) {
-        if (createdJobCount === 0) throw error
-        failedError = error
-        break
-      }
-    }
-    return {
-      createdJobCount,
-      submittedArtworkIds,
-      remainingCount: artworkIds.length - submittedArtworkIds.length,
-      failedError,
-    }
-  },
-  onMutate: () => {
-    notice.value = ''
-    submissionError.value = ''
-  },
-  onSuccess: async (result) => {
-    selection.removeIds(result.submittedArtworkIds)
-    if (result.failedError !== null) {
-      submissionError.value = `已提交 ${String(result.createdJobCount)} 个下载任务，仍有 ${String(result.remainingCount)} 项未提交：${errorMessage(result.failedError)}`
-    } else {
-      notice.value =
-        result.createdJobCount === 1
-          ? '下载任务已提交。'
-          : `已分批提交 ${String(result.createdJobCount)} 个下载任务。`
-    }
-    await queryClient.invalidateQueries({ queryKey: ['download-jobs'] })
-  },
-})
+const submission = useDownloadSubmissionStore()
 
 const actionMutation = useMutation({
   mutationFn: async ({ action, jobId }: { action: 'cancel' | 'retry'; jobId: string }) => {
@@ -202,6 +154,24 @@ function progressLabel(job: DownloadJob) {
   return progress.totalPages === null
     ? `作品 ${String(progress.currentArtworkId)} · 正在准备下载`
     : `作品 ${String(progress.currentArtworkId)} · ${String(progress.completedPages)} / ${String(progress.totalPages)} 页`
+}
+
+async function submitSelection() {
+  notice.value = ''
+  submissionError.value = ''
+  try {
+    const result = await submission.submit(props.sourceLabel)
+    if (result.failedError !== null) {
+      submissionError.value = `已提交 ${String(result.createdJobCount)} 个下载任务，仍有 ${String(result.remainingCount)} 项未提交：${errorMessage(result.failedError)}`
+    } else {
+      notice.value =
+        result.createdJobCount === 1
+          ? '下载任务已提交。'
+          : `已分批提交 ${String(result.createdJobCount)} 个下载任务。`
+    }
+  } catch {
+    // 具体错误由共享提交状态统一保存，并在下方展示。
+  }
 }
 </script>
 
@@ -281,18 +251,18 @@ function progressLabel(job: DownloadJob) {
       </div>
       <Button
         class="mt-4 w-full"
-        :disabled="selection.selectedIds.length === 0 || createMutation.isPending.value"
-        @click="createMutation.mutate()"
+        :disabled="selection.selectedIds.length === 0 || submission.isPending"
+        @click="submitSelection"
       >
         <Download :size="18" />
-        {{ createMutation.isPending.value ? '提交中…' : '创建下载任务' }}
+        {{ submission.isPending ? '提交中…' : '创建下载任务' }}
       </Button>
       <p v-if="notice" class="mt-3 text-sm text-success">{{ notice }}</p>
       <p v-if="submissionError" class="mt-3 text-sm text-destructive">
         {{ submissionError }}
       </p>
-      <p v-else-if="createMutation.error.value" class="mt-3 text-sm text-destructive">
-        {{ errorMessage(createMutation.error.value) }}
+      <p v-else-if="submission.error" class="mt-3 text-sm text-destructive">
+        {{ errorMessage(submission.error) }}
       </p>
     </Card>
 
