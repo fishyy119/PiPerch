@@ -12,12 +12,18 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query'
 import { computed, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 
+import { usePreference } from '@/app/usePreference'
+import { getUserProfile, type UserProfile, userProfileKey } from '@/features/authors/author-api'
+import AuthorFollowButton from '@/features/authors/AuthorFollowButton.vue'
+import AuthorIdButton from '@/features/authors/AuthorIdButton.vue'
 import { deleteArtwork, getArtwork, listRelatedArtworks } from '@/features/gallery/gallery-api'
 import SafeHtml from '@/pages/artworks/SafeHtml.vue'
 import Button from '@ui/Button.vue'
 import Card from '@ui/Card.vue'
 import ConfirmDialog from '@ui/ConfirmDialog.vue'
 import LightboxGallery, { type LightboxItem } from '@ui/LightboxGallery.vue'
+import SettingsPopover from '@ui/SettingsPopover.vue'
+import Slider from '@ui/Slider.vue'
 import SmartCropImage from '@ui/SmartCropImage.vue'
 
 const PAGE_SELECTOR_ITEM_SIZE_PX = 80
@@ -32,6 +38,8 @@ const pageSelectorExpanded = ref(false)
 const pageSelectorGrid = ref<HTMLElement | null>(null)
 const pageSelectorColumns = ref(Number.POSITIVE_INFINITY)
 const deleteOpen = ref(false)
+const authorAvatarFailed = ref(false)
+const relatedCardWidth = usePreference('artworkDetail.relatedCardWidth')
 
 const artworkQuery = useQuery({
   queryKey: computed(() => ['artwork', artworkId.value]),
@@ -41,6 +49,18 @@ const relatedQuery = useQuery({
   queryKey: computed(() => ['related-artworks', artworkId.value]),
   queryFn: () => listRelatedArtworks(artworkId.value),
 })
+const authorId = computed(() => artworkQuery.data.value?.authorId)
+const authorProfileQuery = useQuery({
+  queryKey: computed(() => userProfileKey(authorId.value ?? 0)),
+  queryFn: () => {
+    if (authorId.value === undefined) throw new Error('作品缺少作者 ID。')
+    return getUserProfile(authorId.value)
+  },
+  enabled: computed(() => authorId.value !== undefined),
+})
+const relatedGridStyle = computed(() => ({
+  gridTemplateColumns: `repeat(auto-fill, minmax(min(100%, ${String(relatedCardWidth.value)}px), ${String(relatedCardWidth.value)}px))`,
+}))
 
 const deleteMutation = useMutation({
   mutationFn: () => deleteArtwork(artworkId.value),
@@ -49,6 +69,14 @@ const deleteMutation = useMutation({
     await router.replace('/gallery')
   },
 })
+
+function updateAuthorFollowState(followed: boolean) {
+  const userId = authorId.value
+  if (userId === undefined) return
+  queryClient.setQueryData<UserProfile>(userProfileKey(userId), (profile) =>
+    profile ? { ...profile, isFollowed: followed } : profile,
+  )
+}
 
 const pageIndexes = computed(() => {
   const artwork = artworkQuery.data.value
@@ -96,6 +124,7 @@ const pageSelectorCanExpand = computed(
 watch(artworkId, () => {
   selectedPage.value = null
   pageSelectorExpanded.value = false
+  authorAvatarFailed.value = false
 })
 
 watch(
@@ -335,9 +364,28 @@ function typeLabel(type: string) {
         </Card>
 
         <Card as="section" class="p-5 sm:p-6">
-          <div class="mb-4">
-            <h2 class="font-semibold">相关作品</h2>
-            <p class="mt-1 text-xs text-muted-foreground">根据本地作品的作者和共享标签推荐。</p>
+          <div class="mb-4 flex items-start justify-between gap-3">
+            <div>
+              <h2 class="font-semibold">相关作品</h2>
+              <p class="mt-1 text-xs text-muted-foreground">根据本地作品的作者和共享标签推荐。</p>
+            </div>
+            <SettingsPopover title="相关作品显示设置">
+              <div class="space-y-2">
+                <p class="text-sm font-medium">卡片大小</p>
+                <div class="flex items-center gap-3">
+                  <Slider
+                    v-model="relatedCardWidth"
+                    class="flex-1"
+                    :min="120"
+                    :max="320"
+                    :step="10"
+                  />
+                  <output class="w-11 text-right text-xs tabular-nums">
+                    {{ relatedCardWidth }}px
+                  </output>
+                </div>
+              </div>
+            </SettingsPopover>
           </div>
           <p v-if="relatedQuery.isPending.value" class="py-8 text-sm text-muted-foreground">
             正在查找相关作品…
@@ -347,15 +395,16 @@ function typeLabel(type: string) {
           </p>
           <div
             v-else-if="relatedQuery.data.value?.length"
-            class="grid grid-cols-[repeat(auto-fill,10rem)] justify-between gap-x-4 gap-y-5"
+            class="grid justify-between gap-4"
+            :style="relatedGridStyle"
           >
             <RouterLink
               v-for="related in relatedQuery.data.value"
               :key="related.artworkId"
-              class="group block w-40 min-w-0"
+              class="group block min-w-0"
               :to="`/artworks/${String(related.artworkId)}`"
             >
-              <div class="size-40 overflow-hidden rounded-xl bg-muted">
+              <div class="aspect-square w-full overflow-hidden rounded-xl bg-muted">
                 <SmartCropImage
                   class="size-full object-cover transition duration-300 group-hover:scale-[1.025]"
                   :src="`/api/artworks/${String(related.artworkId)}/thumbnail`"
@@ -363,12 +412,6 @@ function typeLabel(type: string) {
                   loading="lazy"
                 />
               </div>
-              <strong class="mt-2 block truncate text-sm group-hover:text-primary">
-                {{ related.title }}
-              </strong>
-              <span class="mt-0.5 block truncate text-xs text-muted-foreground">
-                {{ related.authorName }}
-              </span>
             </RouterLink>
           </div>
           <p v-else class="py-8 text-sm text-muted-foreground">本地图库中暂无相关作品。</p>
@@ -377,20 +420,43 @@ function typeLabel(type: string) {
 
       <aside class="space-y-4 xl:sticky xl:top-20">
         <Card as="section" class="p-5">
-          <h3 class="text-sm font-semibold text-muted-foreground">画师</h3>
+          <div class="flex items-center justify-between gap-3">
+            <h3 class="text-sm font-semibold text-muted-foreground">画师</h3>
+            <span v-if="authorProfileQuery.isPending.value" class="text-xs text-muted-foreground">
+              查询中…
+            </span>
+            <span v-else-if="authorProfileQuery.error.value" class="text-xs text-muted-foreground">
+              状态未知
+            </span>
+            <AuthorFollowButton
+              v-else-if="authorProfileQuery.data.value"
+              size="small"
+              :user-id="artworkQuery.data.value.authorId"
+              :followed="authorProfileQuery.data.value.isFollowed"
+              @change="updateAuthorFollowState"
+            />
+          </div>
           <button
             type="button"
             :class="[
               'group mt-3 flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left',
-              'cursor-pointer transition hover:bg-accent',
+              'cursor-pointer transition',
               'focus-visible:bg-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
             ]"
             @click="filterByAuthor"
           >
             <span
-              class="grid size-12 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground shadow-sm"
+              class="grid size-12 shrink-0 place-items-center overflow-hidden rounded-full bg-primary text-primary-foreground shadow-sm"
             >
-              <UserRound :size="22" />
+              <img
+                v-if="authorProfileQuery.data.value?.avatarUrl && !authorAvatarFailed"
+                class="size-full object-cover"
+                :src="authorProfileQuery.data.value.avatarUrl"
+                alt=""
+                loading="lazy"
+                @error="authorAvatarFailed = true"
+              />
+              <UserRound v-else :size="22" />
             </span>
             <span class="min-w-0">
               <strong class="block truncate text-sm transition group-hover:text-primary">{{
@@ -402,7 +468,7 @@ function typeLabel(type: string) {
           <div
             class="mt-2 flex items-center justify-between gap-3 px-2 text-xs text-muted-foreground"
           >
-            <span>ID: {{ artworkQuery.data.value.authorId }}</span>
+            <AuthorIdButton :user-id="artworkQuery.data.value.authorId" />
             <a
               class="inline-flex items-center gap-1 transition hover:text-primary"
               :href="`https://www.pixiv.net/users/${String(artworkQuery.data.value.authorId)}`"

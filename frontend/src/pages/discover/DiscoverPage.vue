@@ -1,11 +1,10 @@
 <script setup lang="ts">
 import { RefreshCw } from '@lucide/vue'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query'
+import { useQuery, useQueryClient } from '@tanstack/vue-query'
 import { computed, ref, watch } from 'vue'
 
 import { usePreference } from '@/app/usePreference'
 import {
-  followUser,
   listRecommendations,
   listRecommendedUsers,
   type RecommendedUser,
@@ -78,21 +77,6 @@ watch(
   { immediate: true },
 )
 
-const followMutation = useMutation({
-  mutationFn: followUser,
-  onSuccess: (_, userId) => {
-    queryClient.setQueryData<RecommendedUser[]>(recommendedUsersKey, (authors) =>
-      authors?.map((author) =>
-        author.userId === userId ? { ...author, isFollowed: true } : author,
-      ),
-    )
-    toast.success(`已关注作者 ${String(userId)}`)
-  },
-  onError: (error) => {
-    toast.error('关注作者失败', { description: errorMessage(error) })
-  },
-})
-
 const isRefreshing = computed(() =>
   activeView.value === 'artworks'
     ? recommendationsQuery.isFetching.value
@@ -123,6 +107,14 @@ function setAuthorColumns(value: string) {
   const selected = DISCOVERY_AUTHOR_COLUMN_OPTIONS.find((columns) => columns === parsed)
   if (selected === undefined) return
   authorColumns.value = selected
+}
+
+function updateAuthorFollowState(userId: number, followed: boolean) {
+  queryClient.setQueryData<RecommendedUser[]>(recommendedUsersKey, (authors) =>
+    authors?.map((author) =>
+      author.userId === userId ? { ...author, isFollowed: followed } : author,
+    ),
+  )
 }
 </script>
 
@@ -215,11 +207,8 @@ function setAuthorColumns(value: string) {
           :key="author.userId"
           :author="author"
           :selected-ids="selection.selectedIds"
-          :following="
-            followMutation.isPending.value && followMutation.variables.value === author.userId
-          "
+          @follow-change="updateAuthorFollowState"
           @toggle="selection.toggle"
-          @follow="followMutation.mutate"
         />
       </div>
       <Card v-else class="py-20 text-center text-muted-foreground">

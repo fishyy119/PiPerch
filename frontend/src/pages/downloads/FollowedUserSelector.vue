@@ -2,7 +2,7 @@
 import { UserRound } from '@lucide/vue'
 import { ref } from 'vue'
 
-import type { FollowedUser } from '@/features/discovery/discovery-api'
+import type { FollowedUser } from '@/features/authors/author-api'
 
 defineProps<{
   users: readonly FollowedUser[]

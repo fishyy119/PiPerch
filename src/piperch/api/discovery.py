@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 
 from anyio import to_thread
-from fastapi import APIRouter, Depends, Path, Response, status
+from fastapi import APIRouter, Depends, Path
 
 from piperch.api.dependencies import get_container
 from piperch.api.models import (
@@ -16,8 +16,6 @@ from piperch.api.models import (
     DiscoveryItem,
     DiscoveryRequest,
     DiscoveryResponse,
-    FollowedUserResponse,
-    FollowedUsersResponse,
     RecommendationsResponse,
     RecommendedUserResponse,
     RecommendedUsersResponse,
@@ -131,16 +129,6 @@ async def recommended_users(
     )
 
 
-@router.post("/users/{user_id}/follow", status_code=status.HTTP_204_NO_CONTENT)
-async def follow_user(
-    user_id: int = Path(gt=0),
-    container: AppContainer = Depends(get_container),
-) -> Response:
-    settings = await to_thread.run_sync(container.settings.get)
-    await container.pixiv.follow_user(user_id, settings.pixiv_cookie)
-    return Response(status_code=status.HTTP_204_NO_CONTENT)
-
-
 @router.get(
     "/artworks/{artwork_id}/preview",
     response_model=ArtworkPreviewResponse,
@@ -203,22 +191,4 @@ async def selectable_user_artwork_ids(
     existing_ids = await to_thread.run_sync(container.artworks.find_existing_ids, artwork_ids)
     return UserArtworkIdsResponse(
         artwork_ids=[artwork_id for artwork_id in artwork_ids if artwork_id not in existing_ids]
-    )
-
-
-@router.get("/followed-users", response_model=FollowedUsersResponse)
-async def followed_users(
-    container: AppContainer = Depends(get_container),
-) -> FollowedUsersResponse:
-    settings = await to_thread.run_sync(container.settings.get)
-    items = await container.pixiv.list_followed_users(settings.pixiv_cookie)
-    return FollowedUsersResponse(
-        items=[
-            FollowedUserResponse(
-                user_id=item.user_id,
-                name=item.name,
-                avatar_url=proxied_image_url(item.avatar_url),
-            )
-            for item in items
-        ]
     )

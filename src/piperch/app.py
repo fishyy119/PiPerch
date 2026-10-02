@@ -19,7 +19,7 @@ from fastapi.responses import JSONResponse, Response
 from sqlalchemy import text
 from starlette.exceptions import HTTPException
 
-from piperch.api import discovery, downloads, gallery, pixiv_images, settings
+from piperch.api import authors, discovery, downloads, gallery, pixiv_images, settings
 from piperch.api.models import ErrorBody, ErrorResponse, HealthResponse
 from piperch.container import AppContainer
 from piperch.database import Database, run_migrations
@@ -208,6 +208,7 @@ def create_app(paths: AppPaths | None = None, control: AppControl | None = None)
         return HealthResponse(instance_id=container.instance_id)
 
     application.include_router(settings.router, prefix="/api")
+    application.include_router(authors.router, prefix="/api")
     application.include_router(discovery.router, prefix="/api")
     application.include_router(pixiv_images.router, prefix="/api")
     application.include_router(downloads.router, prefix="/api")

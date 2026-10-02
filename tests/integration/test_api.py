@@ -67,7 +67,7 @@ def test_followed_users_returns_safe_author_fields(
 
     monkeypatch.setattr(container.pixiv, "list_followed_users", list_followed_users)
 
-    response = client.get("/api/discovery/followed-users")
+    response = client.get("/api/authors/followed")
 
     assert response.status_code == 200
     assert response.json() == {

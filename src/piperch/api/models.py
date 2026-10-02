@@ -159,6 +159,11 @@ class RecommendedUsersResponse(ApiModel):
     items: list[RecommendedUserResponse]
 
 
+class UserProfileResponse(ApiModel):
+    avatar_url: str | None
+    is_followed: bool | None
+
+
 class ArtworkPreviewResponse(ApiModel):
     urls: list[str]
 

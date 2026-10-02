@@ -16,6 +16,7 @@ from piperch.domain import (
     RemoteArtwork,
     TagRecord,
     UgoiraFrame,
+    UserProfile,
 )
 from piperch.errors import UpstreamError
 from piperch.pixiv.parsing import (
@@ -202,6 +203,35 @@ class PixivClient:
                 "restrict": 0,
                 "format": "json",
             },
+        )
+
+    async def unfollow_user(self, user_id: int, cookie: str | None) -> None:
+        """取消当前账号对指定作者的关注。"""
+        self._require_current_user_id(cookie)
+        await self._transport.post_form(
+            "/rpc_group_setting.php",
+            cookie=cookie,
+            data={
+                "mode": "del",
+                "type": "bookuser",
+                "id": user_id,
+            },
+        )
+
+    async def get_user_profile(self, user_id: int, cookie: str | None) -> UserProfile:
+        """读取作者头像和当前账号的关注状态。"""
+        body = _mapping(
+            await self._transport.get_body(
+                f"/ajax/user/{user_id}",
+                cookie=cookie,
+                params={"full": 1, "lang": "zh"},
+            )
+        )
+        return UserProfile(
+            avatar_url=(
+                _text(body.get("imageBig")) or _text(body.get("image")) or _text(body.get("profileImageUrl")) or None
+            ),
+            is_followed=body.get("isFollowed") is True if parse_pixiv_user_id(cookie) is not None else None,
         )
 
     async def list_artwork_preview_urls(

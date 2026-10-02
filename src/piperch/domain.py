@@ -136,6 +136,12 @@ class FollowedUser:
 
 
 @dataclass(frozen=True, slots=True)
+class UserProfile:
+    avatar_url: str | None
+    is_followed: bool | None
+
+
+@dataclass(frozen=True, slots=True)
 class BookmarkFolderReference:
     visibility: BookmarkVisibility
     tag: str | None

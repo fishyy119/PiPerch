@@ -11,6 +11,9 @@ export interface PreferenceConfig {
     cardWidth: number
     authorColumns: number
   }
+  artworkDetail: {
+    relatedCardWidth: number
+  }
   downloadCandidates: {
     viewStyle: string
     cardWidth: number
@@ -27,6 +30,9 @@ export const PREFERENCE_DEFAULTS: PreferenceConfig = {
   discovery: {
     cardWidth: 220,
     authorColumns: 1,
+  },
+  artworkDetail: {
+    relatedCardWidth: 160,
   },
   downloadCandidates: {
     viewStyle: 'list',

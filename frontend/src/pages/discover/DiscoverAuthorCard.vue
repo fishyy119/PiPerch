@@ -1,38 +1,27 @@
 <script setup lang="ts">
-import { Check, LoaderCircle, UserPlus, UserRound } from '@lucide/vue'
+import { UserRound } from '@lucide/vue'
 import { ref } from 'vue'
 
+import AuthorFollowButton from '@/features/authors/AuthorFollowButton.vue'
+import AuthorIdButton from '@/features/authors/AuthorIdButton.vue'
 import type { DiscoveryItem, RecommendedUser } from '@/features/discovery/discovery-api'
 import DiscoveryArtworkCard from '@/features/discovery/DiscoveryArtworkCard.vue'
-import { errorMessage } from '@/shared/errors'
-import Button from '@ui/Button.vue'
 import Card from '@ui/Card.vue'
-import { toast } from '@ui/toast'
 
 defineProps<{
   author: RecommendedUser
   selectedIds: readonly number[]
-  following: boolean
 }>()
 
 const emit = defineEmits<{
   toggle: [item: DiscoveryItem]
-  follow: [userId: number]
+  followChange: [userId: number, followed: boolean]
 }>()
 
 const avatarFailed = ref(false)
 
 function pixivUserUrl(userId: number) {
   return `https://www.pixiv.net/users/${String(userId)}`
-}
-
-async function copyUserId(userId: number) {
-  try {
-    await navigator.clipboard.writeText(String(userId))
-    toast.success(`已复制作者 ID ${String(userId)}`)
-  } catch (error) {
-    toast.error('复制作者 ID 失败', { description: errorMessage(error) })
-  }
 }
 </script>
 
@@ -63,27 +52,15 @@ async function copyUserId(userId: number) {
           >
             {{ author.name }}
           </a>
-          <button
-            type="button"
-            class="mt-0.5 cursor-pointer text-xs text-muted-foreground transition-colors hover:text-primary"
-            title="复制作者 ID"
-            @click="copyUserId(author.userId)"
-          >
-            ID: {{ author.userId }}
-          </button>
+          <AuthorIdButton class="mt-0.5" :user-id="author.userId" />
         </div>
       </div>
 
-      <Button
-        :variant="author.isFollowed ? 'secondary' : 'primary'"
-        :disabled="author.isFollowed || following"
-        @click="emit('follow', author.userId)"
-      >
-        <LoaderCircle v-if="following" class="animate-spin" :size="17" />
-        <Check v-else-if="author.isFollowed" :size="17" />
-        <UserPlus v-else :size="17" />
-        {{ following ? '关注中…' : author.isFollowed ? '已关注' : '关注' }}
-      </Button>
+      <AuthorFollowButton
+        :user-id="author.userId"
+        :followed="author.isFollowed"
+        @change="emit('followChange', author.userId, $event)"
+      />
     </header>
 
     <p

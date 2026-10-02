@@ -3,11 +3,8 @@ import { Check, Search, UsersRound } from '@lucide/vue'
 import { useMutation } from '@tanstack/vue-query'
 import { computed, ref } from 'vue'
 
-import {
-  type FollowedUser,
-  listFollowedUsers,
-  listSelectableUserArtworkIds,
-} from '@/features/discovery/discovery-api'
+import { type FollowedUser, listFollowedUsers } from '@/features/authors/author-api'
+import { listSelectableUserArtworkIds } from '@/features/discovery/discovery-api'
 import { useDownloadSelection } from '@/features/downloads/download-selection'
 import DiscoverySourceLayout from '@/pages/downloads/DiscoverySourceLayout.vue'
 import FollowedUserSelector from '@/pages/downloads/FollowedUserSelector.vue'
