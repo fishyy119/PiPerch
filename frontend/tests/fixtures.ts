@@ -1,4 +1,4 @@
-import type { DiscoveryItem } from '@/features/downloads/download-api'
+import type { DiscoveryItem } from '@/features/discovery/discovery-api'
 
 export function discoveryItem(
   artworkId: number,

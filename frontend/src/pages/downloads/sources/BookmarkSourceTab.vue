@@ -9,7 +9,7 @@ import {
   type DiscoveryItem,
   listBookmarkFolders,
   listSelectableBookmarkArtworkIds,
-} from '@/features/downloads/download-api'
+} from '@/features/discovery/discovery-api'
 import { useDownloadSelection } from '@/features/downloads/download-selection'
 import BookmarkFolderSelector from '@/pages/downloads/BookmarkFolderSelector.vue'
 import DiscoverySourceLayout from '@/pages/downloads/DiscoverySourceLayout.vue'

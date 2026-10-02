@@ -3,10 +3,10 @@ import { ChevronDown, ChevronUp, Download, ImageOff, LoaderCircle, RefreshCw, X 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query'
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 
+import { discover } from '@/features/discovery/discovery-api'
 import {
   cancelDownloadJob,
   createDownloadJob,
-  discover,
   type DownloadJob,
   listDownloadJobs,
   retryDownloadJob,

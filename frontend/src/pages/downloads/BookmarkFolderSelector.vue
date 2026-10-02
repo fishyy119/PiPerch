@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Check, LockKeyhole } from '@lucide/vue'
 
-import type { BookmarkFolder, BookmarkFolderReference } from '@/features/downloads/download-api'
+import type { BookmarkFolder, BookmarkFolderReference } from '@/features/discovery/discovery-api'
 
 const props = defineProps<{
   folders: readonly BookmarkFolder[]

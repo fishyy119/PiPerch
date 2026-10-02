@@ -2,7 +2,7 @@ import { http, HttpResponse } from 'msw'
 import { setupServer } from 'msw/node'
 import { ZodError } from 'zod'
 
-import { discover } from '@/features/downloads/download-api'
+import { discover } from '@/features/discovery/discovery-api'
 import { api } from '@/shared/api/http'
 
 const server = setupServer()

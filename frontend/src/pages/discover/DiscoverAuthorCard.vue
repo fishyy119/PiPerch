@@ -2,8 +2,8 @@
 import { Check, LoaderCircle, UserPlus, UserRound } from '@lucide/vue'
 import { ref } from 'vue'
 
+import type { DiscoveryItem, RecommendedUser } from '@/features/discovery/discovery-api'
 import DiscoveryArtworkCard from '@/features/discovery/DiscoveryArtworkCard.vue'
-import type { DiscoveryItem, RecommendedUser } from '@/features/downloads/download-api'
 import { errorMessage } from '@/shared/errors'
 import Button from '@ui/Button.vue'
 import Card from '@ui/Card.vue'

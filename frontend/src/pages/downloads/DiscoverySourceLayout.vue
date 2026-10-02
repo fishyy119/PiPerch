@@ -2,7 +2,7 @@
 import { Check, ChevronLeft, ChevronRight, X } from '@lucide/vue'
 import { computed } from 'vue'
 
-import type { DiscoveryItem } from '@/features/downloads/download-api'
+import type { DiscoveryItem } from '@/features/discovery/discovery-api'
 import { useDownloadCandidatePreferences } from '@/features/downloads/download-candidate-preferences'
 import { useDownloadSelection } from '@/features/downloads/download-selection'
 import DiscoveryCandidateResults from '@/pages/downloads/DiscoveryCandidateResults.vue'

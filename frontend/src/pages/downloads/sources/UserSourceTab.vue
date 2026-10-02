@@ -7,7 +7,7 @@ import {
   type FollowedUser,
   listFollowedUsers,
   listSelectableUserArtworkIds,
-} from '@/features/downloads/download-api'
+} from '@/features/discovery/discovery-api'
 import { useDownloadSelection } from '@/features/downloads/download-selection'
 import DiscoverySourceLayout from '@/pages/downloads/DiscoverySourceLayout.vue'
 import FollowedUserSelector from '@/pages/downloads/FollowedUserSelector.vue'

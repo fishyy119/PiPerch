@@ -5,7 +5,7 @@ import {
   discover,
   type DiscoveryItem,
   type DiscoveryRequest,
-} from '@/features/downloads/download-api'
+} from '@/features/discovery/discovery-api'
 import { useDownloadSelection } from '@/features/downloads/download-selection'
 
 export function useDiscoveryPagination(makeRequest: (page: number) => DiscoveryRequest) {

@@ -4,17 +4,17 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query'
 import { computed, reactive, ref, watch } from 'vue'
 
 import {
+  followUser,
+  listRecommendations,
+  listRecommendedUsers,
+  type RecommendedUser,
+} from '@/features/discovery/discovery-api'
+import {
   DISCOVERY_AUTHOR_COLUMN_OPTIONS,
   loadDiscoveryPreferences,
   saveDiscoveryPreferences,
 } from '@/features/discovery/discovery-preferences'
 import DiscoveryArtworkCard from '@/features/discovery/DiscoveryArtworkCard.vue'
-import {
-  followUser,
-  listRecommendations,
-  listRecommendedUsers,
-  type RecommendedUser,
-} from '@/features/downloads/download-api'
 import { useDownloadSelection } from '@/features/downloads/download-selection'
 import DiscoverAuthorCard from '@/pages/discover/DiscoverAuthorCard.vue'
 import { errorMessage } from '@/shared/errors'

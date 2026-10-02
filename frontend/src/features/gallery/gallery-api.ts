@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-import { artworkTypeSchema } from '@/features/downloads/download-api'
+import { artworkTypeSchema } from '@/features/artworks/artwork'
 import { api } from '@/shared/api/http'
 
 export const tagSchema = z.object({

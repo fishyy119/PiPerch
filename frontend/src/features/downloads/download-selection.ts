@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 
-import type { DiscoveryItem } from './download-api'
+import type { DiscoveryItem } from '@/features/discovery/discovery-api'
 
 export interface DownloadSelectionEntry {
   artworkId: number

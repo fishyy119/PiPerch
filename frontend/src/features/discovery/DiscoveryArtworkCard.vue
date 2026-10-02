@@ -5,7 +5,7 @@ import { computed } from 'vue'
 
 import type { ArtworkCardTarget } from '@/features/artworks/artwork-card'
 import ArtworkCard from '@/features/artworks/ArtworkCard.vue'
-import { type DiscoveryItem, listArtworkPreviewUrls } from '@/features/downloads/download-api'
+import { type DiscoveryItem, listArtworkPreviewUrls } from '@/features/discovery/discovery-api'
 
 const props = withDefaults(
   defineProps<{

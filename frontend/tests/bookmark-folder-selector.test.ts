@@ -2,7 +2,7 @@ import userEvent from '@testing-library/user-event'
 import { render, screen } from '@testing-library/vue'
 import { vi } from 'vitest'
 
-import type { BookmarkFolder } from '@/features/downloads/download-api'
+import type { BookmarkFolder } from '@/features/discovery/discovery-api'
 import BookmarkFolderSelector from '@/pages/downloads/BookmarkFolderSelector.vue'
 
 const folders: BookmarkFolder[] = [
