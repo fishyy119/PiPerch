@@ -3,6 +3,7 @@ import { ArrowDown, ArrowUp } from '@lucide/vue'
 import { computed, ref } from 'vue'
 
 import type { NamedCount, Tag } from '@/features/gallery/gallery-api'
+import CollapsibleFilterOptions from '@/pages/gallery/CollapsibleFilterOptions.vue'
 import FilterOptionButton from '@/pages/gallery/FilterOptionButton.vue'
 import Button from '@ui/Button.vue'
 import Dialog from '@ui/Dialog.vue'
@@ -54,7 +55,7 @@ const visibleTags = computed(() => {
     position="top"
     title="筛选本地作品"
     title-class="mb-5"
-    content-class="w-full p-4 sm:p-6 lg:left-60"
+    content-class="p-4 sm:p-6 lg:left-60"
     overlay-class="top-16 lg:left-60"
     @update:open="!$event && emit('close')"
   >
@@ -148,7 +149,7 @@ const visibleTags = computed(() => {
         <h3 class="filter-row-title">标签</h3>
         <div>
           <SearchInput v-model="tagSearch" class="mb-3 w-full max-w-sm" placeholder="搜索标签…" />
-          <div class="flex flex-wrap gap-2">
+          <CollapsibleFilterOptions>
             <FilterOptionButton
               v-for="tag in visibleTags"
               :key="tag.tagId"
@@ -161,7 +162,7 @@ const visibleTags = computed(() => {
             <span v-if="visibleTags.length === 0" class="app-muted text-sm">
               没有匹配的本地标签。
             </span>
-          </div>
+          </CollapsibleFilterOptions>
         </div>
       </section>
 
@@ -174,7 +175,7 @@ const visibleTags = computed(() => {
             placeholder="搜索作者…"
             @update:model-value="emit('updateAuthorSearch', $event)"
           />
-          <div class="flex flex-wrap gap-2">
+          <CollapsibleFilterOptions>
             <FilterOptionButton
               v-if="authorId && !authors.some((item) => item.itemId === authorId)"
               :active="true"
@@ -199,7 +200,7 @@ const visibleTags = computed(() => {
             <span v-if="authors.length === 0" class="app-muted text-sm">
               没有匹配的本地作者。
             </span>
-          </div>
+          </CollapsibleFilterOptions>
         </div>
       </section>
 
@@ -212,7 +213,7 @@ const visibleTags = computed(() => {
             placeholder="搜索系列…"
             @update:model-value="emit('updateSeriesSearch', $event)"
           />
-          <div class="flex flex-wrap gap-2">
+          <CollapsibleFilterOptions>
             <FilterOptionButton
               v-if="seriesId && !series.some((item) => item.itemId === seriesId)"
               :active="true"
@@ -235,7 +236,7 @@ const visibleTags = computed(() => {
               {{ item.name }} <span class="app-muted text-xs">{{ item.count }}</span>
             </FilterOptionButton>
             <span v-if="series.length === 0" class="app-muted text-sm"> 没有匹配的本地系列。 </span>
-          </div>
+          </CollapsibleFilterOptions>
         </div>
       </section>
     </div>
