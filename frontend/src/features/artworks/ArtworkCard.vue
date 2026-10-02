@@ -19,10 +19,11 @@ const props = withDefaults(
     target: ArtworkCardTarget
     resolvePreviewUrl: ArtworkPreviewUrlResolver
     selected?: boolean
+    showTitle?: boolean
     showAuthor?: boolean
     showPagePreview?: boolean
   }>(),
-  { selected: false, showAuthor: true, showPagePreview: true },
+  { selected: false, showTitle: true, showAuthor: true, showPagePreview: true },
 )
 
 const thumbnailFailed = ref(false)
@@ -42,9 +43,9 @@ watch(
 </script>
 
 <template>
-  <article class="group min-w-0">
+  <article class="min-w-0">
     <div
-      class="relative aspect-square overflow-hidden rounded-xl bg-muted ring-primary transition"
+      class="group relative aspect-square overflow-hidden rounded-xl bg-muted ring-primary transition"
       :class="selected ? 'ring-3' : 'ring-0'"
     >
       <component
@@ -54,13 +55,13 @@ watch(
       >
         <SmartCropImage
           v-if="thumbnailUrl && !thumbnailFailed"
-          class="size-full object-cover transition duration-300 group-hover:scale-[1.025]"
+          class="size-full object-cover transition duration-300 hover:scale-[1.025]"
           :src="thumbnailUrl"
           :alt="title"
           loading="lazy"
           @error="thumbnailFailed = true"
         />
-        <ImageOff v-else class="app-muted absolute inset-0 m-auto" :size="28" />
+        <ImageOff v-else class="absolute inset-0 m-auto text-muted-foreground" :size="28" />
       </component>
 
       <slot name="leading-action" />
@@ -73,16 +74,17 @@ watch(
       <slot name="trailing-action" />
     </div>
 
-    <div class="pt-2.5">
+    <div v-if="showTitle || showAuthor" class="pt-2.5">
       <component
         :is="linkComponent"
+        v-if="showTitle"
         v-bind="linkAttributes"
-        class="block truncate text-sm font-semibold hover:text-primary"
+        class="block truncate text-sm font-semibold transition-colors hover:text-primary"
       >
         {{ title }}
       </component>
       <slot v-if="showAuthor" name="author" :author-name="authorName">
-        <span class="app-muted mt-0.5 block truncate text-xs">
+        <span class="mt-0.5 block truncate text-xs text-muted-foreground">
           {{ authorName }}
         </span>
       </slot>

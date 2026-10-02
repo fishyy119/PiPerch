@@ -168,7 +168,9 @@ function typeLabel(type: string) {
 </script>
 
 <template>
-  <div v-if="artworkQuery.isPending.value" class="app-muted py-24 text-center">正在读取作品…</div>
+  <div v-if="artworkQuery.isPending.value" class="py-24 text-center text-muted-foreground">
+    正在读取作品…
+  </div>
   <div v-else-if="artworkQuery.error.value" class="py-24 text-center text-destructive">
     {{ artworkQuery.error.value.message }}
   </div>
@@ -242,7 +244,7 @@ function typeLabel(type: string) {
           </div>
 
           <div class="flex flex-wrap items-center justify-between gap-3 border-t p-3 sm:p-4">
-            <div class="app-muted flex items-center gap-2 text-sm">
+            <div class="flex items-center gap-2 text-sm text-muted-foreground">
               <Images :size="17" />
               <span v-if="artworkQuery.data.value.artworkType === 'ugoira'">
                 {{ artworkQuery.data.value.ugoiraFrames.length }} 帧 · 首版暂不支持播放
@@ -308,10 +310,10 @@ function typeLabel(type: string) {
             class="detail-description mt-5 text-sm leading-7"
             :html="artworkQuery.data.value.description"
           />
-          <p v-else class="app-muted mt-5 text-sm">作者没有为这件作品添加说明。</p>
+          <p v-else class="mt-5 text-sm text-muted-foreground">作者没有为这件作品添加说明。</p>
 
           <div v-if="artworkQuery.data.value.tags.length" class="mt-5 border-t pt-4">
-            <h3 class="app-muted mb-2 text-xs font-medium">标签</h3>
+            <h3 class="mb-2 text-xs font-medium text-muted-foreground">标签</h3>
             <div class="flex flex-wrap gap-2">
               <button
                 v-for="tag in artworkQuery.data.value.tags"
@@ -323,7 +325,7 @@ function typeLabel(type: string) {
                 <span>{{ tag.translatedName || tag.name }}</span>
                 <span
                   v-if="tag.translatedName && tag.translatedName !== tag.name"
-                  class="app-muted"
+                  class="text-muted-foreground"
                 >
                   {{ tag.name }}
                 </span>
@@ -335,9 +337,9 @@ function typeLabel(type: string) {
         <Card as="section" class="p-5 sm:p-6">
           <div class="mb-4">
             <h2 class="font-semibold">相关作品</h2>
-            <p class="app-muted mt-1 text-xs">根据本地作品的作者和共享标签推荐。</p>
+            <p class="mt-1 text-xs text-muted-foreground">根据本地作品的作者和共享标签推荐。</p>
           </div>
-          <p v-if="relatedQuery.isPending.value" class="app-muted py-8 text-sm">
+          <p v-if="relatedQuery.isPending.value" class="py-8 text-sm text-muted-foreground">
             正在查找相关作品…
           </p>
           <p v-else-if="relatedQuery.error.value" class="py-8 text-sm text-destructive">
@@ -364,16 +366,18 @@ function typeLabel(type: string) {
               <strong class="mt-2 block truncate text-sm group-hover:text-primary">
                 {{ related.title }}
               </strong>
-              <span class="app-muted mt-0.5 block truncate text-xs">{{ related.authorName }}</span>
+              <span class="mt-0.5 block truncate text-xs text-muted-foreground">
+                {{ related.authorName }}
+              </span>
             </RouterLink>
           </div>
-          <p v-else class="app-muted py-8 text-sm">本地图库中暂无相关作品。</p>
+          <p v-else class="py-8 text-sm text-muted-foreground">本地图库中暂无相关作品。</p>
         </Card>
       </div>
 
       <aside class="space-y-4 xl:sticky xl:top-20">
         <Card as="section" class="p-5">
-          <h3 class="app-muted text-sm font-semibold">画师</h3>
+          <h3 class="text-sm font-semibold text-muted-foreground">画师</h3>
           <button
             type="button"
             :class="[
@@ -392,10 +396,12 @@ function typeLabel(type: string) {
               <strong class="block truncate text-sm transition group-hover:text-primary">{{
                 artworkQuery.data.value.authorName
               }}</strong>
-              <span class="app-muted mt-0.5 block text-xs">查看本地作品</span>
+              <span class="mt-0.5 block text-xs text-muted-foreground">查看本地作品</span>
             </span>
           </button>
-          <div class="app-muted mt-2 flex items-center justify-between gap-3 px-2 text-xs">
+          <div
+            class="mt-2 flex items-center justify-between gap-3 px-2 text-xs text-muted-foreground"
+          >
             <span>ID: {{ artworkQuery.data.value.authorId }}</span>
             <a
               class="inline-flex items-center gap-1 transition hover:text-primary"
@@ -412,34 +418,34 @@ function typeLabel(type: string) {
           <h3 class="text-sm font-semibold">作品信息</h3>
           <dl class="mt-3 grid gap-3 text-sm">
             <div class="flex justify-between gap-3">
-              <dt class="app-muted">作品 ID</dt>
+              <dt class="text-muted-foreground">作品 ID</dt>
               <dd>{{ artworkQuery.data.value.artworkId }}</dd>
             </div>
             <div class="flex justify-between gap-3">
-              <dt class="app-muted">类型</dt>
+              <dt class="text-muted-foreground">类型</dt>
               <dd>{{ typeLabel(artworkQuery.data.value.artworkType) }}</dd>
             </div>
             <div class="flex justify-between gap-3">
-              <dt class="app-muted">尺寸</dt>
+              <dt class="text-muted-foreground">尺寸</dt>
               <dd>
                 {{ artworkQuery.data.value.width ?? '未知' }} ×
                 {{ artworkQuery.data.value.height ?? '未知' }}
               </dd>
             </div>
             <div class="flex justify-between gap-3">
-              <dt class="app-muted">页数</dt>
+              <dt class="text-muted-foreground">页数</dt>
               <dd>{{ artworkQuery.data.value.pageCount }}</dd>
             </div>
             <div class="flex justify-between gap-3">
-              <dt class="app-muted">发布时间</dt>
+              <dt class="text-muted-foreground">发布时间</dt>
               <dd class="text-right">{{ formatDate(artworkQuery.data.value.publishedAt) }}</dd>
             </div>
             <div class="flex justify-between gap-3">
-              <dt class="app-muted">下载时间</dt>
+              <dt class="text-muted-foreground">下载时间</dt>
               <dd class="text-right">{{ formatDate(artworkQuery.data.value.downloadedAt) }}</dd>
             </div>
             <div v-if="artworkQuery.data.value.seriesId" class="flex justify-between gap-3">
-              <dt class="app-muted shrink-0">所属系列</dt>
+              <dt class="shrink-0 text-muted-foreground">所属系列</dt>
               <dd class="min-w-0 text-right">
                 <button
                   type="button"

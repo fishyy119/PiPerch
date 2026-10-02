@@ -63,7 +63,7 @@ function toggleFolder(folder: BookmarkFolder) {
         <Check v-if="isSelected(folder)" :size="13" :stroke-width="3" />
       </span>
       <span class="min-w-0 flex-1 truncate text-sm font-medium">{{ folder.name }}</span>
-      <span class="app-muted shrink-0 text-xs">{{ folder.itemCount }}</span>
+      <span class="shrink-0 text-xs text-muted-foreground">{{ folder.itemCount }}</span>
       <LockKeyhole
         v-if="folder.visibility === 'private'"
         class="shrink-0 text-muted-foreground"

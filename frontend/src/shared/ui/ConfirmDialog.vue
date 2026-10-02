@@ -57,7 +57,7 @@ function updateOpen(open: boolean) {
           ]"
         >
           <AlertDialogTitle class="text-lg font-semibold">{{ title }}</AlertDialogTitle>
-          <AlertDialogDescription class="app-muted mt-2 text-sm leading-6">
+          <AlertDialogDescription class="mt-2 text-sm leading-6 text-muted-foreground">
             {{ description }}
           </AlertDialogDescription>
           <div class="mt-6 flex justify-end gap-2">

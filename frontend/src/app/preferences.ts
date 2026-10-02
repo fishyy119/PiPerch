@@ -4,6 +4,8 @@ export interface PreferenceConfig {
   gallery: {
     cardWidth: number
     pageSize: number
+    showTitle: boolean
+    showAuthor: boolean
   }
   discovery: {
     cardWidth: number
@@ -19,6 +21,8 @@ export const PREFERENCE_DEFAULTS: PreferenceConfig = {
   gallery: {
     cardWidth: 220,
     pageSize: 24,
+    showTitle: true,
+    showAuthor: true,
   },
   discovery: {
     cardWidth: 220,

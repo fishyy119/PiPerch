@@ -82,7 +82,7 @@ function close() {
           </DialogTitle>
           <DialogDescription
             v-if="description || $slots.description"
-            class="app-muted mt-2 text-sm leading-6"
+            class="mt-2 text-sm leading-6 text-muted-foreground"
           >
             <slot name="description">{{ description }}</slot>
           </DialogDescription>

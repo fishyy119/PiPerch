@@ -91,10 +91,12 @@ function hidePreviewOnFocusOut(event: FocusEvent) {
       <div
         :class="[
           'absolute top-2 right-2 z-10',
-          'max-w-[calc(100%-1rem)]',
-          'flex flex-wrap justify-end gap-0.5 rounded-xl p-1',
-          'bg-overlay/55 opacity-0 shadow-sm backdrop-blur-sm transition',
-          'group-focus-within:opacity-100 group-hover:opacity-100',
+          'max-w-[calc(100%-2rem)]',
+          'grid grid-cols-[repeat(auto-fit,0.625rem)] justify-between gap-0.5 rounded-md p-1',
+          'bg-overlay/55 shadow-sm backdrop-blur-sm transition',
+          previewOpen
+            ? 'opacity-100'
+            : 'opacity-0 group-focus-within:opacity-100 group-hover:opacity-100',
         ]"
         @focusout="hidePreviewOnFocusOut"
       >
@@ -138,7 +140,7 @@ function hidePreviewOnFocusOut(event: FocusEvent) {
       />
       <ImageOff
         v-else-if="!previewUrl || previewImageFailed"
-        class="app-muted absolute inset-0 m-auto"
+        class="absolute inset-0 m-auto text-muted-foreground"
         :size="28"
       />
     </div>

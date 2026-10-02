@@ -68,11 +68,11 @@ function markThumbnailUnavailable(artworkId: number) {
           loading="lazy"
           @error="markThumbnailUnavailable(item.artworkId)"
         />
-        <ImageOff v-else class="app-muted" :size="22" />
+        <ImageOff v-else class="text-muted-foreground" :size="22" />
       </div>
       <span class="min-w-0 flex-1">
         <strong class="block truncate text-sm" :title="item.title">{{ item.title }}</strong>
-        <span class="app-muted mt-2 flex min-w-0 items-center gap-3 text-xs">
+        <span class="mt-2 flex min-w-0 items-center gap-3 text-xs text-muted-foreground">
           <span class="inline-flex shrink-0 items-center gap-1">
             <Images :size="14" />{{ item.pageCount }} 张
           </span>

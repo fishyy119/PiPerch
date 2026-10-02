@@ -130,33 +130,24 @@
   }
 }
 
-* {
-  border-color: var(--border);
-}
+@layer base {
+  * {
+    border-color: var(--border);
+  }
 
-body {
-  min-width: 320px;
-  min-height: 100vh;
-  margin: 0;
-  color: var(--foreground);
-  background: var(--background);
-}
+  body {
+    min-width: 320px;
+    min-height: 100vh;
+    margin: 0;
+    color: var(--foreground);
+    background: var(--background);
+  }
 
-button,
-input,
-select,
-textarea {
-  font: inherit;
-}
-
-button,
-a,
-input,
-select,
-textarea {
-  outline-color: var(--ring);
-}
-
-.app-muted {
-  color: var(--muted-foreground);
+  button,
+  a,
+  input,
+  select,
+  textarea {
+    outline-color: var(--ring);
+  }
 }

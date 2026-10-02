@@ -40,7 +40,7 @@ const navigation = [
           >
           <span>
             <strong class="block leading-tight">PiPerch</strong>
-            <small class="app-muted">Local Pixiv Library</small>
+            <small class="text-muted-foreground">Local Pixiv Library</small>
           </span>
         </RouterLink>
         <button class="lg:hidden" type="button" @click="mobileOpen = false">

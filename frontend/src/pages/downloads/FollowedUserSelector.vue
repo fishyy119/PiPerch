@@ -49,5 +49,5 @@ function markAvatarUnavailable(userId: number) {
       <strong class="min-w-0 truncate text-sm">{{ user.name }}</strong>
     </button>
   </div>
-  <p v-else class="app-muted py-5 text-center text-sm">当前账号没有已关注作者。</p>
+  <p v-else class="py-5 text-center text-sm text-muted-foreground">当前账号没有已关注作者。</p>
 </template>

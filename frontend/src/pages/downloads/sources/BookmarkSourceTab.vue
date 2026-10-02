@@ -242,7 +242,7 @@ onBeforeUnmount(() => {
       <div v-if="showFolders">
         <p
           v-if="foldersQuery.isFetching.value && !foldersLoaded"
-          class="app-muted py-6 text-center text-sm"
+          class="py-6 text-center text-sm text-muted-foreground"
         >
           正在读取收藏夹…
         </p>
@@ -251,7 +251,7 @@ onBeforeUnmount(() => {
           v-model:selected-folders="draftFolders"
           :folders="folders"
         />
-        <p v-else-if="foldersLoaded" class="app-muted py-6 text-center text-sm">
+        <p v-else-if="foldersLoaded" class="py-6 text-center text-sm text-muted-foreground">
           没有可用的收藏标签。
         </p>
         <div
@@ -282,7 +282,7 @@ onBeforeUnmount(() => {
         </div>
       </div>
       <div v-else-if="confirmedFolders.length" class="flex items-center gap-3">
-        <p class="app-muted min-w-0 flex-1 text-sm">
+        <p class="min-w-0 flex-1 text-sm text-muted-foreground">
           已选：<span class="text-foreground">{{ confirmedFolderSummary }}</span>
         </p>
         <Button

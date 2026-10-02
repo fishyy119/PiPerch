@@ -157,9 +157,9 @@ const visibleTags = computed(() => {
               @click="emit('toggleTag', tag.tagId)"
             >
               {{ tag.translatedName || tag.name }}
-              <span class="app-muted text-xs">{{ tag.artworkCount ?? 0 }}</span>
+              <span class="text-xs text-muted-foreground">{{ tag.artworkCount ?? 0 }}</span>
             </FilterOptionButton>
-            <span v-if="visibleTags.length === 0" class="app-muted text-sm">
+            <span v-if="visibleTags.length === 0" class="text-sm text-muted-foreground">
               没有匹配的本地标签。
             </span>
           </CollapsibleFilterOptions>
@@ -195,9 +195,10 @@ const visibleTags = computed(() => {
                 )
               "
             >
-              {{ author.name }} <span class="app-muted text-xs">{{ author.count }}</span>
+              {{ author.name }}
+              <span class="text-xs text-muted-foreground">{{ author.count }}</span>
             </FilterOptionButton>
-            <span v-if="authors.length === 0" class="app-muted text-sm">
+            <span v-if="authors.length === 0" class="text-sm text-muted-foreground">
               没有匹配的本地作者。
             </span>
           </CollapsibleFilterOptions>
@@ -233,9 +234,11 @@ const visibleTags = computed(() => {
                 )
               "
             >
-              {{ item.name }} <span class="app-muted text-xs">{{ item.count }}</span>
+              {{ item.name }} <span class="text-xs text-muted-foreground">{{ item.count }}</span>
             </FilterOptionButton>
-            <span v-if="series.length === 0" class="app-muted text-sm"> 没有匹配的本地系列。 </span>
+            <span v-if="series.length === 0" class="text-sm text-muted-foreground">
+              没有匹配的本地系列。
+            </span>
           </CollapsibleFilterOptions>
         </div>
       </section>

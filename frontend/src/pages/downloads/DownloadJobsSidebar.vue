@@ -210,7 +210,7 @@ function progressLabel(job: DownloadJob) {
     <Card class="sticky top-20 p-5">
       <h2 class="font-semibold">提交下载</h2>
       <div class="mt-1 flex items-center justify-between gap-3">
-        <p class="app-muted text-sm">已选择 {{ selection.selectedIds.length }} 项</p>
+        <p class="text-sm text-muted-foreground">已选择 {{ selection.selectedIds.length }} 项</p>
         <button
           v-if="selection.selectedIds.length"
           type="button"
@@ -263,7 +263,9 @@ function progressLabel(job: DownloadJob) {
             </button>
           </div>
         </div>
-        <p v-if="previewQuery.isFetching.value" class="app-muted mt-2 text-xs">正在加载作品预览…</p>
+        <p v-if="previewQuery.isFetching.value" class="mt-2 text-xs text-muted-foreground">
+          正在加载作品预览…
+        </p>
         <div
           v-else-if="previewQuery.error.value && missingPreviewIds.length"
           class="mt-2 flex items-center justify-between gap-2"
@@ -273,7 +275,7 @@ function progressLabel(job: DownloadJob) {
           </p>
           <Button variant="ghost" size="small" @click="previewQuery.refetch()">重试</Button>
         </div>
-        <p v-if="hiddenPreviewCount" class="app-muted mt-2 text-xs">
+        <p v-if="hiddenPreviewCount" class="mt-2 text-xs text-muted-foreground">
           另有 {{ hiddenPreviewCount }} 项未展示
         </p>
       </div>
@@ -304,7 +306,9 @@ function progressLabel(job: DownloadJob) {
           <div class="flex items-start justify-between gap-2">
             <div class="min-w-0">
               <strong class="block truncate text-sm">{{ job.sourceLabel }}</strong>
-              <span class="app-muted text-xs">{{ new Date(job.createdAt).toLocaleString() }}</span>
+              <span class="text-xs text-muted-foreground">
+                {{ new Date(job.createdAt).toLocaleString() }}
+              </span>
             </div>
             <span class="rounded-lg bg-muted px-2 py-1 text-xs text-muted-foreground">
               {{ stateLabel(job.state) }}
@@ -316,11 +320,11 @@ function progressLabel(job: DownloadJob) {
               :style="{ width: `${String(jobProgress(job))}%` }"
             />
           </div>
-          <p class="app-muted mt-2 text-xs">
+          <p class="mt-2 text-xs text-muted-foreground">
             完成 {{ job.counts.succeeded }} · 跳过 {{ job.counts.skipped }} · 失败
             {{ job.counts.failed }} · 等待 {{ job.counts.queued + job.counts.running }}
           </p>
-          <p v-if="progressLabel(job)" class="app-muted mt-1 text-xs">
+          <p v-if="progressLabel(job)" class="mt-1 text-xs text-muted-foreground">
             {{ progressLabel(job) }}
           </p>
           <p v-if="job.errorSummary" class="mt-2 text-xs text-destructive">
@@ -346,7 +350,7 @@ function progressLabel(job: DownloadJob) {
           </div>
         </article>
       </div>
-      <p v-else class="app-muted p-8 text-center text-sm">暂无下载任务。</p>
+      <p v-else class="p-8 text-center text-sm text-muted-foreground">暂无下载任务。</p>
     </Card>
   </aside>
 </template>

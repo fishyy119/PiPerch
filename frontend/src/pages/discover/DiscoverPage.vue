@@ -156,7 +156,10 @@ function setAuthorColumns(value: string) {
     </template>
 
     <template #artworks>
-      <div v-if="recommendationsQuery.isPending.value" class="app-muted py-20 text-center">
+      <div
+        v-if="recommendationsQuery.isPending.value"
+        class="py-20 text-center text-muted-foreground"
+      >
         正在读取发现作品…
       </div>
       <Card
@@ -181,11 +184,16 @@ function setAuthorColumns(value: string) {
           @toggle="selection.toggle"
         />
       </div>
-      <Card v-else class="app-muted py-20 text-center">当前没有可展示的发现作品。</Card>
+      <Card v-else class="py-20 text-center text-muted-foreground">
+        当前没有可展示的发现作品。
+      </Card>
     </template>
 
     <template #authors>
-      <div v-if="recommendedUsersQuery.isPending.value" class="app-muted py-20 text-center">
+      <div
+        v-if="recommendedUsersQuery.isPending.value"
+        class="py-20 text-center text-muted-foreground"
+      >
         正在读取发现作者…
       </div>
       <Card
@@ -214,7 +222,9 @@ function setAuthorColumns(value: string) {
           @follow="followMutation.mutate"
         />
       </div>
-      <Card v-else class="app-muted py-20 text-center">当前没有可展示的发现作者。</Card>
+      <Card v-else class="py-20 text-center text-muted-foreground">
+        当前没有可展示的发现作者。
+      </Card>
     </template>
   </Tabs>
 </template>

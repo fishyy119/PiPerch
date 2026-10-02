@@ -23,6 +23,7 @@ import SearchInput from '@ui/SearchInput.vue'
 import Select from '@ui/Select.vue'
 import SettingsPopover from '@ui/SettingsPopover.vue'
 import Slider from '@ui/Slider.vue'
+import Switch from '@ui/Switch.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -36,6 +37,8 @@ const authorFilterSearch = ref('')
 const seriesFilterSearch = ref('')
 const preferredCardWidth = usePreference('gallery.cardWidth')
 const preferredPageSize = usePreference('gallery.pageSize')
+const preferredShowTitle = usePreference('gallery.showTitle')
+const preferredShowAuthor = usePreference('gallery.showAuthor')
 const GALLERY_PAGE_SIZE_OPTIONS = [24, 48, 96] as const
 const pageSizeOptions = GALLERY_PAGE_SIZE_OPTIONS.map((size) => ({
   value: String(size),
@@ -288,6 +291,14 @@ const deleteMutation = useMutation({
               @update:model-value="setPageSize"
             />
           </div>
+          <div class="flex items-center justify-between gap-3">
+            <p class="text-sm font-medium">显示标题</p>
+            <Switch v-model="preferredShowTitle" />
+          </div>
+          <div class="flex items-center justify-between gap-3">
+            <p class="text-sm font-medium">显示作者</p>
+            <Switch v-model="preferredShowAuthor" />
+          </div>
         </div>
       </SettingsPopover>
     </div>
@@ -342,13 +353,13 @@ const deleteMutation = useMutation({
     </div>
 
     <div class="mb-4 min-w-0">
-      <p class="app-muted text-sm">{{ resultRange }}</p>
-      <p v-if="singleQuery('search')" class="app-muted mt-0.5 truncate text-xs">
+      <p class="text-sm text-muted-foreground">{{ resultRange }}</p>
+      <p v-if="singleQuery('search')" class="mt-0.5 truncate text-xs text-muted-foreground">
         搜索“{{ singleQuery('search') }}”
       </p>
     </div>
 
-    <div v-if="artworksQuery.isPending.value" class="app-muted py-20 text-center">
+    <div v-if="artworksQuery.isPending.value" class="py-20 text-center text-muted-foreground">
       正在读取图库…
     </div>
     <div v-else-if="artworksQuery.error.value" class="py-20 text-center text-destructive">
@@ -365,17 +376,19 @@ const deleteMutation = useMutation({
         :artwork="artwork"
         :selected="selected.includes(artwork.artworkId)"
         :selection-mode="selectionMode"
+        :show-title="preferredShowTitle"
+        :show-author="preferredShowAuthor"
         @toggle-selection="toggleSelection"
         @filter-author="replaceQuery({ authorId: String($event) })"
       />
     </div>
-    <Card v-else class="app-muted py-20 text-center"> 图库中没有符合条件的作品。 </Card>
+    <Card v-else class="py-20 text-center text-muted-foreground"> 图库中没有符合条件的作品。 </Card>
 
     <nav class="mt-8 flex items-center justify-center gap-3">
       <Button variant="secondary" :disabled="pageNumber() === 0" @click="setPage(pageNumber() - 1)">
         <ChevronLeft :size="17" />上一页
       </Button>
-      <span class="app-muted text-sm">
+      <span class="text-sm text-muted-foreground">
         第 {{ pageNumber() + 1 }} /
         {{ Math.max(1, artworksQuery.data.value?.totalPages ?? 1) }}
         页
@@ -407,7 +420,7 @@ const deleteMutation = useMutation({
       >
         <div class="flex items-center gap-2">
           <strong class="text-sm">批量管理</strong>
-          <span class="app-muted text-sm">已选择 {{ selected.length }} 项</span>
+          <span class="text-sm text-muted-foreground">已选择 {{ selected.length }} 项</span>
         </div>
         <div class="flex flex-wrap gap-2">
           <Button

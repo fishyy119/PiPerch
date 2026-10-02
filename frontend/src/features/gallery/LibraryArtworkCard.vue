@@ -10,6 +10,8 @@ const props = defineProps<{
   artwork: ArtworkSummary
   selected: boolean
   selectionMode: boolean
+  showTitle: boolean
+  showAuthor: boolean
 }>()
 
 const emit = defineEmits<{
@@ -48,6 +50,8 @@ function handleCardClick(event: MouseEvent) {
     :target="target"
     :resolve-preview-url="resolvePreviewUrl"
     :selected="selected"
+    :show-title="showTitle"
+    :show-author="showAuthor"
     :show-page-preview="!selectionMode"
     @click.capture="handleCardClick"
   >
@@ -66,7 +70,10 @@ function handleCardClick(event: MouseEvent) {
     <template #author>
       <button
         type="button"
-        class="app-muted mt-0.5 block max-w-full truncate text-left text-xs hover:text-primary"
+        :class="[
+          'block max-w-full cursor-pointer truncate text-left text-xs text-muted-foreground hover:text-primary',
+          showTitle ? 'mt-0.5' : '',
+        ]"
         @click="emit('filterAuthor', artwork.authorId)"
       >
         {{ artwork.authorName }}

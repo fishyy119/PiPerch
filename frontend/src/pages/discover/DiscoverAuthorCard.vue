@@ -65,7 +65,7 @@ async function copyUserId(userId: number) {
           </a>
           <button
             type="button"
-            class="app-muted mt-0.5 cursor-pointer text-xs transition-colors hover:text-primary"
+            class="mt-0.5 cursor-pointer text-xs text-muted-foreground transition-colors hover:text-primary"
             title="复制作者 ID"
             @click="copyUserId(author.userId)"
           >
@@ -86,7 +86,10 @@ async function copyUserId(userId: number) {
       </Button>
     </header>
 
-    <p v-if="author.comment" class="app-muted mt-4 line-clamp-2 text-sm whitespace-pre-line">
+    <p
+      v-if="author.comment"
+      class="mt-4 line-clamp-2 text-sm whitespace-pre-line text-muted-foreground"
+    >
       {{ author.comment }}
     </p>
 
@@ -100,7 +103,7 @@ async function copyUserId(userId: number) {
         @toggle="emit('toggle', $event)"
       />
     </div>
-    <p v-else class="app-muted mt-auto rounded-xl bg-muted/50 py-8 text-center text-sm">
+    <p v-else class="mt-auto rounded-xl bg-muted/50 py-8 text-center text-sm text-muted-foreground">
       当前没有可展示的近期插画。
     </p>
   </Card>

@@ -64,7 +64,7 @@ function setViewStyle(value: string) {
       <div class="flex flex-wrap items-center justify-between gap-3 border-b p-4">
         <div>
           <h2 class="font-semibold">候选作品</h2>
-          <p class="app-muted text-sm">跨页选择会保留，提交任务后自动清空。</p>
+          <p class="text-sm text-muted-foreground">跨页选择会保留，提交任务后自动清空。</p>
         </div>
         <div class="flex items-center gap-2">
           <Button variant="secondary" :disabled="candidates.length === 0" @click="togglePage">
@@ -109,7 +109,7 @@ function setViewStyle(value: string) {
         :card-width="cardWidth"
         @toggle="selection.toggle"
       />
-      <p v-else class="app-muted p-10 text-center">{{ emptyMessage }}</p>
+      <p v-else class="p-10 text-center text-muted-foreground">{{ emptyMessage }}</p>
 
       <slot name="errors" />
 
@@ -121,7 +121,7 @@ function setViewStyle(value: string) {
         >
           <ChevronLeft :size="17" />上一页
         </Button>
-        <span class="app-muted text-sm">第 {{ page + 1 }} 页</span>
+        <span class="text-sm text-muted-foreground">第 {{ page + 1 }} 页</span>
         <Button
           variant="secondary"
           :disabled="nextPage === null || pending"

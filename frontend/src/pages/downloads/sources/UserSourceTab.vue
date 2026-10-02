@@ -131,7 +131,7 @@ function toggleAllWorks() {
       <div v-if="showFollowedUsers" class="mt-4 border-t pt-4">
         <div class="mb-3 flex items-center justify-between gap-3">
           <h2 class="text-sm font-semibold">已关注作者</h2>
-          <span class="app-muted text-xs">共 {{ followedUsers.length }} 位</span>
+          <span class="text-xs text-muted-foreground">共 {{ followedUsers.length }} 位</span>
         </div>
         <FollowedUserSelector
           :users="followedUsers"
