@@ -5,15 +5,11 @@ import { ref, watch } from 'vue'
 import type { ArtworkPreviewUrlResolver } from '@/features/artworks/artwork-card'
 import HoverCard from '@ui/HoverCard.vue'
 
-const props = withDefaults(
-  defineProps<{
-    title: string
-    pageCount: number
-    resolveUrl: ArtworkPreviewUrlResolver
-    hasLeadingAction?: boolean
-  }>(),
-  { hasLeadingAction: false },
-)
+const props = defineProps<{
+  title: string
+  pageCount: number
+  resolveUrl: ArtworkPreviewUrlResolver
+}>()
 
 const previewPage = ref(0)
 const previewOpen = ref(false)
@@ -95,7 +91,7 @@ function hidePreviewOnFocusOut(event: FocusEvent) {
       <div
         :class="[
           'absolute top-2 right-2 z-10',
-          hasLeadingAction ? 'max-w-[calc(100%-3rem)]' : 'max-w-[calc(100%-1rem)]',
+          'max-w-[calc(100%-1rem)]',
           'flex flex-wrap justify-end gap-0.5 rounded-xl p-1',
           'bg-overlay/55 opacity-0 shadow-sm backdrop-blur-sm transition',
           'group-focus-within:opacity-100 group-hover:opacity-100',

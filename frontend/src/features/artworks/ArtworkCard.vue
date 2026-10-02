@@ -20,8 +20,9 @@ const props = withDefaults(
     resolvePreviewUrl: ArtworkPreviewUrlResolver
     selected?: boolean
     showAuthor?: boolean
+    showPagePreview?: boolean
   }>(),
-  { selected: false, showAuthor: true },
+  { selected: false, showAuthor: true, showPagePreview: true },
 )
 
 const thumbnailFailed = ref(false)
@@ -64,10 +65,10 @@ watch(
 
       <slot name="leading-action" />
       <ArtworkPagePreview
+        v-if="showPagePreview"
         :title="title"
         :page-count="pageCount"
         :resolve-url="resolvePreviewUrl"
-        :has-leading-action="$slots['leading-action'] !== undefined"
       />
       <slot name="trailing-action" />
     </div>

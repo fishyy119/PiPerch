@@ -28,10 +28,19 @@ function resolvePreviewUrl(pageIndex: number) {
     ? `/api/artworks/${String(props.artwork.artworkId)}/cover`
     : `/api/artworks/${String(props.artwork.artworkId)}/pages/${String(pageIndex)}`
 }
+
+function handleCardClick(event: MouseEvent) {
+  if (!props.selectionMode) return
+
+  event.preventDefault()
+  event.stopPropagation()
+  emit('toggleSelection', props.artwork.artworkId)
+}
 </script>
 
 <template>
   <ArtworkCard
+    :class="{ 'cursor-pointer': selectionMode }"
     :title="artwork.title"
     :author-name="artwork.authorName"
     :page-count="artwork.pageCount"
@@ -39,14 +48,14 @@ function resolvePreviewUrl(pageIndex: number) {
     :target="target"
     :resolve-preview-url="resolvePreviewUrl"
     :selected="selected"
+    :show-page-preview="!selectionMode"
+    @click.capture="handleCardClick"
   >
-    <template #leading-action>
+    <template v-if="selectionMode" #leading-action>
       <Checkbox
         :class="[
           'absolute top-2 left-2 z-10 size-5',
           'border-overlay-foreground/80 bg-overlay/55 shadow-sm backdrop-blur-sm transition',
-          'sm:opacity-0 sm:group-hover:opacity-100 sm:focus-visible:opacity-100',
-          { 'opacity-100!': selectionMode || selected },
         ]"
         :model-value="selected"
         @click.stop
