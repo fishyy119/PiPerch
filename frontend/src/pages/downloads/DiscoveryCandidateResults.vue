@@ -1,20 +1,30 @@
 <script setup lang="ts">
 import { ImageOff, Images } from '@lucide/vue'
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 
+import DiscoveryArtworkCard from '@/features/downloads/DiscoveryArtworkCard.vue'
 import type { DiscoveryItem } from '@/features/downloads/download-api'
+import type { DownloadCandidateViewStyle } from '@/features/downloads/download-candidate-preferences'
 import Checkbox from '@ui/Checkbox.vue'
 
-defineProps<{
-  candidates: readonly DiscoveryItem[]
-  selectedIds: readonly number[]
-}>()
+const props = withDefaults(
+  defineProps<{
+    candidates: readonly DiscoveryItem[]
+    selectedIds: readonly number[]
+    viewStyle?: DownloadCandidateViewStyle
+    cardWidth?: number
+  }>(),
+  { viewStyle: 'list', cardWidth: 220 },
+)
 
 const emit = defineEmits<{
   toggle: [item: DiscoveryItem]
 }>()
 
 const failedThumbnails = ref(new Set<number>())
+const artworkGridStyle = computed(() => ({
+  gridTemplateColumns: `repeat(auto-fill, minmax(min(100%, ${String(props.cardWidth)}px), 1fr))`,
+}))
 
 function markThumbnailUnavailable(artworkId: number) {
   const next = new Set(failedThumbnails.value)
@@ -24,7 +34,7 @@ function markThumbnailUnavailable(artworkId: number) {
 </script>
 
 <template>
-  <div class="candidate-grid grid gap-3 p-4">
+  <div v-if="viewStyle === 'list'" class="candidate-grid grid gap-3 p-4">
     <div
       v-for="item in candidates"
       :key="item.artworkId"
@@ -71,6 +81,15 @@ function markThumbnailUnavailable(artworkId: number) {
         </span>
       </span>
     </div>
+  </div>
+  <div v-else class="grid gap-x-3.5 gap-y-6 p-4" :style="artworkGridStyle">
+    <DiscoveryArtworkCard
+      v-for="item in candidates"
+      :key="item.artworkId"
+      :artwork="item"
+      :selected="selectedIds.includes(item.artworkId)"
+      @toggle="emit('toggle', $event)"
+    />
   </div>
 </template>
 

@@ -3,10 +3,14 @@ import { Check, ChevronLeft, ChevronRight, X } from '@lucide/vue'
 import { computed } from 'vue'
 
 import type { DiscoveryItem } from '@/features/downloads/download-api'
+import { useDownloadCandidatePreferences } from '@/features/downloads/download-candidate-preferences'
 import { useDownloadSelection } from '@/features/downloads/download-selection'
 import DiscoveryCandidateResults from '@/pages/downloads/DiscoveryCandidateResults.vue'
 import Button from '@ui/Button.vue'
 import Card from '@ui/Card.vue'
+import Select from '@ui/Select.vue'
+import SettingsPopover from '@ui/SettingsPopover.vue'
+import Slider from '@ui/Slider.vue'
 
 const props = defineProps<{
   candidates: readonly DiscoveryItem[]
@@ -21,6 +25,11 @@ const emit = defineEmits<{
 }>()
 
 const selection = useDownloadSelection()
+const preferences = useDownloadCandidatePreferences()
+const viewStyleOptions = [
+  { value: 'list', label: '列表' },
+  { value: 'artwork', label: '作品' },
+] as const
 const pageFullySelected = computed(() => {
   const selectable = props.candidates.filter((item) => !item.inLibrary)
   return (
@@ -33,6 +42,12 @@ function togglePage() {
   const selectable = props.candidates.filter((item) => !item.inLibrary)
   if (pageFullySelected.value) selection.removeAll(selectable)
   else selection.addAll(selectable)
+}
+
+function setViewStyle(value: string) {
+  const selected = viewStyleOptions.find((option) => option.value === value)
+  if (selected === undefined) return
+  preferences.setViewStyle(selected.value)
 }
 </script>
 
@@ -60,6 +75,35 @@ function togglePage() {
           >
             <X :size="17" />清空
           </Button>
+          <SettingsPopover variant="ghost" title="候选作品显示设置">
+            <div class="space-y-5">
+              <div class="flex items-center justify-between gap-3">
+                <p class="text-sm font-medium">候选作品样式</p>
+                <Select
+                  size="small"
+                  :options="viewStyleOptions"
+                  :model-value="preferences.viewStyle"
+                  @update:model-value="setViewStyle"
+                />
+              </div>
+              <div v-if="preferences.viewStyle === 'artwork'" class="space-y-2">
+                <p class="text-sm font-medium">卡片大小</p>
+                <div class="flex items-center gap-3">
+                  <Slider
+                    class="flex-1"
+                    :min="140"
+                    :max="360"
+                    :step="10"
+                    :model-value="preferences.cardWidth"
+                    @update:model-value="preferences.setCardWidth"
+                  />
+                  <output class="w-11 text-right text-xs tabular-nums">
+                    {{ preferences.cardWidth }}px
+                  </output>
+                </div>
+              </div>
+            </div>
+          </SettingsPopover>
         </div>
       </div>
 
@@ -67,6 +111,8 @@ function togglePage() {
         v-if="candidates.length"
         :candidates="candidates"
         :selected-ids="selection.selectedIds"
+        :view-style="preferences.viewStyle"
+        :card-width="preferences.cardWidth"
         @toggle="selection.toggle"
       />
       <p v-else class="app-muted p-10 text-center">{{ emptyMessage }}</p>

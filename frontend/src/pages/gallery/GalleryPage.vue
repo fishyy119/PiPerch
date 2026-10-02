@@ -25,6 +25,7 @@ import ConfirmDialog from '@ui/ConfirmDialog.vue'
 import FilterButton from '@ui/FilterButton.vue'
 import SearchInput from '@ui/SearchInput.vue'
 import Select from '@ui/Select.vue'
+import SettingsPopover from '@ui/SettingsPopover.vue'
 import Slider from '@ui/Slider.vue'
 
 const route = useRoute()
@@ -277,6 +278,37 @@ const deleteMutation = useMutation({
         <CheckSquare :size="17" />批量管理
       </Button>
     </form>
+    <div class="ml-auto shrink-0">
+      <SettingsPopover title="图库显示设置">
+        <div class="space-y-5">
+          <div class="space-y-2">
+            <p class="text-sm font-medium">卡片大小</p>
+            <div class="flex items-center gap-3">
+              <Slider
+                class="flex-1"
+                :min="140"
+                :max="360"
+                :step="10"
+                :model-value="preferredCardWidth"
+                @update:model-value="setCardWidth"
+              />
+              <output class="w-11 text-right text-xs tabular-nums">
+                {{ preferredCardWidth }}px
+              </output>
+            </div>
+          </div>
+          <div class="flex items-center justify-between gap-3">
+            <p class="text-sm font-medium">每页数量</p>
+            <Select
+              size="small"
+              :options="pageSizeOptions"
+              :model-value="String(preferredPageSize)"
+              @update:model-value="setPageSize"
+            />
+          </div>
+        </div>
+      </SettingsPopover>
+    </div>
   </TopbarActions>
 
   <GalleryFilterPopup
@@ -327,36 +359,11 @@ const deleteMutation = useMutation({
       </form>
     </div>
 
-    <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
-      <div class="min-w-0">
-        <p class="app-muted text-sm">{{ resultRange }}</p>
-        <p v-if="singleQuery('search')" class="app-muted mt-0.5 truncate text-xs">
-          搜索“{{ singleQuery('search') }}”
-        </p>
-      </div>
-      <div class="flex flex-wrap items-center gap-3">
-        <label class="app-muted flex items-center gap-2 text-xs">
-          <span>卡片</span>
-          <Slider
-            class="w-28 sm:w-36"
-            :min="140"
-            :max="360"
-            :step="10"
-            :model-value="preferredCardWidth"
-            @update:model-value="setCardWidth"
-          />
-          <output class="w-11 text-right tabular-nums">{{ preferredCardWidth }}px</output>
-        </label>
-        <label class="app-muted flex items-center gap-2 text-xs">
-          <span>每页</span>
-          <Select
-            size="small"
-            :options="pageSizeOptions"
-            :model-value="String(preferredPageSize)"
-            @update:model-value="setPageSize"
-          />
-        </label>
-      </div>
+    <div class="mb-4 min-w-0">
+      <p class="app-muted text-sm">{{ resultRange }}</p>
+      <p v-if="singleQuery('search')" class="app-muted mt-0.5 truncate text-xs">
+        搜索“{{ singleQuery('search') }}”
+      </p>
     </div>
 
     <div v-if="artworksQuery.isPending.value" class="app-muted py-20 text-center">

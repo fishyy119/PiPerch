@@ -8,6 +8,7 @@ import {
   loadDiscoveryPreferences,
   saveDiscoveryPreferences,
 } from '@/features/discovery/discovery-preferences'
+import DiscoveryArtworkCard from '@/features/downloads/DiscoveryArtworkCard.vue'
 import {
   followUser,
   listRecommendations,
@@ -15,12 +16,12 @@ import {
   type RecommendedUser,
 } from '@/features/downloads/download-api'
 import { useDownloadSelection } from '@/features/downloads/download-selection'
-import DiscoverArtworkCard from '@/pages/discover/DiscoverArtworkCard.vue'
 import DiscoverAuthorCard from '@/pages/discover/DiscoverAuthorCard.vue'
 import { errorMessage } from '@/shared/errors'
 import Button from '@ui/Button.vue'
 import Card from '@ui/Card.vue'
 import Select from '@ui/Select.vue'
+import SettingsPopover from '@ui/SettingsPopover.vue'
 import Slider from '@ui/Slider.vue'
 import Tabs from '@ui/Tabs.vue'
 import { toast } from '@ui/toast'
@@ -137,25 +138,42 @@ function setAuthorColumns(value: string) {
 <template>
   <Tabs v-model="activeView" :items="viewOptions" teleport-to="#topbar-actions">
     <template #actions>
-      <Button variant="secondary" :disabled="isRefreshing" @click="refreshCurrentView">
-        <RefreshCw :class="isRefreshing ? 'animate-spin' : ''" :size="17" />
-        刷新
-      </Button>
+      <div class="flex items-center gap-2">
+        <Button variant="secondary" :disabled="isRefreshing" @click="refreshCurrentView">
+          <RefreshCw :class="isRefreshing ? 'animate-spin' : ''" :size="17" />
+          刷新
+        </Button>
+        <SettingsPopover title="发现页显示设置">
+          <div v-if="activeView === 'artworks'" class="space-y-2">
+            <p class="text-sm font-medium">卡片大小</p>
+            <div class="flex items-center gap-3">
+              <Slider
+                class="flex-1"
+                :min="140"
+                :max="360"
+                :step="10"
+                :model-value="preferences.cardWidth"
+                @update:model-value="setCardWidth"
+              />
+              <output class="w-11 text-right text-xs tabular-nums">
+                {{ preferences.cardWidth }}px
+              </output>
+            </div>
+          </div>
+          <div v-else class="flex items-center justify-between gap-3">
+            <p class="text-sm font-medium">作者栏数</p>
+            <Select
+              size="small"
+              :options="authorColumnOptions"
+              :model-value="String(preferences.authorColumns)"
+              @update:model-value="setAuthorColumns"
+            />
+          </div>
+        </SettingsPopover>
+      </div>
     </template>
 
     <template #artworks>
-      <label class="app-muted mb-4 ml-auto flex w-fit items-center gap-2 text-xs">
-        <span>卡片</span>
-        <Slider
-          class="w-28 sm:w-36"
-          :min="140"
-          :max="360"
-          :step="10"
-          :model-value="preferences.cardWidth"
-          @update:model-value="setCardWidth"
-        />
-        <output class="w-11 text-right tabular-nums">{{ preferences.cardWidth }}px</output>
-      </label>
       <div v-if="recommendationsQuery.isPending.value" class="app-muted py-20 text-center">
         正在读取发现作品…
       </div>
@@ -173,7 +191,7 @@ function setAuthorColumns(value: string) {
         class="grid gap-x-3.5 gap-y-6"
         :style="artworkGridStyle"
       >
-        <DiscoverArtworkCard
+        <DiscoveryArtworkCard
           v-for="artwork in recommendationsQuery.data.value"
           :key="artwork.artworkId"
           :artwork="artwork"
@@ -185,15 +203,6 @@ function setAuthorColumns(value: string) {
     </template>
 
     <template #authors>
-      <label class="app-muted mb-4 ml-auto flex w-fit items-center gap-2 text-xs">
-        <span>栏数</span>
-        <Select
-          size="small"
-          :options="authorColumnOptions"
-          :model-value="String(preferences.authorColumns)"
-          @update:model-value="setAuthorColumns"
-        />
-      </label>
       <div v-if="recommendedUsersQuery.isPending.value" class="app-muted py-20 text-center">
         正在读取发现作者…
       </div>

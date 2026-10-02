@@ -2,8 +2,8 @@
 import { Check, LoaderCircle, UserPlus, UserRound } from '@lucide/vue'
 import { ref } from 'vue'
 
+import DiscoveryArtworkCard from '@/features/downloads/DiscoveryArtworkCard.vue'
 import type { DiscoveryItem, RecommendedUser } from '@/features/downloads/download-api'
-import DiscoverArtworkCard from '@/pages/discover/DiscoverArtworkCard.vue'
 import { errorMessage } from '@/shared/errors'
 import Button from '@ui/Button.vue'
 import Card from '@ui/Card.vue'
@@ -91,7 +91,7 @@ async function copyUserId(userId: number) {
     </p>
 
     <div v-if="author.artworks.length" class="mt-auto grid grid-cols-5 gap-x-3 gap-y-5 pt-5">
-      <DiscoverArtworkCard
+      <DiscoveryArtworkCard
         v-for="artwork in author.artworks"
         :key="artwork.artworkId"
         :artwork="artwork"

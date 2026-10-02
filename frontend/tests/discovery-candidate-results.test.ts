@@ -1,3 +1,4 @@
+import { QueryClient, VueQueryPlugin } from '@tanstack/vue-query'
 import userEvent from '@testing-library/user-event'
 import { render, screen } from '@testing-library/vue'
 import { vi } from 'vitest'
@@ -28,6 +29,31 @@ describe('候选作品显示', () => {
     expect(onToggle).not.toHaveBeenCalled()
 
     await user.click(remoteCheckbox)
+    expect(onToggle).toHaveBeenCalledWith(selectable)
+  })
+
+  it('作品视图仅允许将尚未入库的作品加入队列', async () => {
+    const user = userEvent.setup()
+    const selectable = { ...candidate, artworkId: 456, inLibrary: false }
+    const onToggle = vi.fn()
+    render(DiscoveryCandidateResults, {
+      props: {
+        candidates: [candidate, selectable],
+        selectedIds: [],
+        viewStyle: 'artwork',
+        onToggle,
+      },
+      global: {
+        plugins: [[VueQueryPlugin, { queryClient: new QueryClient() }]],
+      },
+    })
+
+    expect(screen.getByText('已在图库')).toBeInTheDocument()
+    const queueButtons = screen.getAllByTitle('加入待提交队列')
+    expect(queueButtons).toHaveLength(1)
+    const queueButton = queueButtons[0]
+    if (!queueButton) throw new Error('缺少加入待提交队列按钮。')
+    await user.click(queueButton)
     expect(onToggle).toHaveBeenCalledWith(selectable)
   })
 })
