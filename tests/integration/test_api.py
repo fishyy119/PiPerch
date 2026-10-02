@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 from io import BytesIO
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 from PIL import Image
@@ -20,9 +19,11 @@ from piperch.domain import (
     RemoteArtwork,
     TagRecord,
 )
+from piperch.services.storage import StorageMigrationSelection
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
+    from pathlib import Path
 
     from pytest import MonkeyPatch
     from tests.support import ApiTestClient
@@ -284,7 +285,11 @@ def test_health_and_settings_return_cookie(
     app_client: tuple[ApiTestClient, AppContainer],
 ) -> None:
     client, container = app_client
-    assert client.get("/api/health").json() == {"status": "ok", "database": "ok"}
+    assert client.get("/api/health").json() == {
+        "status": "ok",
+        "database": "ok",
+        "instanceId": container.instance_id,
+    }
 
     cookie = "PHPSESSID=123_secret-value"
     response = client.patch(
@@ -313,10 +318,9 @@ def test_health_and_settings_return_cookie(
 
 def test_settings_patch_and_proxy_redaction(
     app_client: tuple[ApiTestClient, AppContainer],
-    tmp_path: Path,
 ) -> None:
     client, container = app_client
-    library = tmp_path / "library"
+    original_library = container.settings.get().library_root
     response = client.patch(
         "/api/settings",
         json={"proxyUrl": "http://user:password@127.0.0.1:7890"},
@@ -328,11 +332,9 @@ def test_settings_patch_and_proxy_redaction(
     persisted = json.loads(container.paths.settings.read_text(encoding="utf-8"))
     assert persisted["proxy_url"] == "http://user:password@127.0.0.1:7890"
 
-    library_response = client.patch("/api/settings", json={"libraryRoot": str(library)})
-    assert library_response.status_code == 200
-    assert Path(library_response.json()["libraryRoot"]) == library.resolve()
-    persisted = json.loads(container.paths.settings.read_text(encoding="utf-8"))
-    assert persisted["library_root"] == str(library.resolve())
+    library_response = client.patch("/api/settings", json={"libraryRoot": "C:\\other-library"})
+    assert library_response.status_code == 422
+    assert container.settings.get().library_root == original_library
 
     repeated = client.patch(
         "/api/settings",
@@ -340,6 +342,43 @@ def test_settings_patch_and_proxy_redaction(
     )
     assert repeated.status_code == 200
     assert container.settings.get().proxy_url == "http://user:password@127.0.0.1:7890"
+
+
+def test_library_migration_endpoint_reports_cancelled_and_started(
+    app_client: tuple[ApiTestClient, AppContainer],
+    monkeypatch: MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    client, container = app_client
+    monkeypatch.setattr(container.storage, "prepare_interactive", lambda: None)
+
+    cancelled = client.post("/api/settings/library-root/migrate")
+
+    assert cancelled.status_code == 200
+    assert cancelled.json()["status"] == "cancelled"
+
+    target = tmp_path / "target"
+    target.mkdir()
+    monkeypatch.setattr(
+        container.storage,
+        "prepare_interactive",
+        lambda: StorageMigrationSelection(target),
+    )
+    migrated: list[Path] = []
+
+    async def migrate(path: Path) -> None:
+        migrated.append(path)
+
+    monkeypatch.setattr(container.storage, "migrate", migrate)
+
+    started = client.post("/api/settings/library-root/migrate")
+
+    assert started.status_code == 202
+    payload = started.json()
+    assert payload["status"] == "started"
+    assert payload["targetPath"] == str(target)
+    assert payload["instanceId"] == container.instance_id
+    assert migrated == [target]
 
 
 def test_settings_patch_updates_only_requested_fields(

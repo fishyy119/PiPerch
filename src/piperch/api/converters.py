@@ -83,7 +83,7 @@ def download_job_summary_response(job: DownloadJobRecord) -> DownloadJobSummaryR
                 current_artwork_id=job.progress.current_artwork_id,
                 completed_pages=job.progress.completed_pages,
                 total_pages=job.progress.total_pages,
-                phase=job.progress.phase,
+                phase=job.progress.phase.value,
             )
             if job.progress is not None
             else None

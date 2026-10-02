@@ -1,14 +1,17 @@
 from __future__ import annotations
 
-from pathlib import Path
-
 from anyio import to_thread
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, status
+from fastapi.responses import JSONResponse
+from starlette.background import BackgroundTask
 
 from piperch.api.dependencies import get_container
 from piperch.api.models import (
     CookieValidationRequest,
     CookieValidationResponse,
+    LibraryMigrationCancelledResponse,
+    LibraryMigrationResponse,
+    LibraryMigrationStartedResponse,
     SettingsPatch,
     SettingsResponse,
 )
@@ -42,12 +45,29 @@ async def patch_settings(
     container: AppContainer = Depends(get_container),
 ) -> SettingsResponse:
     changes = request.model_dump(exclude_unset=True)
-    if "library_root" in changes:
-        changes["library_root"] = Path(changes["library_root"])
     settings = await to_thread.run_sync(lambda: container.settings.patch(**changes))
     if {"proxy_url", "request_interval_ms"} & changes.keys():
         await container.pixiv.reconfigure(settings.proxy_url, settings.request_interval_ms)
     return _response(settings)
+
+
+@router.post("/library-root/migrate", response_model=LibraryMigrationResponse)
+async def migrate_library_root(
+    container: AppContainer = Depends(get_container),
+) -> LibraryMigrationCancelledResponse | JSONResponse:
+    selection = await to_thread.run_sync(container.storage.prepare_interactive)
+    if selection is None:
+        return LibraryMigrationCancelledResponse(message="已取消图库迁移。")
+    response = LibraryMigrationStartedResponse(
+        message="图库迁移已开始，后续状态请查看后端终端。",
+        target_path=str(selection.target),
+        instance_id=container.instance_id,
+    )
+    return JSONResponse(
+        status_code=status.HTTP_202_ACCEPTED,
+        content=response.model_dump(mode="json", by_alias=True),
+        background=BackgroundTask(container.storage.migrate, selection.target),
+    )
 
 
 @router.post("/pixiv-cookie/validate", response_model=CookieValidationResponse)

@@ -15,7 +15,7 @@ interface SettingFieldOptions<K extends keyof Settings, D> {
   validate?: (value: D) => string | null
 }
 
-function useSettingsQuery() {
+export function useSettingsQuery() {
   return useQuery({ queryKey: settingsQueryKey, queryFn: getSettings })
 }
 

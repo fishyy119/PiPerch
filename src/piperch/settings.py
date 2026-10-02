@@ -3,18 +3,12 @@ from __future__ import annotations
 import json
 from pathlib import Path
 from threading import RLock
-from typing import TYPE_CHECKING
 
 from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, field_validator
-from sqlalchemy import func, select
 
-from piperch.database.tables import artworks
 from piperch.domain import AppSettings
 from piperch.errors import ConflictError
 from piperch.utils.urls import normalize_proxy_url, redact_url_password
-
-if TYPE_CHECKING:
-    from piperch.database import Database
 
 _SETTINGS_OBJECT = TypeAdapter(dict[str, object])
 
@@ -52,10 +46,9 @@ class StoredSettings(BaseModel):
 
 
 class SettingsManager:
-    def __init__(self, path: Path, default_library: Path, database: Database) -> None:
+    def __init__(self, path: Path, default_library: Path) -> None:
         self._path = path
         self._default_library = default_library.expanduser().resolve()
-        self._database = database
         self._lock = RLock()
         self._current: StoredSettings | None = None
 
@@ -91,17 +84,25 @@ class SettingsManager:
                 raise ValueError(f"Unknown settings: {names}")
             if "proxy_url" in changes and changes["proxy_url"] == redact_url_password(current.proxy_url):
                 changes["proxy_url"] = current.proxy_url
+            if "library_root" in changes:
+                raise ConflictError(
+                    "library_migration_required",
+                    "请使用图库迁移功能修改图库根目录。",
+                )
 
             updated = StoredSettings.model_validate({**current.model_dump(mode="python"), **changes})
-            if updated.library_root.resolve() != current.library_root.resolve():
-                with self._database.connect() as connection:
-                    count = connection.scalar(select(func.count()).select_from(artworks)) or 0
-                if count:
-                    raise ConflictError(
-                        "library_not_empty",
-                        "图库中已有作品，首版不支持直接迁移下载目录。",
-                    )
             updated.library_root.mkdir(parents=True, exist_ok=True)
+            self._save(updated)
+            self._current = updated
+            return self._to_domain(updated)
+
+    def set_library_root_after_migration(self, library_root: Path) -> AppSettings:
+        """仅在迁移文件校验完成后切换图库根目录。"""
+        with self._lock:
+            current = self._require_current()
+            updated = StoredSettings.model_validate({**current.model_dump(mode="python"), "library_root": library_root})
+            if not updated.library_root.is_dir():
+                raise ValueError("迁移后的图库根目录不存在。")
             self._save(updated)
             self._current = updated
             return self._to_domain(updated)

@@ -1,21 +1,60 @@
 <script setup lang="ts">
 import { HardDrive } from '@lucide/vue'
+import { useMutation } from '@tanstack/vue-query'
+import { computed, onBeforeUnmount, ref } from 'vue'
 
+import { getHealth, migrateLibraryRoot } from '@/features/settings/settings-api'
+import { errorMessage } from '@/shared/errors'
+import Button from '@ui/Button.vue'
 import Input from '@ui/Input.vue'
 import Slider from '@ui/Slider.vue'
 import Switch from '@ui/Switch.vue'
+import { toast } from '@ui/toast'
 
 import SettingItem from '../SettingItem.vue'
 import SettingsSection from '../SettingsSection.vue'
-import { useSettingField } from '../useSettingField'
+import { useSettingField, useSettingsQuery } from '../useSettingField'
 
-const libraryRootField = useSettingField('libraryRoot', {
-  label: '图库根目录',
-  initialValue: '',
-  write: (value) => value.trim(),
-  validate: (value) => (value.trim() ? null : '图库根目录不能为空。'),
+const settingsQuery = useSettingsQuery()
+const libraryRoot = computed(() => settingsQuery.data.value?.libraryRoot ?? '')
+const migrationStarted = ref(false)
+let restartPoll = 0
+
+const migrationMutation = useMutation({
+  mutationFn: migrateLibraryRoot,
+  onSuccess: (result) => {
+    if (result.status === 'cancelled') {
+      toast.info(result.message)
+      return
+    }
+    migrationStarted.value = true
+    toast.success(result.message)
+    void waitForRestart(result.instanceId)
+  },
+  onError: (error) => {
+    toast.error('图库迁移未启动', { description: errorMessage(error) })
+  },
 })
-const libraryRoot = libraryRootField.value
+
+async function waitForRestart(instanceId: string) {
+  const currentPoll = ++restartPoll
+  while (currentPoll === restartPoll) {
+    await new Promise((resolve) => window.setTimeout(resolve, 1000))
+    try {
+      const health = await getHealth()
+      if (health.instanceId !== instanceId) {
+        window.location.reload()
+        return
+      }
+    } catch {
+      // 后端重启期间连接失败属于预期状态，继续等待新实例。
+    }
+  }
+}
+
+onBeforeUnmount(() => {
+  restartPoll += 1
+})
 
 const webpEnabledField = useSettingField('webpEnabled', {
   label: 'WebP 转换',
@@ -49,10 +88,26 @@ function commitWebpQuality(value: number) {
   >
     <SettingItem
       title="图库根目录"
-      description="作品文件和图库数据的本地存储位置。"
+      description="作品文件的本地存储位置；数据库、设置和缓存不会随之迁移。"
       control-id="library-root"
     >
-      <Input id="library-root" v-model="libraryRoot" required @blur="libraryRootField.save" />
+      <div class="flex items-center gap-3">
+        <Input id="library-root" :model-value="libraryRoot" class="min-w-0 flex-1" readonly />
+        <Button
+          variant="secondary"
+          class="shrink-0"
+          :disabled="migrationMutation.isPending.value || migrationStarted"
+          @click="migrationMutation.mutate()"
+        >
+          {{
+            migrationStarted
+              ? '迁移中…'
+              : migrationMutation.isPending.value
+                ? '等待确认…'
+                : '迁移目录'
+          }}
+        </Button>
+      </div>
     </SettingItem>
     <SettingItem
       title="转换为 WebP"

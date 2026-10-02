@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import shutil
+from threading import Lock
 from typing import TYPE_CHECKING
 from uuid import uuid4
 
@@ -23,13 +24,19 @@ class LibraryService:
         settings: SettingsManager,
         artworks: ArtworkRepository,
         thumbnails: ArtworkThumbnailCache | None = None,
+        mutation_lock: Lock | None = None,
     ) -> None:
         self._paths = paths
         self._settings = settings
         self._artworks = artworks
         self._thumbnails = thumbnails or ArtworkThumbnailCache(paths)
+        self._mutation_lock = mutation_lock or Lock()
 
     def delete_artworks(self, artwork_ids: Sequence[int]) -> int:
+        with self._mutation_lock:
+            return self._delete_artworks(artwork_ids)
+
+    def _delete_artworks(self, artwork_ids: Sequence[int]) -> int:
         root = self._settings.get().library_root.resolve()
         staged: list[tuple[Path, Path]] = []
         try:

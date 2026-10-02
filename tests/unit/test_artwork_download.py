@@ -109,7 +109,7 @@ async def test_download_writes_configured_image_format(
     )
     repository = StubArtworkRepository()
     qualities: list[int] = []
-    transcode = ArtworkDownloadService._transcode_to_webp
+    transcode = ArtworkDownloadService._transcode_to_webp  # pyright: ignore[reportPrivateUsage]
 
     def capture_quality(source: Path, quality: int) -> tuple[Path, int]:
         qualities.append(quality)
@@ -155,7 +155,9 @@ async def test_download_writes_configured_image_format(
     with Image.open(saved) as image:
         assert image.format == ("WEBP" if webp_enabled else "PNG")
         assert "A" in image.getbands()
-        assert image.getpixel((0, 0))[3] == 128
+        pixel = image.getpixel((0, 0))
+        assert isinstance(pixel, tuple) and len(pixel) == 4
+        assert pixel[3] == 128
     assert (paths.thumbnails / "123.webp").is_file()
     page_thumbnails = sorted((paths.thumbnails / "pages" / "123").glob("*.webp"))
     assert [path.name for path in page_thumbnails] == ["0.webp", "1.webp", "2.webp"]

@@ -154,6 +154,7 @@ def delete_artwork(
     artwork_id: int = PathParameter(gt=0),
     container: AppContainer = Depends(get_container),
 ) -> DeleteResponse:
+    container.storage.require_available()
     return DeleteResponse(deleted=container.library.delete_artworks([artwork_id]))
 
 
@@ -162,6 +163,7 @@ def bulk_delete_artworks(
     request: BulkDeleteRequest,
     container: AppContainer = Depends(get_container),
 ) -> DeleteResponse:
+    container.storage.require_available()
     return DeleteResponse(deleted=container.library.delete_artworks(request.artwork_ids))
 
 

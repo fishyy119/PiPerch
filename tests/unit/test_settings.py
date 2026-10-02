@@ -19,7 +19,7 @@ def _manager(tmp_path: Path) -> tuple[AppPaths, Database, SettingsManager]:
     paths.ensure_directories()
     run_migrations(paths)
     database = Database(paths.database)
-    return paths, database, SettingsManager(paths.settings, paths.default_library, database)
+    return paths, database, SettingsManager(paths.settings, paths.default_library)
 
 
 def test_initialize_creates_complete_default_settings(tmp_path: Path) -> None:

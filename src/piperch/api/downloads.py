@@ -28,6 +28,7 @@ async def create_job(
     request: DownloadJobCreate,
     container: AppContainer = Depends(get_container),
 ) -> DownloadJobCreated:
+    container.storage.require_available()
     job_id = await to_thread.run_sync(
         container.downloads.create_job,
         request.artwork_ids,
@@ -77,6 +78,7 @@ async def retry_job(
     job_id: str,
     container: AppContainer = Depends(get_container),
 ) -> None:
+    container.storage.require_available()
     await to_thread.run_sync(container.downloads.retry, job_id)
     container.supervisor.notify()
     await container.events.publish(job_id)

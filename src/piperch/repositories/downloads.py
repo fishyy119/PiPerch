@@ -80,6 +80,51 @@ class DownloadRepository:
                 .values(state=JobState.QUEUED.value, started_at=None)
             )
 
+    def count_active(self) -> tuple[int, int]:
+        states = [JobState.QUEUED.value, JobState.RUNNING.value]
+        item_states = [ItemState.QUEUED.value, ItemState.RUNNING.value]
+        with self._database.connect() as connection:
+            job_count = int(
+                connection.scalar(
+                    select(func.count()).select_from(download_jobs).where(download_jobs.c.state.in_(states))
+                )
+                or 0
+            )
+            item_count = int(
+                connection.scalar(
+                    select(func.count()).select_from(download_items).where(download_items.c.state.in_(item_states))
+                )
+                or 0
+            )
+        return job_count, item_count
+
+    def cancel_active(self) -> tuple[int, int]:
+        """迁移前一次性取消全部排队中和运行中的下载。"""
+        now = utc_now_text()
+        with self._database.begin() as connection:
+            items = connection.execute(
+                update(download_items)
+                .where(download_items.c.state.in_([ItemState.QUEUED.value, ItemState.RUNNING.value]))
+                .values(
+                    state=ItemState.CANCELLED.value,
+                    finished_at=now,
+                    progress_phase=None,
+                    progress_completed=0,
+                    progress_total=None,
+                )
+            )
+            jobs = connection.execute(
+                update(download_jobs)
+                .where(download_jobs.c.state.in_([JobState.QUEUED.value, JobState.RUNNING.value]))
+                .values(
+                    state=JobState.CANCELLED.value,
+                    cancel_requested=True,
+                    finished_at=now,
+                    error_summary=None,
+                )
+            )
+        return int(jobs.rowcount or 0), int(items.rowcount or 0)
+
     def claim_next(self) -> tuple[str, DownloadItemRecord] | None:
         with self._database.begin() as connection:
             job_row = (

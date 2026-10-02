@@ -30,6 +30,7 @@ class ErrorResponse(ApiModel):
 class HealthResponse(ApiModel):
     status: Literal["ok"] = "ok"
     database: Literal["ok"] = "ok"
+    instance_id: str
 
 
 class SettingsResponse(ApiModel):
@@ -45,7 +46,6 @@ class SettingsResponse(ApiModel):
 class SettingsPatch(ApiModel):
     pixiv_cookie: str | None = None
     proxy_url: str | None = None
-    library_root: str = Field(default=".", min_length=1)
     download_concurrency: int = Field(default=3, ge=1, le=8)
     request_interval_ms: int = Field(default=500, ge=0, le=60_000)
     webp_enabled: bool = True
@@ -69,6 +69,24 @@ class CookieValidationRequest(ApiModel):
 
 class CookieValidationResponse(ApiModel):
     valid: bool
+
+
+class LibraryMigrationCancelledResponse(ApiModel):
+    status: Literal["cancelled"] = "cancelled"
+    message: str
+
+
+class LibraryMigrationStartedResponse(ApiModel):
+    status: Literal["started"] = "started"
+    message: str
+    target_path: str
+    instance_id: str
+
+
+LibraryMigrationResponse = Annotated[
+    LibraryMigrationCancelledResponse | LibraryMigrationStartedResponse,
+    Field(discriminator="status"),
+]
 
 
 class ArtworkDiscoveryRequest(ApiModel):

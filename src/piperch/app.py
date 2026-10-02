@@ -9,6 +9,7 @@ from contextlib import asynccontextmanager
 from importlib.resources import files
 from mimetypes import guess_type
 from pathlib import PurePosixPath
+from threading import Lock
 
 from fastapi import FastAPI, Request
 from fastapi.encoders import jsonable_encoder
@@ -26,12 +27,14 @@ from piperch.errors import AppError, NotFoundError
 from piperch.paths import AppPaths
 from piperch.pixiv import PixivClient
 from piperch.repositories import ArtworkRepository, DownloadRepository
+from piperch.runtime import AppControl
 from piperch.services.downloads import (
     ArtworkDownloadService,
     DownloadEventBroker,
     DownloadSupervisor,
 )
 from piperch.services.library import LibraryService
+from piperch.services.storage import StorageMigrationService
 from piperch.services.thumbnails import ArtworkThumbnailCache
 from piperch.settings import SettingsManager
 
@@ -72,8 +75,9 @@ async def shutdown_resources(
         database.close()
 
 
-def create_app(paths: AppPaths | None = None) -> FastAPI:
+def create_app(paths: AppPaths | None = None, control: AppControl | None = None) -> FastAPI:
     resolved_paths = paths or AppPaths.from_data_dir()
+    app_control = control or AppControl.standalone()
     frontend_dist = files("piperch").joinpath("frontend")
 
     @asynccontextmanager
@@ -82,10 +86,9 @@ def create_app(paths: AppPaths | None = None) -> FastAPI:
         _cleanup_staging(resolved_paths)
         run_migrations(resolved_paths)
         database = Database(resolved_paths.database)
-        settings_manager = SettingsManager(resolved_paths.settings, resolved_paths.default_library, database)
+        settings_manager = SettingsManager(resolved_paths.settings, resolved_paths.default_library)
         settings_manager.initialize()
         current_settings = settings_manager.get()
-        current_settings.library_root.mkdir(parents=True, exist_ok=True)
         pixiv = PixivClient(
             proxy_url=current_settings.proxy_url,
             request_interval_ms=current_settings.request_interval_ms,
@@ -102,12 +105,24 @@ def create_app(paths: AppPaths | None = None) -> FastAPI:
             thumbnail_cache,
         )
         supervisor = DownloadSupervisor(download_repository, download_service, events)
+        mutation_lock = Lock()
         library_service = LibraryService(
             resolved_paths,
             settings_manager,
             artwork_repository,
             thumbnail_cache,
+            mutation_lock,
         )
+        storage_service = StorageMigrationService(
+            resolved_paths,
+            settings_manager,
+            download_repository,
+            supervisor,
+            app_control,
+            mutation_lock,
+        )
+        storage_service.recover()
+        settings_manager.get().library_root.mkdir(parents=True, exist_ok=True)
         library_service.recover_pending_deletes()
         container = AppContainer(
             paths=resolved_paths,
@@ -120,6 +135,8 @@ def create_app(paths: AppPaths | None = None) -> FastAPI:
             events=events,
             library=library_service,
             thumbnails=thumbnail_cache,
+            storage=storage_service,
+            instance_id=app_control.instance_id,
         )
         app.state.container = container
         await supervisor.start()
@@ -188,7 +205,7 @@ def create_app(paths: AppPaths | None = None) -> FastAPI:
         container: AppContainer = request.app.state.container
         with container.database.connect() as connection:
             connection.execute(text("SELECT 1"))
-        return HealthResponse()
+        return HealthResponse(instance_id=container.instance_id)
 
     application.include_router(settings.router, prefix="/api")
     application.include_router(discovery.router, prefix="/api")

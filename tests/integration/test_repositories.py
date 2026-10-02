@@ -45,7 +45,7 @@ def _repositories(
     paths.ensure_directories()
     run_migrations(paths)
     database = Database(paths.database)
-    settings = SettingsManager(paths.settings, paths.default_library, database)
+    settings = SettingsManager(paths.settings, paths.default_library)
     settings.initialize()
     return paths, database, settings, ArtworkRepository(database), DownloadRepository(database)
 

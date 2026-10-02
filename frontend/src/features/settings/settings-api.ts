@@ -12,9 +12,23 @@ export const settingsSchema = z.object({
   webpQuality: z.number().int().min(1).max(100),
 })
 export type Settings = z.infer<typeof settingsSchema>
-export type SettingsPatch = Partial<Settings>
+export type SettingsPatch = Partial<Omit<Settings, 'libraryRoot'>>
 
 const cookieValidationSchema = z.object({ valid: z.boolean() })
+const libraryMigrationSchema = z.discriminatedUnion('status', [
+  z.object({ status: z.literal('cancelled'), message: z.string() }),
+  z.object({
+    status: z.literal('started'),
+    message: z.string(),
+    targetPath: z.string(),
+    instanceId: z.string(),
+  }),
+])
+const healthSchema = z.object({
+  status: z.literal('ok'),
+  database: z.literal('ok'),
+  instanceId: z.string(),
+})
 
 export async function getSettings() {
   return settingsSchema.parse(await api.get<unknown>('/api/settings'))
@@ -28,4 +42,12 @@ export async function validatePixivCookie(value: string) {
   return cookieValidationSchema.parse(
     await api.post<unknown>('/api/settings/pixiv-cookie/validate', { value }),
   )
+}
+
+export async function migrateLibraryRoot() {
+  return libraryMigrationSchema.parse(await api.post<unknown>('/api/settings/library-root/migrate'))
+}
+
+export async function getHealth() {
+  return healthSchema.parse(await api.get<unknown>('/api/health'))
 }

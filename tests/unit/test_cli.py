@@ -10,6 +10,8 @@ if TYPE_CHECKING:
 
     from pytest import MonkeyPatch
 
+    from piperch.runtime import AppControl
+
 
 class FakeServer:
     instances: ClassVar[list[FakeServer]] = []
@@ -52,6 +54,42 @@ def test_run_server_uses_bounded_graceful_shutdown(
     assert configs[0]["workers"] == 1
     assert configs[0]["timeout_graceful_shutdown"] == 5
     assert FakeServer.instances[0].ran
+
+
+def test_run_server_recreates_application_after_restart_request(
+    monkeypatch: MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    controls: list[AppControl] = []
+    watcher_calls: list[object] = []
+
+    def fake_create_app(_paths: AppPaths, control: AppControl) -> object:
+        controls.append(control)
+        return object()
+
+    def fake_config(_app: object, **_kwargs: object) -> object:
+        return object()
+
+    def record_watcher(lifecycle: object) -> None:
+        watcher_calls.append(lifecycle)
+
+    class RestartingServer(FakeServer):
+        def run(self) -> None:
+            self.ran = True
+            if len(self.instances) == 1:
+                controls[-1].request_restart()
+
+    FakeServer.instances.clear()
+    monkeypatch.setattr("piperch.cli.create_app", fake_create_app)
+    monkeypatch.setattr("piperch.cli.uvicorn.Config", fake_config)
+    monkeypatch.setattr("piperch.cli.uvicorn.Server", RestartingServer)
+    monkeypatch.setattr("piperch.cli._start_terminal_interrupt_watcher", record_watcher)
+
+    run_server(AppPaths.from_data_dir(tmp_path), 7000)
+
+    assert len(RestartingServer.instances) == 2
+    assert len(controls) == 2
+    assert len(watcher_calls) == 1
 
 
 def test_terminal_interrupt_requests_graceful_then_forced_exit() -> None:

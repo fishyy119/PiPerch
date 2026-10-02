@@ -96,7 +96,7 @@ def candidate_from_mapping(
     thumbnail_url = as_text(item.get("url"))
     if not thumbnail_url:
         pages = as_sequence(item.get("pages"))
-        first_page = as_mapping(pages[0]) if pages else {}
+        first_page: Mapping[str, object] = as_mapping(pages[0]) if pages else {}
         urls = as_mapping(first_page.get("urls"))
         # 部分 Pixiv 缩略图列表使用尺寸名称作为键，其他接口则直接提供 url。
         thumbnail_url = (

@@ -13,6 +13,7 @@ if TYPE_CHECKING:
         DownloadSupervisor,
     )
     from piperch.services.library import LibraryService
+    from piperch.services.storage import StorageMigrationService
     from piperch.services.thumbnails import ArtworkThumbnailCache
     from piperch.settings import SettingsManager
 
@@ -29,3 +30,5 @@ class AppContainer:
     events: DownloadEventBroker
     library: LibraryService
     thumbnails: ArtworkThumbnailCache
+    storage: StorageMigrationService
+    instance_id: str
