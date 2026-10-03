@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 import httpx
 
@@ -562,7 +562,7 @@ class PixivClient:
                 bookmark_tags = body.get("bookmarkTags")
                 if not isinstance(bookmark_tags, (dict, list)) or (isinstance(bookmark_tags, list) and bookmark_tags):
                     raise UpstreamError("invalid_pixiv_response", "Pixiv 公开收藏标签结构无效。")
-                tags_by_bookmark = _mapping(bookmark_tags)
+                tags_by_bookmark = _mapping(cast("object", bookmark_tags))
                 for raw_work in works:
                     work = _mapping(raw_work)
                     work_id = _integer(work.get("id"))
@@ -579,7 +579,7 @@ class PixivClient:
                     if has_tag_entry and not isinstance(raw_tags, list):
                         raise UpstreamError("invalid_pixiv_response", "Pixiv 公开收藏标签结构无效。")
                     parsed_tags: list[str] = []
-                    for raw_tag in _sequence(raw_tags):
+                    for raw_tag in _sequence(cast("object", raw_tags)):
                         tag = raw_tag if isinstance(raw_tag, str) else _text(_mapping(raw_tag).get("tag"))
                         if not tag:
                             raise UpstreamError("invalid_pixiv_response", "Pixiv 公开收藏标签结构无效。")

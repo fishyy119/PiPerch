@@ -380,7 +380,7 @@ class FavoriteGroupResponse(ApiModel):
 
 class FavoriteStateRequest(ApiModel):
     is_favorite: bool
-    group_ids: list[int] = Field(default_factory=list, max_length=10)
+    group_ids: list[int] = Field(default_factory=lambda: list[int](), max_length=10)
 
     @field_validator("group_ids")
     @classmethod
@@ -416,8 +416,8 @@ class BulkFavoriteRequest(ApiModel):
 
 class BulkFavoriteGroupsRequest(ApiModel):
     artwork_ids: list[int] = Field(min_length=1, max_length=1000)
-    add_group_ids: list[int] = Field(default_factory=list, max_length=10)
-    remove_group_ids: list[int] = Field(default_factory=list, max_length=10)
+    add_group_ids: list[int] = Field(default_factory=lambda: list[int](), max_length=10)
+    remove_group_ids: list[int] = Field(default_factory=lambda: list[int](), max_length=10)
 
     @field_validator("artwork_ids", "add_group_ids", "remove_group_ids")
     @classmethod

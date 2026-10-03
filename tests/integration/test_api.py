@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from dataclasses import replace
 from io import BytesIO
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from PIL import Image
 
@@ -703,11 +703,13 @@ def test_local_favorite_import_filter_and_single_pixiv_sync(
         if path.endswith("/remove_tags"):
             removed = json_body["removeTags"]
             assert isinstance(removed, list)
-            remote_tags[:] = [tag for tag in remote_tags if tag not in removed]
+            removed_tags = cast("list[object]", removed)
+            remote_tags[:] = [tag for tag in remote_tags if tag not in removed_tags]
         elif path.endswith("/add_tags"):
             added = json_body["tags"]
             assert isinstance(added, list)
-            remote_tags.extend(str(tag) for tag in added)
+            added_tags = cast("list[object]", added)
+            remote_tags.extend(str(tag) for tag in added_tags)
 
     async def post_form(
         path: str,

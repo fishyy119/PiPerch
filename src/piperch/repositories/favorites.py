@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from sqlalchemy import delete, func, insert, select, update
 from sqlalchemy.exc import IntegrityError
@@ -87,7 +87,10 @@ class FavoriteRepository:
                 result = connection.execute(
                     insert(favorite_groups).values(name=normalized, created_at=now, updated_at=now)
                 )
-                group_id = int(result.inserted_primary_key[0])
+                inserted_primary_key = result.inserted_primary_key
+                if inserted_primary_key is None:
+                    raise RuntimeError("数据库未返回新建收藏分组的 ID。")
+                group_id = _integer(cast("object", inserted_primary_key[0]))
         except IntegrityError as error:
             raise ConflictError("favorite_group_exists", "同名收藏分组已经存在。") from error
         return FavoriteGroup(group_id=group_id, name=normalized, artwork_count=0)
@@ -245,7 +248,10 @@ class FavoriteRepository:
             group_id = connection.scalar(select(favorite_groups.c.id).where(favorite_groups.c.name == name))
             if group_id is None:
                 result = connection.execute(insert(favorite_groups).values(name=name, created_at=now, updated_at=now))
-                group_id = int(result.inserted_primary_key[0])
+                inserted_primary_key = result.inserted_primary_key
+                if inserted_primary_key is None:
+                    raise RuntimeError("数据库未返回新建收藏分组的 ID。")
+                group_id = _integer(cast("object", inserted_primary_key[0]))
             connection.execute(insert(favorite_group_items).values(artwork_id=artwork_id, group_id=group_id))
 
     @staticmethod
