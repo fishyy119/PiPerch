@@ -18,7 +18,7 @@ class StoredSettings(BaseModel):
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    pixiv_cookie: str | None = None
+    pixiv_cookie: str | None = None  # TODO: 便捷获取
     proxy_url: str | None = None
     library_root: Path
     download_concurrency: int = Field(default=3, ge=1, le=8, strict=True)

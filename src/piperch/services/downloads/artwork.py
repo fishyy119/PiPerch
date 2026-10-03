@@ -18,19 +18,16 @@ from piperch.services.library_files import LibraryFileOperations
 from piperch.services.thumbnails import ArtworkThumbnailCache
 
 if TYPE_CHECKING:
-    from collections.abc import Awaitable, Callable, Sequence
+    from collections.abc import Sequence
 
     from piperch.paths import AppPaths
     from piperch.pixiv import PixivClient
     from piperch.repositories import ArtworkRepository
+    from piperch.services.downloads.cancellation import DownloadCancellation
     from piperch.settings import SettingsManager
 
 _IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp"}
 logger = logging.getLogger(__name__)
-
-
-class DownloadCancelledError(Exception):
-    """任务取消后中断尚未开始的媒体请求。"""
 
 
 class ArtworkDownloadService:
@@ -53,7 +50,7 @@ class ArtworkDownloadService:
         self,
         artwork_id: int,
         job_id: str,
-        is_cancel_requested: Callable[[], Awaitable[bool]],
+        cancellation: DownloadCancellation,
     ) -> ItemState:
         settings = await to_thread.run_sync(self._settings.get)
         if await to_thread.run_sync(
@@ -62,11 +59,13 @@ class ArtworkDownloadService:
             settings.library_root,
         ):
             return ItemState.SKIPPED
+        cancellation.raise_if_requested()
 
         is_new_artwork = not await to_thread.run_sync(
             lambda: artwork_id in self._artworks.find_existing_ids((artwork_id,))
         )
         artwork = await self._pixiv.get_artwork(artwork_id, settings.pixiv_cookie)
+        cancellation.raise_if_requested()
         bookmark_tags: tuple[str, ...] | None = None
         if is_new_artwork and artwork.bookmark_data is not None and not artwork.bookmark_data.private:
             try:
@@ -82,22 +81,25 @@ class ArtworkDownloadService:
                     artwork_id,
                     error.message,
                 )
-        await self._raise_if_cancelled(is_cancel_requested)
+        cancellation.raise_if_requested()
         existing_media = await to_thread.run_sync(self._artworks.list_media, artwork_id)
         stage = self._files.download_stage(settings.library_root, job_id, artwork_id)
         try:
             await to_thread.run_sync(self._prepare_stage, stage)
+            cancellation.raise_if_requested()
             media = await self._download_media(
                 artwork,
                 stage,
                 settings.pixiv_cookie,
                 settings.webp_enabled,
                 settings.webp_quality,
-                is_cancel_requested,
+                cancellation,
                 existing_media,
                 settings.library_root,
             )
+            cancellation.raise_if_requested()
             await to_thread.run_sync(self._validate_stage, artwork, stage)
+            cancellation.raise_if_requested()
             final_dir = settings.library_root / str(artwork.author_id) / str(artwork_id)
             final_media = tuple(
                 MediaRecord(
@@ -111,6 +113,7 @@ class ArtworkDownloadService:
                 )
                 for item in media
             )
+            # 文件发布后必须完成元数据提交与备份清理，取消只在此提交边界之前生效。
             published = await to_thread.run_sync(self._files.publish, stage, final_dir)
             try:
                 if bookmark_tags is None:
@@ -141,11 +144,12 @@ class ArtworkDownloadService:
         cookie: str | None,
         webp_enabled: bool,
         webp_quality: int,
-        is_cancel_requested: Callable[[], Awaitable[bool]],
+        cancellation: DownloadCancellation,
         existing_media: Sequence[MediaRecord],
         library_root: Path,
     ) -> tuple[MediaRecord, ...]:
         records: list[MediaRecord] = []
+        cancellation.raise_if_requested()
         if artwork.artwork_type is ArtworkType.UGOIRA:
             cover_url = artwork.original_urls[0] if artwork.original_urls else artwork.thumbnail_url
             if not cover_url or not artwork.ugoira_zip_url:
@@ -176,8 +180,9 @@ class ArtworkDownloadService:
                     )
             if reused_cover is None:
                 cover = stage / (f"{artwork.artwork_id}_cover{self._extension(cover_url, '.jpg')}")
-                await self._raise_if_cancelled(is_cancel_requested)
+                cancellation.raise_if_requested()
                 mime, size = await self._pixiv.download(cover_url, cover, cookie)
+                cancellation.raise_if_requested()
                 self._require_media_type(mime, "image/", "Ugoira 封面")
                 records.append(
                     await self._finalize_image(
@@ -190,6 +195,7 @@ class ArtworkDownloadService:
                         webp_quality,
                     )
                 )
+            cancellation.raise_if_requested()
             archive = stage / f"{artwork.artwork_id}_ugoira.zip"
             reused_archive = await to_thread.run_sync(
                 self._reuse_media,
@@ -203,12 +209,15 @@ class ArtworkDownloadService:
                 archive = stage / Path(reused_archive.relative_path).name
                 records.append(reused_archive)
             else:
-                await self._raise_if_cancelled(is_cancel_requested)
+                cancellation.raise_if_requested()
                 mime, size = await self._pixiv.download(artwork.ugoira_zip_url, archive, cookie)
+                cancellation.raise_if_requested()
                 if mime not in {"application/zip", "application/octet-stream"}:
                     raise UpstreamError("invalid_media_type", "Ugoira ZIP 的媒体类型无效。")
                 records.append(MediaRecord("ugoiraZip", archive.name, mime, size))
+            cancellation.raise_if_requested()
             await to_thread.run_sync(self._validate_zip, archive, artwork)
+            cancellation.raise_if_requested()
             metadata_path = stage / "ugoira.json"
             payload = {
                 "artworkId": artwork.artwork_id,
@@ -238,6 +247,7 @@ class ArtworkDownloadService:
             )
 
         async def download_page(page_index: int, url: str) -> MediaRecord:
+            cancellation.raise_if_requested()
             reused = await to_thread.run_sync(
                 self._reuse_media,
                 existing_media,
@@ -250,7 +260,7 @@ class ArtworkDownloadService:
                 if not webp_enabled and reused.mime_type == "image/webp":
                     (stage / Path(reused.relative_path).name).unlink()
                 else:
-                    return await self._finalize_image(
+                    finalized = await self._finalize_image(
                         stage / Path(reused.relative_path).name,
                         reused.mime_type,
                         reused.byte_size,
@@ -259,11 +269,14 @@ class ArtworkDownloadService:
                         webp_enabled and reused.mime_type != "image/webp",
                         webp_quality,
                     )
-            await self._raise_if_cancelled(is_cancel_requested)
+                    cancellation.raise_if_requested()
+                    return finalized
+            cancellation.raise_if_requested()
             target = stage / (f"{artwork.artwork_id}_p{page_index}{self._extension(url, '.jpg')}")
             mime, size = await self._pixiv.download(url, target, cookie)
+            cancellation.raise_if_requested()
             self._require_media_type(mime, "image/", "作品原图")
-            return await self._finalize_image(
+            finalized = await self._finalize_image(
                 target,
                 mime,
                 size,
@@ -272,6 +285,8 @@ class ArtworkDownloadService:
                 webp_enabled,
                 webp_quality,
             )
+            cancellation.raise_if_requested()
+            return finalized
 
         for index, url in enumerate(artwork.original_urls):
             records.append(await download_page(index, url))
@@ -316,13 +331,6 @@ class ArtworkDownloadService:
         if source != target:
             source.unlink()
         return target, target.stat().st_size
-
-    @staticmethod
-    async def _raise_if_cancelled(
-        is_cancel_requested: Callable[[], Awaitable[bool]],
-    ) -> None:
-        if await is_cancel_requested():
-            raise DownloadCancelledError
 
     @staticmethod
     def _require_media_type(mime_type: str, prefix: str, label: str) -> None:

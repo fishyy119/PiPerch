@@ -15,11 +15,15 @@ from piperch.domain import (
     RemoteArtwork,
 )
 from piperch.paths import AppPaths
-from piperch.services.downloads import ArtworkDownloadService
+from piperch.services.downloads import (
+    ArtworkDownloadService,
+    DownloadCancellation,
+    DownloadCancelledError,
+)
 from piperch.services.thumbnails import ArtworkThumbnailCache
 
 if TYPE_CHECKING:
-    from collections.abc import Awaitable, Callable, Sequence
+    from collections.abc import Callable, Sequence
 
     from pytest import MonkeyPatch
 
@@ -54,8 +58,13 @@ class StubArtworkRepository:
 
 
 class StubPixivClient:
-    def __init__(self, artwork: RemoteArtwork) -> None:
+    def __init__(
+        self,
+        artwork: RemoteArtwork,
+        on_download: Callable[[], None] | None = None,
+    ) -> None:
         self._artwork = artwork
+        self._on_download = on_download
         self.active_downloads = 0
         self.maximum_active_downloads = 0
 
@@ -69,6 +78,8 @@ class StubPixivClient:
         try:
             Image.new("RGBA", (8, 8), (30, 120, 210, 128)).save(target, "PNG")
             size = await to_thread.run_sync(lambda: target.stat().st_size)
+            if self._on_download is not None:
+                self._on_download()
             return "image/png", size
         finally:
             self.active_downloads -= 1
@@ -139,14 +150,7 @@ async def test_download_writes_configured_image_format(
         cast("PixivClient", pixiv),
     )
 
-    async def is_cancel_requested() -> bool:
-        return False
-
-    result = await service.download_artwork(
-        123,
-        "job-id",
-        cast("Callable[[], Awaitable[bool]]", is_cancel_requested),
-    )
+    result = await service.download_artwork(123, "job-id", DownloadCancellation())
 
     assert result is ItemState.SUCCEEDED
     assert pixiv.maximum_active_downloads == 1
@@ -210,11 +214,61 @@ async def test_thumbnail_failure_keeps_committed_artwork_files(tmp_path: Path) -
         FailingThumbnailCache(paths),
     )
 
-    async def is_cancel_requested() -> bool:
-        return False
-
-    result = await service.download_artwork(123, "job-id", is_cancel_requested)
+    result = await service.download_artwork(123, "job-id", DownloadCancellation())
 
     assert result is ItemState.SUCCEEDED
     assert repository.saved_media is not None
     assert (settings.library_root / repository.saved_media[0].relative_path).is_file()
+
+
+@pytest.mark.asyncio
+async def test_cancellation_before_commit_discards_staged_media(tmp_path: Path) -> None:
+    paths = AppPaths.from_data_dir(tmp_path / "data")
+    paths.ensure_directories()
+    settings = AppSettings(
+        pixiv_cookie=None,
+        proxy_url=None,
+        library_root=paths.default_library,
+        download_concurrency=1,
+        request_interval_ms=0,
+        webp_enabled=False,
+        webp_quality=75,
+    )
+    artwork = RemoteArtwork(
+        artwork_id=123,
+        artwork_type=ArtworkType.ILLUST,
+        title="测试作品",
+        description="",
+        author_id=456,
+        author_name="测试作者",
+        author_account=None,
+        author_avatar_url=None,
+        series_id=None,
+        series_title=None,
+        page_count=1,
+        width=8,
+        height=8,
+        x_restrict=0,
+        is_ai=False,
+        published_at=None,
+        original_urls=("https://i.pximg.net/123_p0.png",),
+        thumbnail_url=None,
+    )
+    repository = StubArtworkRepository()
+    cancellation = DownloadCancellation()
+
+    def request_cancel() -> None:
+        cancellation.request()
+
+    service = ArtworkDownloadService(
+        paths,
+        cast("SettingsManager", StubSettings(settings)),
+        cast("ArtworkRepository", repository),
+        cast("PixivClient", StubPixivClient(artwork, request_cancel)),
+    )
+
+    with pytest.raises(DownloadCancelledError):
+        await service.download_artwork(123, "job-id", cancellation)
+
+    assert repository.saved_media is None
+    assert not (settings.library_root / "456" / "123").exists()

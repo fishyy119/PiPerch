@@ -68,9 +68,7 @@ async def cancel_job(
     job_id: str,
     container: AppContainer = Depends(get_container),
 ) -> None:
-    await to_thread.run_sync(container.downloads.request_cancel, job_id)
-    container.supervisor.notify()
-    await container.events.publish(job_id)
+    await container.supervisor.request_cancel(job_id)
 
 
 @router.post("/{job_id}/retry", status_code=status.HTTP_202_ACCEPTED)
