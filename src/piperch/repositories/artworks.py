@@ -54,6 +54,7 @@ if TYPE_CHECKING:
 
 
 class ArtworkRepository:
+    _RANDOM_MODULUS: ClassVar[int] = 2_147_483_647
     _SORT_COLUMNS: ClassVar[dict[str, ColumnElement[object]]] = {
         "downloadedAt": artworks.c.downloaded_at,
         "publishedAt": artworks.c.published_at,
@@ -257,6 +258,7 @@ class ArtworkRepository:
         ai: str,
         sort: str,
         order: str,
+        random_seed: int = 0,
         favorite: str = "all",
         favorite_group_ids: Sequence[int] = (),
     ) -> tuple[list[ArtworkSummary], int]:
@@ -317,9 +319,20 @@ class ArtworkRepository:
         if conditions:
             count_statement = count_statement.where(and_(*conditions))
             statement = statement.where(and_(*conditions))
-        sort_column = self._SORT_COLUMNS.get(sort, artworks.c.downloaded_at)
-        direction = sort_column.asc() if order == "asc" else sort_column.desc()
-        statement = statement.order_by(direction, artworks.c.id.desc()).offset(page * size).limit(size)
+        if sort == "random":
+            # 先扩散种子，避免相邻种子只产生相近的线性排序。
+            mixed_seed = (random_seed + 0x9E3779B9) & 0xFFFFFFFF
+            mixed_seed = ((mixed_seed ^ (mixed_seed >> 16)) * 0x85EBCA6B) & 0xFFFFFFFF
+            mixed_seed = ((mixed_seed ^ (mixed_seed >> 13)) * 0xC2B2AE35) & 0xFFFFFFFF
+            mixed_seed ^= mixed_seed >> 16
+            multiplier = (mixed_seed % (self._RANDOM_MODULUS - 1)) + 1
+            random_key = ((artworks.c.id % self._RANDOM_MODULUS) * multiplier + random_seed) % self._RANDOM_MODULUS
+            statement = statement.order_by(random_key.asc(), artworks.c.id.desc())
+        else:
+            sort_column = self._SORT_COLUMNS.get(sort, artworks.c.downloaded_at)
+            direction = sort_column.asc() if order == "asc" else sort_column.desc()
+            statement = statement.order_by(direction, artworks.c.id.desc())
+        statement = statement.offset(page * size).limit(size)
 
         with self._database.connect() as connection:
             total = int(connection.scalar(count_statement) or 0)

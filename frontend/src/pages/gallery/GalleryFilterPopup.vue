@@ -68,6 +68,7 @@ const visibleTags = computed(() => {
         <div class="filter-row-title flex items-center gap-1">
           <h3>排序</h3>
           <Button
+            v-if="sort !== 'random'"
             variant="ghost"
             size="iconSmall"
             class="-my-1 shrink-0 rounded-full text-muted-foreground"
@@ -84,6 +85,7 @@ const visibleTags = computed(() => {
               { value: 'publishedAt', label: '发布时间' },
               { value: 'id', label: '作品 ID' },
               { value: 'title', label: '标题' },
+              { value: 'random', label: '随机' },
             ]"
             :key="option.value"
             :active="sort === option.value"

@@ -54,6 +54,7 @@ const preferredPageSize = usePreference('gallery.pageSize')
 const preferredShowTitle = usePreference('gallery.showTitle')
 const preferredShowAuthor = usePreference('gallery.showAuthor')
 const preferredShowFavoriteIndicator = usePreference('gallery.showFavoriteIndicator')
+const RANDOM_SEED_MODULUS = 2_147_483_647
 const GALLERY_PAGE_SIZE_OPTIONS = [24, 48, 96] as const
 const pageSizeOptions = GALLERY_PAGE_SIZE_OPTIONS.map((size) => ({
   value: String(size),
@@ -73,6 +74,11 @@ function positiveInt(value: string | null | undefined) {
 function pageNumber() {
   const parsed = Number(singleQuery('page'))
   return Number.isSafeInteger(parsed) && parsed >= 0 ? parsed : 0
+}
+
+function randomSeed() {
+  const parsed = Number(singleQuery('randomSeed'))
+  return Number.isSafeInteger(parsed) && parsed >= 0 && parsed < RANDOM_SEED_MODULUS ? parsed : 0
 }
 
 function selectedTagIds() {
@@ -95,6 +101,7 @@ function artworkFilters(): GalleryFilters {
   const authorId = positiveInt(singleQuery('authorId'))
   const seriesId = positiveInt(singleQuery('seriesId'))
   const artworkType = singleQuery('artworkType')
+  const sort = singleQuery('sort') || 'downloadedAt'
   return {
     page: pageNumber(),
     size: preferredPageSize.value,
@@ -107,8 +114,9 @@ function artworkFilters(): GalleryFilters {
     ai: singleQuery('ai') || 'all',
     favorite: singleQuery('favorite') || 'all',
     favoriteGroupIds: selectedFavoriteGroupIds(),
-    sort: singleQuery('sort') || 'downloadedAt',
+    sort,
     order: singleQuery('order') || 'desc',
+    ...(sort === 'random' ? { randomSeed: randomSeed() } : {}),
   }
 }
 
@@ -226,7 +234,16 @@ function toggleFavoriteGroup(groupId: number) {
 }
 
 function updateSort(sort: string, order: string) {
-  replaceQuery({ sort, order })
+  if (sort === 'random') {
+    const currentSeed = randomSeed()
+    let nextSeed = currentSeed
+    while (nextSeed === currentSeed) {
+      nextSeed = (crypto.getRandomValues(new Uint32Array(1))[0] ?? 0) % RANDOM_SEED_MODULUS
+    }
+    replaceQuery({ sort, randomSeed: String(nextSeed) })
+    return
+  }
+  replaceQuery({ sort, order, randomSeed: undefined })
 }
 
 function updateFilter(
@@ -250,6 +267,7 @@ function clearFilters() {
     favoriteGroupId: undefined,
     sort: undefined,
     order: undefined,
+    randomSeed: undefined,
   })
 }
 

@@ -84,6 +84,7 @@ export interface GalleryFilters {
   favoriteGroupIds: number[]
   sort: string
   order: string
+  randomSeed?: number
 }
 
 function galleryQuery(filters: GalleryFilters) {
@@ -102,6 +103,7 @@ function galleryQuery(filters: GalleryFilters) {
   if (filters.authorId !== undefined) params.set('authorId', String(filters.authorId))
   if (filters.seriesId !== undefined) params.set('seriesId', String(filters.seriesId))
   if (filters.artworkType) params.set('artworkType', filters.artworkType)
+  if (filters.randomSeed !== undefined) params.set('randomSeed', String(filters.randomSeed))
   return params
 }
 

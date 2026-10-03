@@ -42,8 +42,9 @@ def list_artworks(
     ai: str = Query(default="all", pattern="^(all|yes|no)$"),
     favorite: str = Query(default="all", pattern="^(all|yes|no)$"),
     favorite_group_id: list[PositiveId] = Query(default=[], alias="favoriteGroupId"),
-    sort: str = Query(default="downloadedAt", pattern="^(downloadedAt|publishedAt|title|id)$"),
+    sort: str = Query(default="downloadedAt", pattern="^(downloadedAt|publishedAt|title|id|random)$"),
     order: str = Query(default="desc", pattern="^(asc|desc)$"),
+    random_seed: int = Query(default=0, ge=0, lt=2_147_483_647, alias="randomSeed"),
     container: AppContainer = Depends(get_container),
 ) -> ArtworkPage:
     items, total = container.artworks.list_artworks(
@@ -60,6 +61,7 @@ def list_artworks(
         favorite_group_ids=favorite_group_id,
         sort=sort,
         order=order,
+        random_seed=random_seed,
     )
     return ArtworkPage(
         items=[artwork_summary_response(item) for item in items],
