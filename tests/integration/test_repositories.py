@@ -182,7 +182,7 @@ def test_delete_metadata_removes_unused_gallery_facets(tmp_path: Path) -> None:
         )
         deleted = artworks.delete_metadata([101])
         available_tags = artworks.list_tags("", 50)
-        available_authors, author_total = artworks.list_authors(0, 50, "")
+        available_authors = artworks.list_authors("")
         available_series, series_total = artworks.list_series(0, 50, "")
     finally:
         database.close()
@@ -190,7 +190,6 @@ def test_delete_metadata_removes_unused_gallery_facets(tmp_path: Path) -> None:
     assert deleted == 1
     assert available_tags == []
     assert available_authors == []
-    assert author_total == 0
     assert available_series == []
     assert series_total == 0
 

@@ -194,29 +194,20 @@ def list_tags(
     ]
 
 
-@router.get("/authors", response_model=NamedCountPage)
+@router.get("/authors", response_model=list[NamedCountResponse])
 def list_authors(
-    page: int = Query(default=0, ge=0),
-    size: int = Query(default=24, ge=1, le=100),
     search: str = Query(default="", max_length=100),
     container: AppContainer = Depends(get_container),
-) -> NamedCountPage:
-    items, total = container.artworks.list_authors(page, size, search)
-    return NamedCountPage(
-        items=[
-            NamedCountResponse(
-                item_id=item.item_id,
-                name=item.name,
-                count=item.count,
-                subtitle=item.subtitle,
-            )
-            for item in items
-        ],
-        page=page,
-        size=size,
-        total_elements=total,
-        total_pages=math.ceil(total / size),
-    )
+) -> list[NamedCountResponse]:
+    return [
+        NamedCountResponse(
+            item_id=item.item_id,
+            name=item.name,
+            count=item.count,
+            subtitle=item.subtitle,
+        )
+        for item in container.artworks.list_authors(search)
+    ]
 
 
 @router.get("/series", response_model=NamedCountPage)

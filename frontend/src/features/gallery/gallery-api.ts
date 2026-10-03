@@ -37,21 +37,20 @@ const artworkPageSchema = z.object({
   totalPages: z.number().int(),
 })
 
+const namedCountSchema = z.object({
+  itemId: z.number().int().positive(),
+  name: z.string(),
+  count: z.number().int(),
+  subtitle: z.string().nullable(),
+})
 const namedCountPageSchema = z.object({
-  items: z.array(
-    z.object({
-      itemId: z.number().int().positive(),
-      name: z.string(),
-      count: z.number().int(),
-      subtitle: z.string().nullable(),
-    }),
-  ),
+  items: z.array(namedCountSchema),
   page: z.number().int(),
   size: z.number().int(),
   totalElements: z.number().int(),
   totalPages: z.number().int(),
 })
-export type NamedCount = z.infer<typeof namedCountPageSchema>['items'][number]
+export type NamedCount = z.infer<typeof namedCountSchema>
 
 export const artworkDetailSchema = artworkSummarySchema.extend({
   description: z.string(),
@@ -119,9 +118,16 @@ export async function listTags(search = '') {
     .parse(await api.get<unknown>(`/api/tags?search=${encodeURIComponent(search)}&limit=100`))
 }
 
-export async function listNamed(kind: 'authors' | 'series', page: number, search: string) {
+export async function listAuthors(search: string) {
+  const params = new URLSearchParams({ search })
+  return z
+    .array(namedCountSchema)
+    .parse(await api.get<unknown>(`/api/authors?${params.toString()}`))
+}
+
+export async function listSeries(page: number, search: string) {
   const params = new URLSearchParams({ page: String(page), search })
-  return namedCountPageSchema.parse(await api.get<unknown>(`/api/${kind}?${params.toString()}`))
+  return namedCountPageSchema.parse(await api.get<unknown>(`/api/series?${params.toString()}`))
 }
 
 export async function getArtwork(artworkId: number) {

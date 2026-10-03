@@ -48,7 +48,6 @@ if TYPE_CHECKING:
 
     from sqlalchemy.engine import Connection, RowMapping
     from sqlalchemy.sql.elements import ColumnElement
-    from sqlalchemy.sql.selectable import FromClause
 
     from piperch.database import Database
 
@@ -519,8 +518,30 @@ class ArtworkRepository:
                 for row in rows
             ]
 
-    def list_authors(self, page: int, size: int, search: str) -> tuple[list[NamedCount], int]:
-        return self._list_named(authors, authors.c.name, authors.c.id, page, size, search)
+    def list_authors(self, search: str) -> list[NamedCount]:
+        joined = authors.join(artworks, authors.c.id == artworks.c.author_id)
+        statement = (
+            select(
+                authors.c.id,
+                authors.c.name,
+                func.count(artworks.c.id).label("item_count"),
+            )
+            .select_from(joined)
+            .group_by(authors.c.id, authors.c.name)
+            .order_by(authors.c.name.asc())
+        )
+        if search:
+            statement = statement.where(authors.c.name.contains(search, autoescape=True))
+        with self._database.connect() as connection:
+            rows = connection.execute(statement).mappings()
+            return [
+                NamedCount(
+                    item_id=_integer(row["id"]),
+                    name=_string(row["name"]),
+                    count=_integer(row["item_count"]),
+                )
+                for row in rows
+            ]
 
     def list_series(self, page: int, size: int, search: str) -> tuple[list[NamedCount], int]:
         joined = series.join(artworks, series.c.id == artworks.c.series_id).join(
@@ -651,45 +672,3 @@ class ArtworkRepository:
             )
             for summary in summaries
         ]
-
-    def _list_named(
-        self,
-        source: FromClause,
-        name_column: ColumnElement[str],
-        id_column: ColumnElement[int],
-        page: int,
-        size: int,
-        search: str,
-    ) -> tuple[list[NamedCount], int]:
-        joined = source.join(artworks, id_column == artworks.c.author_id)
-        condition = name_column.contains(search, autoescape=True) if search else None
-        statement = (
-            select(
-                id_column.label("id"),
-                name_column.label("name"),
-                func.count(artworks.c.id).label("item_count"),
-            )
-            .select_from(joined)
-            .group_by(id_column, name_column)
-            .order_by(name_column.asc())
-            .offset(page * size)
-            .limit(size)
-        )
-        count_statement = select(func.count(func.distinct(id_column))).select_from(joined)
-        if condition is not None:
-            statement = statement.where(condition)
-            count_statement = count_statement.where(condition)
-        with self._database.connect() as connection:
-            total = int(connection.scalar(count_statement) or 0)
-            rows = connection.execute(statement).mappings()
-            return (
-                [
-                    NamedCount(
-                        item_id=_integer(row["id"]),
-                        name=_string(row["name"]),
-                        count=_integer(row["item_count"]),
-                    )
-                    for row in rows
-                ],
-                total,
-            )

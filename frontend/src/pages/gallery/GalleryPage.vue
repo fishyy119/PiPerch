@@ -15,8 +15,9 @@ import {
   createFavoriteGroup,
   type GalleryFilters,
   listArtworks,
+  listAuthors,
   listFavoriteGroups,
-  listNamed,
+  listSeries,
   listTags,
   replaceFavoriteState,
   syncFavorite,
@@ -133,12 +134,12 @@ const favoriteGroupsQuery = useQuery({
 })
 const filterAuthorsQuery = useQuery({
   queryKey: computed(() => ['filter-authors', authorFilterSearch.value]),
-  queryFn: () => listNamed('authors', 0, authorFilterSearch.value),
+  queryFn: () => listAuthors(authorFilterSearch.value),
   enabled: computed(() => filterOpen.value),
 })
 const filterSeriesQuery = useQuery({
   queryKey: computed(() => ['filter-series', seriesFilterSearch.value]),
-  queryFn: () => listNamed('series', 0, seriesFilterSearch.value),
+  queryFn: () => listSeries(0, seriesFilterSearch.value),
   enabled: computed(() => filterOpen.value),
 })
 const activeFilterCount = computed(() => {
@@ -528,7 +529,7 @@ function saveBulkGroups(addGroupIds: number[], removeGroupIds: number[]) {
   <GalleryFilterPopup
     :open="filterOpen"
     :tags="tagsQuery.data.value ?? []"
-    :authors="filterAuthorsQuery.data.value?.items ?? []"
+    :authors="filterAuthorsQuery.data.value ?? []"
     :series="filterSeriesQuery.data.value?.items ?? []"
     :favorite-groups="favoriteGroupsQuery.data.value ?? []"
     :selected-tag-ids="selectedTagIds()"
