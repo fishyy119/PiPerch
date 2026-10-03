@@ -17,6 +17,7 @@ from piperch.domain import (
 )
 from piperch.paths import AppPaths
 from piperch.services.downloads import ArtworkDownloadService
+from piperch.services.thumbnails import ArtworkThumbnailCache
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable, Sequence
@@ -62,6 +63,11 @@ class StubPixivClient:
         Image.new("RGBA", (8, 8), (30, 120, 210, 128)).save(target, "PNG")
         size = await to_thread.run_sync(lambda: target.stat().st_size)
         return "image/png", size
+
+
+class FailingThumbnailCache(ArtworkThumbnailCache):
+    def create_cover_thumbnail(self, artwork_id: int, source: Path) -> Path:
+        raise OSError("thumbnail failed")
 
 
 @pytest.mark.asyncio
@@ -161,3 +167,55 @@ async def test_download_writes_configured_image_format(
     assert (paths.thumbnails / "123.webp").is_file()
     page_thumbnails = sorted((paths.thumbnails / "pages" / "123").glob("*.webp"))
     assert [path.name for path in page_thumbnails] == ["0.webp", "1.webp", "2.webp"]
+
+
+@pytest.mark.asyncio
+async def test_thumbnail_failure_keeps_committed_artwork_files(tmp_path: Path) -> None:
+    paths = AppPaths.from_data_dir(tmp_path / "data")
+    paths.ensure_directories()
+    settings = AppSettings(
+        pixiv_cookie=None,
+        proxy_url=None,
+        library_root=paths.default_library,
+        download_concurrency=1,
+        request_interval_ms=0,
+        webp_enabled=False,
+        webp_quality=75,
+    )
+    artwork = RemoteArtwork(
+        artwork_id=123,
+        artwork_type=ArtworkType.ILLUST,
+        title="测试作品",
+        description="",
+        author_id=456,
+        author_name="测试作者",
+        author_account=None,
+        author_avatar_url=None,
+        series_id=None,
+        series_title=None,
+        page_count=1,
+        width=8,
+        height=8,
+        x_restrict=0,
+        is_ai=False,
+        published_at=None,
+        original_urls=("https://i.pximg.net/123_p0.png",),
+        thumbnail_url=None,
+    )
+    repository = StubArtworkRepository()
+    service = ArtworkDownloadService(
+        paths,
+        cast("SettingsManager", StubSettings(settings)),
+        cast("ArtworkRepository", repository),
+        cast("PixivClient", StubPixivClient(artwork)),
+        FailingThumbnailCache(paths),
+    )
+
+    async def is_cancel_requested() -> bool:
+        return False
+
+    result = await service.download_artwork(123, "job-id", is_cancel_requested)
+
+    assert result is ItemState.SUCCEEDED
+    assert repository.saved_media is not None
+    assert (settings.library_root / repository.saved_media[0].relative_path).is_file()

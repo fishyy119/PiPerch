@@ -143,10 +143,14 @@ def get_thumbnail(
     artwork_id: int = PathParameter(gt=0),
     container: AppContainer = Depends(get_container),
 ) -> FileResponse:
-    path = container.paths.thumbnails / f"{artwork_id}.webp"
-    if not path.is_file():
-        raise NotFoundError("作品缩略图不存在。")
-    return FileResponse(path, media_type="image/webp")
+    detail = container.artworks.get_detail(artwork_id)
+    source_record = next((item for item in detail.media if item.role in {"page", "cover"}), None)
+    if source_record is None:
+        raise NotFoundError("作品没有可用于生成缩略图的媒体文件。")
+    root = container.settings.get().library_root
+    source = _safe_media_path(root, source_record.relative_path)
+    thumbnail = container.thumbnails.ensure_cover_thumbnail(artwork_id, source)
+    return FileResponse(thumbnail, media_type="image/webp")
 
 
 @router.delete("/artworks/{artwork_id}", response_model=DeleteResponse)

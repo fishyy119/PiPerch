@@ -3,9 +3,9 @@ from __future__ import annotations
 import shutil
 from threading import Lock
 from typing import TYPE_CHECKING
-from uuid import uuid4
 
 from piperch.errors import AppError, NotFoundError
+from piperch.services.library_files import LibraryFileOperations
 from piperch.services.thumbnails import ArtworkThumbnailCache
 
 if TYPE_CHECKING:
@@ -25,12 +25,14 @@ class LibraryService:
         artworks: ArtworkRepository,
         thumbnails: ArtworkThumbnailCache | None = None,
         mutation_lock: Lock | None = None,
+        files: LibraryFileOperations | None = None,
     ) -> None:
         self._paths = paths
         self._settings = settings
         self._artworks = artworks
         self._thumbnails = thumbnails or ArtworkThumbnailCache(paths)
         self._mutation_lock = mutation_lock or Lock()
+        self._files = files or LibraryFileOperations()
 
     def delete_artworks(self, artwork_ids: Sequence[int]) -> int:
         with self._mutation_lock:
@@ -54,9 +56,7 @@ class LibraryService:
                             "作品路径不是目录，已拒绝操作。",
                             409,
                         )
-                    target = (
-                        self._paths.staging / "delete" / str(detail.summary.author_id) / f"{artwork_id}-{uuid4().hex}"
-                    )
+                    target = self._files.delete_target(root, detail.summary.author_id, artwork_id)
                     target.parent.mkdir(parents=True, exist_ok=True)
                     source.replace(target)
                     staged.append((source, target))
@@ -66,19 +66,27 @@ class LibraryService:
                 if target.exists():
                     source.parent.mkdir(parents=True, exist_ok=True)
                     target.replace(source)
+            self._files.cleanup_delete_root(root)
             raise
         for _, target in staged:
             shutil.rmtree(target, ignore_errors=True)
         for artwork_id in artwork_ids:
             self._thumbnails.delete_artwork(artwork_id)
+        self._files.cleanup_delete_root(root)
         return deleted
 
     def recover_pending_deletes(self) -> None:
         """根据数据库是否仍有作品记录，完成或回滚进程中断的删除操作。"""
-        pending_root = self._paths.staging / "delete"
+        library_root = self._settings.get().library_root.resolve()
+        legacy_root = self._paths.staging / "delete"
+        pending_roots = (legacy_root, self._files.delete_root(library_root))
+        for pending_root in dict.fromkeys(pending_roots):
+            self._recover_pending_deletes(pending_root, library_root)
+        self._files.cleanup_delete_root(library_root)
+
+    def _recover_pending_deletes(self, pending_root: Path, library_root: Path) -> None:
         if not pending_root.is_dir():
             return
-        library_root = self._settings.get().library_root.resolve()
         for author_dir in pending_root.iterdir():
             if not author_dir.is_dir() or not author_dir.name.isdecimal():
                 continue

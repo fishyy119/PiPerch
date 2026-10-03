@@ -30,11 +30,24 @@ class ArtworkThumbnailCache:
     def __init__(self, paths: AppPaths) -> None:
         self._paths = paths
         self._generation_slots = BoundedSemaphore(_PAGE_GENERATION_CONCURRENCY)
-        self._page_locks = tuple(Lock() for _ in range(self._PAGE_LOCK_COUNT))
+        self._thumbnail_locks = tuple(Lock() for _ in range(self._PAGE_LOCK_COUNT))
 
     def create_cover_thumbnail(self, artwork_id: int, source: Path) -> Path:
         target = self._paths.thumbnails / f"{artwork_id}.webp"
         self._write_thumbnail(source, target, _COVER_THUMBNAIL_SIZE)
+        return target
+
+    def ensure_cover_thumbnail(self, artwork_id: int, source: Path) -> Path:
+        target = self._paths.thumbnails / f"{artwork_id}.webp"
+        if self._is_fresh(target, source):
+            return target
+
+        lock = self._thumbnail_locks[hash((artwork_id, "cover")) % self._PAGE_LOCK_COUNT]
+        with lock:
+            if self._is_fresh(target, source):
+                return target
+            with self._generation_slots:
+                self._write_thumbnail(source, target, _COVER_THUMBNAIL_SIZE)
         return target
 
     def ensure_page_thumbnail(self, artwork_id: int, page_index: int, source: Path) -> Path:
@@ -42,7 +55,7 @@ class ArtworkThumbnailCache:
         if self._is_fresh(target, source):
             return target
 
-        lock = self._page_locks[hash((artwork_id, page_index)) % self._PAGE_LOCK_COUNT]
+        lock = self._thumbnail_locks[hash((artwork_id, page_index)) % self._PAGE_LOCK_COUNT]
         with lock:
             if self._is_fresh(target, source):
                 return target

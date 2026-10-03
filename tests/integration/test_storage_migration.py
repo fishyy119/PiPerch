@@ -10,6 +10,7 @@ from piperch.domain import JobState
 from piperch.paths import AppPaths
 from piperch.repositories import DownloadRepository
 from piperch.runtime import AppControl
+from piperch.services.library_files import LibraryFileOperations
 from piperch.services.storage import StorageMigrationJournal, StorageMigrationService
 from piperch.settings import SettingsManager
 
@@ -72,6 +73,9 @@ async def test_storage_migration_moves_all_files_and_cancels_unfinished_download
     managed.parent.mkdir(parents=True)
     managed.write_bytes(b"managed")
     (source / "untracked.txt").write_text("untracked", encoding="utf-8")
+    workspace = LibraryFileOperations.workspace(source)
+    workspace.mkdir()
+    (workspace / "interrupted.part").write_bytes(b"temporary")
     job_id = downloads.create_job([1, 2], "迁移测试")
 
     def select_target(_source: Path) -> Path:
@@ -89,6 +93,7 @@ async def test_storage_migration_moves_all_files_and_cancels_unfinished_download
         assert settings.get().library_root == target.resolve()
         assert (target / "100" / "1" / "1_p0.jpg").read_bytes() == b"managed"
         assert (target / "untracked.txt").read_text(encoding="utf-8") == "untracked"
+        assert not (target / workspace.name).exists()
         assert not source.exists()
         assert downloads.get_job(job_id).state is JobState.CANCELLED
         assert not paths.storage_migration.exists()

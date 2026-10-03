@@ -14,6 +14,7 @@ from anyio import to_thread
 from pydantic import BaseModel, ConfigDict
 
 from piperch.errors import AppError, ConflictError
+from piperch.services.library_files import LIBRARY_WORKSPACE_NAME
 
 if TYPE_CHECKING:
     from piperch.paths import AppPaths
@@ -199,7 +200,7 @@ class StorageMigrationService:
     def _migrate_files(self, source: Path, target: Path) -> None:
         with self._mutation_lock:
             self._validate_target(source, target, probe=False)
-            manifest = self._scan(source)
+            manifest = self._scan(source, ignored={Path(LIBRARY_WORKSPACE_NAME)})
             logger.info(
                 "图库扫描完成: %d 个文件，共 %d 字节。",
                 len(manifest.files),

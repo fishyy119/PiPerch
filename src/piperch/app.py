@@ -34,6 +34,7 @@ from piperch.services.downloads import (
     DownloadSupervisor,
 )
 from piperch.services.library import LibraryService
+from piperch.services.library_files import LibraryFileOperations
 from piperch.services.storage import StorageMigrationService
 from piperch.services.thumbnails import ArtworkThumbnailCache
 from piperch.settings import SettingsManager
@@ -97,12 +98,14 @@ def create_app(paths: AppPaths | None = None, control: AppControl | None = None)
         download_repository = DownloadRepository(database)
         events = DownloadEventBroker()
         thumbnail_cache = ArtworkThumbnailCache(resolved_paths)
+        library_files = LibraryFileOperations()
         download_service = ArtworkDownloadService(
             resolved_paths,
             settings_manager,
             artwork_repository,
             pixiv,
             thumbnail_cache,
+            library_files,
         )
         supervisor = DownloadSupervisor(download_repository, download_service, events)
         mutation_lock = Lock()
@@ -112,6 +115,7 @@ def create_app(paths: AppPaths | None = None, control: AppControl | None = None)
             artwork_repository,
             thumbnail_cache,
             mutation_lock,
+            library_files,
         )
         storage_service = StorageMigrationService(
             resolved_paths,

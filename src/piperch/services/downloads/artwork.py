@@ -2,18 +2,19 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import shutil
 import zipfile
 from pathlib import Path
 from typing import TYPE_CHECKING
 from urllib.parse import urlparse
-from uuid import uuid4
 
 from anyio import to_thread
 from PIL import Image, ImageOps
 
 from piperch.domain import ArtworkType, DownloadProgressPhase, ItemState, MediaRecord, RemoteArtwork
 from piperch.errors import UpstreamError
+from piperch.services.library_files import LibraryFileOperations
 from piperch.services.thumbnails import ArtworkThumbnailCache
 
 if TYPE_CHECKING:
@@ -25,6 +26,7 @@ if TYPE_CHECKING:
     from piperch.settings import SettingsManager
 
 _IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp"}
+logger = logging.getLogger(__name__)
 
 
 class DownloadCancelledError(Exception):
@@ -39,12 +41,13 @@ class ArtworkDownloadService:
         artworks: ArtworkRepository,
         pixiv: PixivClient,
         thumbnails: ArtworkThumbnailCache | None = None,
+        files: LibraryFileOperations | None = None,
     ) -> None:
-        self._paths = paths
         self._settings = settings
         self._artworks = artworks
         self._pixiv = pixiv
         self._thumbnails = thumbnails or ArtworkThumbnailCache(paths)
+        self._files = files or LibraryFileOperations()
 
     async def download_artwork(
         self,
@@ -71,9 +74,9 @@ class ArtworkDownloadService:
             total_pages,
         )
         existing_media = await to_thread.run_sync(self._artworks.list_media, artwork_id)
-        stage = self._paths.staging / job_id / str(artwork_id)
-        await to_thread.run_sync(self._prepare_stage, stage)
+        stage = self._files.download_stage(settings.library_root, job_id, artwork_id)
         try:
+            await to_thread.run_sync(self._prepare_stage, stage)
             media = await self._download_media(
                 artwork,
                 stage,
@@ -101,7 +104,6 @@ class ArtworkDownloadService:
             )
             await to_thread.run_sync(self._validate_stage, artwork, stage)
             final_dir = settings.library_root / str(artwork.author_id) / str(artwork_id)
-            backup = await to_thread.run_sync(self._swap_stage, stage, final_dir)
             final_media = tuple(
                 MediaRecord(
                     role=item.role,
@@ -114,18 +116,20 @@ class ArtworkDownloadService:
                 )
                 for item in media
             )
+            published = await to_thread.run_sync(self._files.publish, stage, final_dir)
             try:
                 await to_thread.run_sync(self._artworks.save_download, artwork, final_media)
+            except Exception:
+                await to_thread.run_sync(published.rollback)
+                raise
+            await to_thread.run_sync(published.finalize)
+            try:
                 await to_thread.run_sync(self._create_thumbnails, artwork_id, final_dir, final_media)
             except Exception:
-                await to_thread.run_sync(self._rollback_swap, final_dir, backup)
-                raise
-            if backup is not None:
-                await to_thread.run_sync(shutil.rmtree, backup, True)
+                logger.exception("作品 %d 缩略图缓存生成失败，将在访问时重试。", artwork_id)
             return ItemState.SUCCEEDED
         finally:
-            if stage.exists():
-                await to_thread.run_sync(shutil.rmtree, stage, True)
+            await to_thread.run_sync(self._files.cleanup_download_stage, settings.library_root, stage)
 
     async def _download_media(
         self,
@@ -419,28 +423,6 @@ class ArtworkDownloadService:
         files = [path for path in stage.iterdir() if path.is_file()]
         if not files or any(path.stat().st_size <= 0 for path in files):
             raise UpstreamError("incomplete_stage", f"作品 {artwork.artwork_id} 的临时文件不完整。")
-
-    @staticmethod
-    def _swap_stage(stage: Path, final_dir: Path) -> Path | None:
-        final_dir.parent.mkdir(parents=True, exist_ok=True)
-        backup: Path | None = None
-        if final_dir.exists():
-            backup = final_dir.with_name(f".{final_dir.name}.backup-{uuid4().hex}")
-            final_dir.replace(backup)
-        try:
-            stage.replace(final_dir)
-        except Exception:
-            if backup is not None:
-                backup.replace(final_dir)
-            raise
-        return backup
-
-    @staticmethod
-    def _rollback_swap(final_dir: Path, backup: Path | None) -> None:
-        if final_dir.exists():
-            shutil.rmtree(final_dir)
-        if backup is not None and backup.exists():
-            backup.replace(final_dir)
 
     def _create_thumbnails(
         self,
