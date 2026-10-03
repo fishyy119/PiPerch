@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ArrowDown, ArrowUp } from '@lucide/vue'
-import { computed, ref } from 'vue'
+import { computed } from 'vue'
 
 import type { FavoriteGroup, NamedCount, Tag } from '@/features/gallery/gallery-api'
 import CollapsibleFilterOptions from '@/pages/gallery/CollapsibleFilterOptions.vue'
@@ -27,6 +27,7 @@ const props = defineProps<{
   selectedFavoriteGroupIds: number[]
   sort: string
   order: string
+  tagSearch: string
   authorSearch: string
   seriesSearch: string
 }>()
@@ -37,20 +38,29 @@ const emit = defineEmits<{
   toggleFavoriteGroup: [groupId: number]
   updateFilter: [name: FilterName, value: string | undefined]
   updateSort: [sort: string, order: string]
+  updateTagSearch: [value: string]
   updateAuthorSearch: [value: string]
   updateSeriesSearch: [value: string]
 }>()
 
-const tagSearch = ref('')
 const visibleTags = computed(() => {
-  const needle = tagSearch.value.trim().toLocaleLowerCase()
-  return props.tags.filter((tag) => {
-    if (!needle) return true
-    return [tag.name, tag.translatedName ?? ''].some((name) =>
-      name.toLocaleLowerCase().includes(needle),
-    )
-  })
+  const selectedIds = new Set(props.selectedTagIds)
+  return activeFirst(props.tags, (tag) => selectedIds.has(tag.tagId))
 })
+const visibleAuthors = computed(() =>
+  activeFirst(props.authors, (author) => author.itemId === props.authorId),
+)
+const visibleSeries = computed(() =>
+  activeFirst(props.series, (item) => item.itemId === props.seriesId),
+)
+const visibleFavoriteGroups = computed(() => {
+  const selectedIds = new Set(props.selectedFavoriteGroupIds)
+  return activeFirst(props.favoriteGroups, (group) => selectedIds.has(group.groupId))
+})
+
+function activeFirst<T>(items: T[], isActive: (item: T) => boolean) {
+  return [...items].sort((left, right) => Number(isActive(right)) - Number(isActive(left)))
+}
 </script>
 
 <template>
@@ -171,7 +181,7 @@ const visibleTags = computed(() => {
           <p class="text-xs text-muted-foreground">选择多个分组时，属于任一分组即可</p>
           <div class="flex flex-wrap gap-2">
             <FilterOptionButton
-              v-for="group in favoriteGroups"
+              v-for="group in visibleFavoriteGroups"
               :key="group.groupId"
               :active="selectedFavoriteGroupIds.includes(group.groupId)"
               @click="emit('toggleFavoriteGroup', group.groupId)"
@@ -179,7 +189,7 @@ const visibleTags = computed(() => {
               {{ group.name }}
               <span class="text-xs text-muted-foreground">{{ group.artworkCount }}</span>
             </FilterOptionButton>
-            <span v-if="favoriteGroups.length === 0" class="text-sm text-muted-foreground">
+            <span v-if="visibleFavoriteGroups.length === 0" class="text-sm text-muted-foreground">
               还没有收藏分组。
             </span>
           </div>
@@ -189,7 +199,12 @@ const visibleTags = computed(() => {
       <section class="filter-row border-t pt-5">
         <h3 class="filter-row-title">标签</h3>
         <div>
-          <SearchInput v-model="tagSearch" class="mb-3 w-full max-w-sm" placeholder="搜索标签…" />
+          <SearchInput
+            :model-value="tagSearch"
+            class="mb-3 w-full max-w-sm"
+            placeholder="搜索标签…"
+            @update:model-value="emit('updateTagSearch', $event)"
+          />
           <CollapsibleFilterOptions>
             <FilterOptionButton
               v-for="tag in visibleTags"
@@ -218,14 +233,14 @@ const visibleTags = computed(() => {
           />
           <CollapsibleFilterOptions>
             <FilterOptionButton
-              v-if="authorId && !authors.some((item) => item.itemId === authorId)"
+              v-if="authorId && !visibleAuthors.some((item) => item.itemId === authorId)"
               :active="true"
               @click="emit('updateFilter', 'authorId', undefined)"
             >
               作者 #{{ authorId }}
             </FilterOptionButton>
             <FilterOptionButton
-              v-for="author in authors"
+              v-for="author in visibleAuthors"
               :key="author.itemId"
               :active="authorId === author.itemId"
               @click="
@@ -239,7 +254,7 @@ const visibleTags = computed(() => {
               {{ author.name }}
               <span class="text-xs text-muted-foreground">{{ author.count }}</span>
             </FilterOptionButton>
-            <span v-if="authors.length === 0" class="text-sm text-muted-foreground">
+            <span v-if="visibleAuthors.length === 0" class="text-sm text-muted-foreground">
               没有匹配的本地作者。
             </span>
           </CollapsibleFilterOptions>
@@ -257,14 +272,14 @@ const visibleTags = computed(() => {
           />
           <CollapsibleFilterOptions>
             <FilterOptionButton
-              v-if="seriesId && !series.some((item) => item.itemId === seriesId)"
+              v-if="seriesId && !visibleSeries.some((item) => item.itemId === seriesId)"
               :active="true"
               @click="emit('updateFilter', 'seriesId', undefined)"
             >
               系列 #{{ seriesId }}
             </FilterOptionButton>
             <FilterOptionButton
-              v-for="item in series"
+              v-for="item in visibleSeries"
               :key="item.itemId"
               :active="seriesId === item.itemId"
               @click="
@@ -277,7 +292,7 @@ const visibleTags = computed(() => {
             >
               {{ item.name }} <span class="text-xs text-muted-foreground">{{ item.count }}</span>
             </FilterOptionButton>
-            <span v-if="series.length === 0" class="text-sm text-muted-foreground">
+            <span v-if="visibleSeries.length === 0" class="text-sm text-muted-foreground">
               没有匹配的本地系列。
             </span>
           </CollapsibleFilterOptions>

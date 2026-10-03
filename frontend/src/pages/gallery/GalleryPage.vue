@@ -49,6 +49,7 @@ const selectionMode = ref(false)
 const syncConfirmationArtwork = ref<ArtworkSummary | null>(null)
 const newFavoriteGroupArtwork = ref<ArtworkSummary | null>(null)
 const bulkFavoriteGroupsOpen = ref(false)
+const tagFilterSearch = ref('')
 const authorFilterSearch = ref('')
 const seriesFilterSearch = ref('')
 const preferredCardWidth = usePreference('gallery.cardWidth')
@@ -99,6 +100,11 @@ function selectedFavoriteGroupIds() {
     .filter((value): value is number => value !== undefined)
 }
 
+function selectedAuthorIds() {
+  const authorId = positiveInt(singleQuery('authorId'))
+  return authorId === undefined ? [] : [authorId]
+}
+
 function artworkFilters(): GalleryFilters {
   const authorId = positiveInt(singleQuery('authorId'))
   const seriesId = positiveInt(singleQuery('seriesId'))
@@ -127,15 +133,20 @@ const artworksQuery = useQuery({
   queryFn: () => listArtworks(artworkFilters()),
 })
 
-const tagsQuery = useQuery({ queryKey: ['tags'], queryFn: () => listTags() })
+const tagsQuery = useQuery({
+  queryKey: computed(() => ['tags', tagFilterSearch.value, selectedTagIds()]),
+  queryFn: () => listTags(tagFilterSearch.value, selectedTagIds()),
+  placeholderData: (previousData) => previousData,
+})
 const favoriteGroupsQuery = useQuery({
   queryKey: ['favorite-groups'],
   queryFn: listFavoriteGroups,
 })
 const filterAuthorsQuery = useQuery({
-  queryKey: computed(() => ['filter-authors', authorFilterSearch.value]),
-  queryFn: () => listAuthors(authorFilterSearch.value),
+  queryKey: computed(() => ['filter-authors', authorFilterSearch.value, selectedAuthorIds()]),
+  queryFn: () => listAuthors(authorFilterSearch.value, selectedAuthorIds()),
   enabled: computed(() => filterOpen.value),
+  placeholderData: (previousData) => previousData,
 })
 const filterSeriesQuery = useQuery({
   queryKey: computed(() => ['filter-series', seriesFilterSearch.value]),
@@ -542,6 +553,7 @@ function saveBulkGroups(addGroupIds: number[], removeGroupIds: number[]) {
     :selected-favorite-group-ids="selectedFavoriteGroupIds()"
     :sort="singleQuery('sort') || 'downloadedAt'"
     :order="singleQuery('order') || 'desc'"
+    :tag-search="tagFilterSearch"
     :author-search="authorFilterSearch"
     :series-search="seriesFilterSearch"
     @close="filterOpen = false"
@@ -549,6 +561,7 @@ function saveBulkGroups(addGroupIds: number[], removeGroupIds: number[]) {
     @toggle-favorite-group="toggleFavoriteGroup"
     @update-filter="updateFilter"
     @update-sort="updateSort"
+    @update-tag-search="tagFilterSearch = $event"
     @update-author-search="authorFilterSearch = $event"
     @update-series-search="seriesFilterSearch = $event"
   />

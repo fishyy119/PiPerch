@@ -487,7 +487,13 @@ class ArtworkRepository:
             byte_size=_integer(row["byte_size"]),
         )
 
-    def list_tags(self, search: str, limit: int) -> list[tuple[int, TagRecord, int]]:
+    def list_tags(
+        self,
+        search: str,
+        limit: int,
+        include_ids: Sequence[int] = (),
+    ) -> list[tuple[int, TagRecord, int]]:
+        included_ids = tuple(dict.fromkeys(include_ids))
         statement = (
             select(
                 tags.c.id,
@@ -497,15 +503,26 @@ class ArtworkRepository:
             )
             .select_from(tags.join(artwork_tags, tags.c.id == artwork_tags.c.tag_id))
             .group_by(tags.c.id)
-            .order_by(func.count(artwork_tags.c.artwork_id).desc(), tags.c.name.asc())
-            .limit(limit)
         )
+        if included_ids:
+            statement = statement.order_by(
+                case((tags.c.id.in_(included_ids), 0), else_=1),
+                func.count(artwork_tags.c.artwork_id).desc(),
+                tags.c.name.asc(),
+            )
+        else:
+            statement = statement.order_by(
+                func.count(artwork_tags.c.artwork_id).desc(),
+                tags.c.name.asc(),
+            )
+        statement = statement.limit(limit + len(included_ids))
         if search:
+            search_condition = or_(
+                tags.c.name.contains(search, autoescape=True),
+                tags.c.translated_name.contains(search, autoescape=True),
+            )
             statement = statement.where(
-                or_(
-                    tags.c.name.contains(search, autoescape=True),
-                    tags.c.translated_name.contains(search, autoescape=True),
-                )
+                or_(search_condition, tags.c.id.in_(included_ids)) if included_ids else search_condition
             )
         with self._database.connect() as connection:
             rows = connection.execute(statement).mappings()
@@ -518,7 +535,13 @@ class ArtworkRepository:
                 for row in rows
             ]
 
-    def list_authors(self, search: str) -> list[NamedCount]:
+    def list_authors(
+        self,
+        search: str,
+        limit: int = 100,
+        include_ids: Sequence[int] = (),
+    ) -> list[NamedCount]:
+        included_ids = tuple(dict.fromkeys(include_ids))
         joined = authors.join(artworks, authors.c.id == artworks.c.author_id)
         statement = (
             select(
@@ -528,10 +551,24 @@ class ArtworkRepository:
             )
             .select_from(joined)
             .group_by(authors.c.id, authors.c.name)
-            .order_by(func.count(artworks.c.id).desc(), authors.c.name.asc())
         )
+        if included_ids:
+            statement = statement.order_by(
+                case((authors.c.id.in_(included_ids), 0), else_=1),
+                func.count(artworks.c.id).desc(),
+                authors.c.name.asc(),
+            )
+        else:
+            statement = statement.order_by(
+                func.count(artworks.c.id).desc(),
+                authors.c.name.asc(),
+            )
+        statement = statement.limit(limit + len(included_ids))
         if search:
-            statement = statement.where(authors.c.name.contains(search, autoescape=True))
+            search_condition = authors.c.name.contains(search, autoescape=True)
+            statement = statement.where(
+                or_(search_condition, authors.c.id.in_(included_ids)) if included_ids else search_condition
+            )
         with self._database.connect() as connection:
             rows = connection.execute(statement).mappings()
             return [

@@ -181,6 +181,7 @@ def bulk_delete_artworks(
 def list_tags(
     search: str = Query(default="", max_length=100),
     limit: int = Query(default=50, ge=1, le=200),
+    include_id: list[PositiveId] = Query(default=[], alias="includeId"),
     container: AppContainer = Depends(get_container),
 ) -> list[TagResponse]:
     return [
@@ -190,13 +191,15 @@ def list_tags(
             translated_name=tag.translated_name,
             artwork_count=count,
         )
-        for tag_id, tag, count in container.artworks.list_tags(search, limit)
+        for tag_id, tag, count in container.artworks.list_tags(search, limit, include_id)
     ]
 
 
 @router.get("/authors", response_model=list[NamedCountResponse])
 def list_authors(
     search: str = Query(default="", max_length=100),
+    limit: int = Query(default=100, ge=1, le=200),
+    include_id: list[PositiveId] = Query(default=[], alias="includeId"),
     container: AppContainer = Depends(get_container),
 ) -> list[NamedCountResponse]:
     return [
@@ -206,7 +209,7 @@ def list_authors(
             count=item.count,
             subtitle=item.subtitle,
         )
-        for item in container.artworks.list_authors(search)
+        for item in container.artworks.list_authors(search, limit, include_id)
     ]
 
 

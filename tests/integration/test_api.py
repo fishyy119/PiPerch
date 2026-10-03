@@ -581,11 +581,17 @@ def test_gallery_accepts_camel_case_filter_parameters(
     response = client.get(
         f"/api/artworks?tagId={target_tag_id}&authorId=201&seriesId=301&artworkType=manga&rating=r18&ai=yes"
     )
+    tags_response = client.get(f"/api/tags?search=其他&limit=1&includeId={target_tag_id}")
+    authors_response = client.get("/api/authors?search=其他&limit=1&includeId=201")
 
     assert response.status_code == 200
     payload = response.json()
     assert payload["totalElements"] == 1
     assert [item["artworkId"] for item in payload["items"]] == [101]
+    assert tags_response.status_code == 200
+    assert [item["name"] for item in tags_response.json()] == ["目标标签", "其他标签"]
+    assert authors_response.status_code == 200
+    assert [item["name"] for item in authors_response.json()] == ["目标作者", "其他作者"]
 
 
 def test_local_favorite_import_filter_and_single_pixiv_sync(

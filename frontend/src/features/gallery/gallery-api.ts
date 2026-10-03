@@ -112,14 +112,15 @@ export async function listArtworks(filters: GalleryFilters) {
   )
 }
 
-export async function listTags(search = '') {
-  return z
-    .array(tagSchema)
-    .parse(await api.get<unknown>(`/api/tags?search=${encodeURIComponent(search)}&limit=100`))
+export async function listTags(search = '', includeIds: number[] = []) {
+  const params = new URLSearchParams({ search, limit: '100' })
+  includeIds.forEach((id) => params.append('includeId', String(id)))
+  return z.array(tagSchema).parse(await api.get<unknown>(`/api/tags?${params.toString()}`))
 }
 
-export async function listAuthors(search: string) {
-  const params = new URLSearchParams({ search })
+export async function listAuthors(search: string, includeIds: number[] = []) {
+  const params = new URLSearchParams({ search, limit: '100' })
+  includeIds.forEach((id) => params.append('includeId', String(id)))
   return z
     .array(namedCountSchema)
     .parse(await api.get<unknown>(`/api/authors?${params.toString()}`))
