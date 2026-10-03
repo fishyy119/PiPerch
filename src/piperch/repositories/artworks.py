@@ -1,7 +1,6 @@
-# pyright: reportArgumentType=false, reportAttributeAccessIssue=false, reportUnknownArgumentType=false, reportUnknownMemberType=false, reportUnknownVariableType=false
-# SQLAlchemy Core 的泛型表达式会丢失部分列类型，此文件在数据库边界精确关闭相关噪音。
 from __future__ import annotations
 
+from dataclasses import replace
 from typing import TYPE_CHECKING, ClassVar, cast
 
 from sqlalchemy import Select, and_, case, delete, func, insert, literal, or_, select, update
@@ -44,13 +43,15 @@ if TYPE_CHECKING:
     from collections.abc import Sequence
     from pathlib import Path
 
-    from sqlalchemy.engine import RowMapping
+    from sqlalchemy.engine import Connection, RowMapping
+    from sqlalchemy.sql.elements import ColumnElement
+    from sqlalchemy.sql.selectable import FromClause
 
     from piperch.database import Database
 
 
 class ArtworkRepository:
-    _SORT_COLUMNS: ClassVar[dict[str, object]] = {
+    _SORT_COLUMNS: ClassVar[dict[str, ColumnElement[object]]] = {
         "downloadedAt": artworks.c.downloaded_at,
         "publishedAt": artworks.c.published_at,
         "title": artworks.c.title,
@@ -200,7 +201,7 @@ class ArtworkRepository:
                 )
 
     @staticmethod
-    def _upsert_author(connection: object, artwork: RemoteArtwork, now: str) -> None:
+    def _upsert_author(connection: Connection, artwork: RemoteArtwork, now: str) -> None:
         values = {
             "id": artwork.author_id,
             "name": artwork.author_name,
@@ -215,7 +216,7 @@ class ArtworkRepository:
             connection.execute(update(authors).where(authors.c.id == artwork.author_id).values(**values))
 
     @staticmethod
-    def _upsert_series(connection: object, artwork: RemoteArtwork, now: str) -> None:
+    def _upsert_series(connection: Connection, artwork: RemoteArtwork, now: str) -> None:
         if artwork.series_id is None or artwork.series_title is None:
             return
         values = {
@@ -245,7 +246,7 @@ class ArtworkRepository:
         sort: str,
         order: str,
     ) -> tuple[list[ArtworkSummary], int]:
-        conditions = []
+        conditions: list[ColumnElement[bool]] = []
         if search:
             search_value = search.strip()
             text_match = or_(
@@ -392,8 +393,7 @@ class ArtworkRepository:
             row = connection.execute(statement).mappings().first()
             if row is None:
                 raise NotFoundError("未找到该作品。")
-            summary = self._summary_from_row(row)
-            self._attach_tags(connection, [summary])
+            summary = self._summary_with_tags(connection, self._summary_from_row(row))
             media_rows = connection.execute(
                 select(media_files)
                 .where(media_files.c.artwork_id == artwork_id)
@@ -552,37 +552,33 @@ class ArtworkRepository:
         )
 
     @staticmethod
-    def _attach_tags(connection: object, summaries: Sequence[ArtworkSummary]) -> None:
-        if not summaries:
-            return
-        by_id = {summary.artwork_id: summary for summary in summaries}
+    def _summary_with_tags(connection: Connection, summary: ArtworkSummary) -> ArtworkSummary:
         rows = connection.execute(
             select(
-                artwork_tags.c.artwork_id,
                 tags.c.id,
                 tags.c.name,
                 tags.c.translated_name,
             )
             .select_from(artwork_tags.join(tags, artwork_tags.c.tag_id == tags.c.id))
-            .where(artwork_tags.c.artwork_id.in_(by_id))
+            .where(artwork_tags.c.artwork_id == summary.artwork_id)
             .order_by(tags.c.name.asc())
         ).mappings()
-        grouped: dict[int, list[tuple[int, TagRecord]]] = {key: [] for key in by_id}
-        for row in rows:
-            grouped[_integer(row["artwork_id"])].append(
+        return replace(
+            summary,
+            tags=tuple(
                 (
                     _integer(row["id"]),
                     TagRecord(_string(row["name"]), _optional_string(row["translated_name"])),
                 )
-            )
-        for summary in summaries:
-            object.__setattr__(summary, "tags", tuple(grouped[summary.artwork_id]))
+                for row in rows
+            ),
+        )
 
     def _list_named(
         self,
-        source: object,
-        name_column: object,
-        id_column: object,
+        source: FromClause,
+        name_column: ColumnElement[str],
+        id_column: ColumnElement[int],
         page: int,
         size: int,
         search: str,

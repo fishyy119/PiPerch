@@ -1,5 +1,3 @@
-# pyright: reportArgumentType=false, reportAttributeAccessIssue=false, reportUnknownArgumentType=false, reportUnknownMemberType=false, reportUnknownVariableType=false
-# SQLAlchemy Core 的泛型表达式会丢失部分列类型，此文件在数据库边界精确关闭相关噪音。
 from __future__ import annotations
 
 from collections import Counter
@@ -24,7 +22,7 @@ from piperch.utils.datetime import utc_now_text
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
-    from sqlalchemy.engine import RowMapping
+    from sqlalchemy.engine import Connection, RowMapping
 
     from piperch.database import Database
 
@@ -356,7 +354,7 @@ class DownloadRepository:
             return self._job_from_row(connection, row, True)
 
     @staticmethod
-    def _finalize(connection: object, job_id: str) -> None:
+    def _finalize(connection: Connection, job_id: str) -> None:
         rows = connection.execute(
             select(download_items.c.state, func.count().label("item_count"))
             .where(download_items.c.job_id == job_id)
@@ -403,7 +401,7 @@ class DownloadRepository:
 
     @staticmethod
     def _job_from_row(
-        connection: object,
+        connection: Connection,
         row: RowMapping,
         include_items: bool,
     ) -> DownloadJobRecord:
