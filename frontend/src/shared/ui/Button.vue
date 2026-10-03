@@ -1,12 +1,13 @@
 <script setup lang="ts">
 const props = withDefaults(
   defineProps<{
+    as?: 'button' | 'a'
     type?: 'button' | 'submit' | 'reset'
     variant?: 'primary' | 'secondary' | 'danger' | 'ghost'
     size?: 'default' | 'small' | 'icon' | 'iconSmall'
     disabled?: boolean
   }>(),
-  { type: 'button', variant: 'primary', size: 'default', disabled: false },
+  { as: 'button', type: 'button', variant: 'primary', size: 'default', disabled: false },
 )
 
 const variantClasses = {
@@ -25,12 +26,13 @@ const sizeClasses = {
 </script>
 
 <template>
-  <button
-    :type="type"
-    :disabled="disabled"
+  <component
+    :is="as"
+    :type="as === 'button' ? type : undefined"
+    :disabled="as === 'button' ? disabled : undefined"
     class="inline-flex cursor-pointer items-center justify-center text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50"
     :class="[variantClasses[props.variant], sizeClasses[props.size]]"
   >
     <slot />
-  </button>
+  </component>
 </template>
