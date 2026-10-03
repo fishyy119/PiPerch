@@ -7,7 +7,7 @@ import {
   type ArtworkCardTarget,
   type ArtworkPreviewUrlResolver,
 } from '@/features/artworks/artwork-card'
-import ArtworkPagePreview from '@/features/artworks/ArtworkPagePreview.vue'
+import ArtworkPagePreview from '@/shared/components/artworks/ArtworkPagePreview.vue'
 import SmartCropImage from '@ui/SmartCropImage.vue'
 
 const props = withDefaults(

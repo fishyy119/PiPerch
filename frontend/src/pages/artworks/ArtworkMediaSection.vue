@@ -15,7 +15,6 @@ import { useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 
 import { artworkTypeLabel } from '@/features/artworks/artwork'
-import CreateFavoriteGroupDialog from '@/features/gallery/CreateFavoriteGroupDialog.vue'
 import {
   type ArtworkDetail,
   bulkUpdateFavoriteGroups,
@@ -24,6 +23,7 @@ import {
   listFavoriteGroups,
   replaceFavoriteState,
 } from '@/features/gallery/gallery-api'
+import CreateFavoriteGroupDialog from '@/shared/components/favorites/CreateFavoriteGroupDialog.vue'
 import { errorMessage } from '@/shared/errors'
 import { usePageKeyboardShortcuts } from '@/shared/lib/usePageKeyboardShortcuts'
 import Button from '@ui/Button.vue'

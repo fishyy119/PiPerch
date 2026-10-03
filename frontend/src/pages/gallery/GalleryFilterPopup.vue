@@ -1,90 +1,111 @@
 <script setup lang="ts">
 import { ArrowDown, ArrowUp } from '@lucide/vue'
-import { computed } from 'vue'
+import { computed, watch } from 'vue'
 
-import type { FavoriteGroup, NamedCount, Tag } from '@/features/gallery/gallery-api'
+import { GALLERY_RANDOM_SEED_MODULUS, useGalleryFilters } from '@/features/gallery/gallery-filter'
+import { useGalleryFilterOptions } from '@/features/gallery/useGalleryFilterOptions'
 import CollapsibleFilterOptions from '@/pages/gallery/CollapsibleFilterOptions.vue'
 import FilterOptionButton from '@/pages/gallery/FilterOptionButton.vue'
 import Button from '@ui/Button.vue'
 import Dialog from '@ui/Dialog.vue'
 import SearchInput from '@ui/SearchInput.vue'
 
-type FilterName = 'authorId' | 'seriesId' | 'artworkType' | 'rating' | 'ai' | 'favorite'
+const open = defineModel<boolean>('open', { required: true })
+const { filters, update: updateFilters } = useGalleryFilters()
 
-const props = defineProps<{
-  open: boolean
-  tags: Tag[]
-  authors: NamedCount[]
-  series: NamedCount[]
-  favoriteGroups: FavoriteGroup[]
-  selectedTagIds: number[]
-  authorId: number | undefined
-  seriesId: number | undefined
-  artworkType: string
-  rating: string
-  ai: string
-  favorite: string
-  selectedFavoriteGroupIds: number[]
-  sort: string
-  order: string
-  tagSearch: string
-  authorSearch: string
-  seriesSearch: string
-}>()
-
-const emit = defineEmits<{
-  close: []
-  toggleTag: [tagId: number]
-  toggleFavoriteGroup: [groupId: number]
-  updateFilter: [name: FilterName, value: string | undefined]
-  updateSort: [sort: string, order: string]
-  updateTagSearch: [value: string]
-  updateAuthorSearch: [value: string]
-  updateSeriesSearch: [value: string]
-}>()
+const {
+  tagSearch,
+  authorSearch,
+  seriesSearch,
+  tags,
+  authors,
+  series,
+  favoriteGroups,
+  favoriteGroupsReady,
+} = useGalleryFilterOptions({
+  open: () => open.value,
+  selectedTagIds: () => filters.value.selectedTagIds,
+  authorId: () => filters.value.authorId,
+})
 
 const visibleTags = computed(() => {
-  const selectedIds = new Set(props.selectedTagIds)
-  return activeFirst(props.tags, (tag) => selectedIds.has(tag.tagId))
+  const selectedIds = new Set(filters.value.selectedTagIds)
+  return activeFirst(tags.value, (tag) => selectedIds.has(tag.tagId))
 })
 const visibleAuthors = computed(() =>
-  activeFirst(props.authors, (author) => author.itemId === props.authorId),
+  activeFirst(authors.value, (author) => author.itemId === filters.value.authorId),
 )
 const visibleSeries = computed(() =>
-  activeFirst(props.series, (item) => item.itemId === props.seriesId),
+  activeFirst(series.value, (item) => item.itemId === filters.value.seriesId),
 )
 const visibleFavoriteGroups = computed(() => {
-  const selectedIds = new Set(props.selectedFavoriteGroupIds)
-  return activeFirst(props.favoriteGroups, (group) => selectedIds.has(group.groupId))
+  const selectedIds = new Set(filters.value.selectedFavoriteGroupIds)
+  return activeFirst(favoriteGroups.value, (group) => selectedIds.has(group.groupId))
 })
 
 function activeFirst<T>(items: T[], isActive: (item: T) => boolean) {
   return [...items].sort((left, right) => Number(isActive(right)) - Number(isActive(left)))
 }
+
+watch([favoriteGroups, favoriteGroupsReady], ([groups, ready]) => {
+  if (!ready) return
+  const validIds = new Set(groups.map((group) => group.groupId))
+  const selectedIds = filters.value.selectedFavoriteGroupIds
+  const retainedIds = selectedIds.filter((groupId) => validIds.has(groupId))
+  if (retainedIds.length !== selectedIds.length) {
+    updateFilters({ selectedFavoriteGroupIds: retainedIds })
+  }
+})
+
+function toggleTag(tagId: number) {
+  const selectedTagIds = filters.value.selectedTagIds.includes(tagId)
+    ? filters.value.selectedTagIds.filter((id) => id !== tagId)
+    : [...filters.value.selectedTagIds, tagId]
+  updateFilters({ selectedTagIds })
+}
+
+function toggleFavoriteGroup(groupId: number) {
+  const selectedFavoriteGroupIds = filters.value.selectedFavoriteGroupIds.includes(groupId)
+    ? filters.value.selectedFavoriteGroupIds.filter((id) => id !== groupId)
+    : [...filters.value.selectedFavoriteGroupIds, groupId]
+  updateFilters({ favorite: 'all', selectedFavoriteGroupIds })
+}
+
+function updateSort(sort: string, order: string) {
+  if (sort !== 'random') {
+    updateFilters({ sort, order })
+    return
+  }
+
+  let randomSeed = filters.value.randomSeed
+  while (randomSeed === filters.value.randomSeed) {
+    randomSeed = (crypto.getRandomValues(new Uint32Array(1))[0] ?? 0) % GALLERY_RANDOM_SEED_MODULUS
+  }
+  updateFilters({ sort, order, randomSeed })
+}
 </script>
 
 <template>
   <Dialog
-    :open="open"
+    v-model:open="open"
     position="top"
     title="筛选本地作品"
     title-class="mb-5"
     content-class="p-4 sm:p-6 lg:left-60"
     overlay-class="top-16 lg:left-60"
-    @update:open="!$event && emit('close')"
   >
     <div class="grid gap-x-6 gap-y-5">
       <section class="filter-row">
         <div class="filter-row-title flex items-center gap-1">
           <h3>排序</h3>
           <Button
-            v-if="sort !== 'random'"
+            v-if="filters.sort !== 'random'"
             variant="ghost"
             size="iconSmall"
             class="-my-1 shrink-0 rounded-full text-muted-foreground"
-            @click="emit('updateSort', sort, order === 'desc' ? 'asc' : 'desc')"
+            @click="updateSort(filters.sort, filters.order === 'desc' ? 'asc' : 'desc')"
           >
-            <ArrowDown v-if="order === 'desc'" :size="15" />
+            <ArrowDown v-if="filters.order === 'desc'" :size="15" />
             <ArrowUp v-else :size="15" />
           </Button>
         </div>
@@ -98,8 +119,8 @@ function activeFirst<T>(items: T[], isActive: (item: T) => boolean) {
               { value: 'random', label: '随机' },
             ]"
             :key="option.value"
-            :active="sort === option.value"
-            @click="emit('updateSort', option.value, order)"
+            :active="filters.sort === option.value"
+            @click="updateSort(option.value, filters.order)"
           >
             {{ option.label }}
           </FilterOptionButton>
@@ -117,8 +138,8 @@ function activeFirst<T>(items: T[], isActive: (item: T) => boolean) {
               { value: 'ugoira', label: 'Ugoira' },
             ]"
             :key="option.value"
-            :active="artworkType === option.value"
-            @click="emit('updateFilter', 'artworkType', option.value || undefined)"
+            :active="filters.artworkType === option.value"
+            @click="updateFilters({ artworkType: option.value })"
           >
             {{ option.label }}
           </FilterOptionButton>
@@ -135,8 +156,8 @@ function activeFirst<T>(items: T[], isActive: (item: T) => boolean) {
               { value: 'r18', label: '仅 R18' },
             ]"
             :key="option.value"
-            :active="rating === option.value"
-            @click="emit('updateFilter', 'rating', option.value)"
+            :active="filters.rating === option.value"
+            @click="updateFilters({ rating: option.value })"
           >
             {{ option.label }}
           </FilterOptionButton>
@@ -153,8 +174,8 @@ function activeFirst<T>(items: T[], isActive: (item: T) => boolean) {
               { value: 'no', label: '排除 AI' },
             ]"
             :key="option.value"
-            :active="ai === option.value"
-            @click="emit('updateFilter', 'ai', option.value)"
+            :active="filters.ai === option.value"
+            @click="updateFilters({ ai: option.value })"
           >
             {{ option.label }}
           </FilterOptionButton>
@@ -172,8 +193,10 @@ function activeFirst<T>(items: T[], isActive: (item: T) => boolean) {
                 { value: 'no', label: '未收藏' },
               ]"
               :key="option.value"
-              :active="selectedFavoriteGroupIds.length === 0 && favorite === option.value"
-              @click="emit('updateFilter', 'favorite', option.value)"
+              :active="
+                filters.selectedFavoriteGroupIds.length === 0 && filters.favorite === option.value
+              "
+              @click="updateFilters({ favorite: option.value, selectedFavoriteGroupIds: [] })"
             >
               {{ option.label }}
             </FilterOptionButton>
@@ -183,8 +206,8 @@ function activeFirst<T>(items: T[], isActive: (item: T) => boolean) {
             <FilterOptionButton
               v-for="group in visibleFavoriteGroups"
               :key="group.groupId"
-              :active="selectedFavoriteGroupIds.includes(group.groupId)"
-              @click="emit('toggleFavoriteGroup', group.groupId)"
+              :active="filters.selectedFavoriteGroupIds.includes(group.groupId)"
+              @click="toggleFavoriteGroup(group.groupId)"
             >
               {{ group.name }}
               <span class="text-xs text-muted-foreground">{{ group.artworkCount }}</span>
@@ -199,18 +222,13 @@ function activeFirst<T>(items: T[], isActive: (item: T) => boolean) {
       <section class="filter-row border-t pt-5">
         <h3 class="filter-row-title">标签</h3>
         <div>
-          <SearchInput
-            :model-value="tagSearch"
-            class="mb-3 w-full max-w-sm"
-            placeholder="搜索标签…"
-            @update:model-value="emit('updateTagSearch', $event)"
-          />
+          <SearchInput v-model="tagSearch" class="mb-3 w-full max-w-sm" placeholder="搜索标签…" />
           <CollapsibleFilterOptions>
             <FilterOptionButton
               v-for="tag in visibleTags"
               :key="tag.tagId"
-              :active="selectedTagIds.includes(tag.tagId)"
-              @click="emit('toggleTag', tag.tagId)"
+              :active="filters.selectedTagIds.includes(tag.tagId)"
+              @click="toggleTag(tag.tagId)"
             >
               {{ tag.translatedName || tag.name }}
               <span class="text-xs text-muted-foreground">{{ tag.artworkCount ?? 0 }}</span>
@@ -226,29 +244,28 @@ function activeFirst<T>(items: T[], isActive: (item: T) => boolean) {
         <h3 class="filter-row-title">作者</h3>
         <div>
           <SearchInput
-            :model-value="authorSearch"
+            v-model="authorSearch"
             class="mb-3 w-full max-w-sm"
             placeholder="搜索作者…"
-            @update:model-value="emit('updateAuthorSearch', $event)"
           />
           <CollapsibleFilterOptions>
             <FilterOptionButton
-              v-if="authorId && !visibleAuthors.some((item) => item.itemId === authorId)"
+              v-if="
+                filters.authorId && !visibleAuthors.some((item) => item.itemId === filters.authorId)
+              "
               :active="true"
-              @click="emit('updateFilter', 'authorId', undefined)"
+              @click="updateFilters({ authorId: undefined })"
             >
-              作者 #{{ authorId }}
+              作者 #{{ filters.authorId }}
             </FilterOptionButton>
             <FilterOptionButton
               v-for="author in visibleAuthors"
               :key="author.itemId"
-              :active="authorId === author.itemId"
+              :active="filters.authorId === author.itemId"
               @click="
-                emit(
-                  'updateFilter',
-                  'authorId',
-                  authorId === author.itemId ? undefined : String(author.itemId),
-                )
+                updateFilters({
+                  authorId: filters.authorId === author.itemId ? undefined : author.itemId,
+                })
               "
             >
               {{ author.name }}
@@ -265,29 +282,28 @@ function activeFirst<T>(items: T[], isActive: (item: T) => boolean) {
         <h3 class="filter-row-title">系列</h3>
         <div>
           <SearchInput
-            :model-value="seriesSearch"
+            v-model="seriesSearch"
             class="mb-3 w-full max-w-sm"
             placeholder="搜索系列…"
-            @update:model-value="emit('updateSeriesSearch', $event)"
           />
           <CollapsibleFilterOptions>
             <FilterOptionButton
-              v-if="seriesId && !visibleSeries.some((item) => item.itemId === seriesId)"
+              v-if="
+                filters.seriesId && !visibleSeries.some((item) => item.itemId === filters.seriesId)
+              "
               :active="true"
-              @click="emit('updateFilter', 'seriesId', undefined)"
+              @click="updateFilters({ seriesId: undefined })"
             >
-              系列 #{{ seriesId }}
+              系列 #{{ filters.seriesId }}
             </FilterOptionButton>
             <FilterOptionButton
               v-for="item in visibleSeries"
               :key="item.itemId"
-              :active="seriesId === item.itemId"
+              :active="filters.seriesId === item.itemId"
               @click="
-                emit(
-                  'updateFilter',
-                  'seriesId',
-                  seriesId === item.itemId ? undefined : String(item.itemId),
-                )
+                updateFilters({
+                  seriesId: filters.seriesId === item.itemId ? undefined : item.itemId,
+                })
               "
             >
               {{ item.name }} <span class="text-xs text-muted-foreground">{{ item.count }}</span>

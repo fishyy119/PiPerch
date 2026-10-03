@@ -3,7 +3,7 @@ import { ImageOff, Images } from '@lucide/vue'
 import { computed, ref } from 'vue'
 
 import type { DiscoveryItem } from '@/features/discovery/discovery-api'
-import DiscoveryArtworkCard from '@/features/discovery/DiscoveryArtworkCard.vue'
+import DiscoveryArtworkCard from '@/shared/components/discovery/DiscoveryArtworkCard.vue'
 import Checkbox from '@ui/Checkbox.vue'
 
 const props = withDefaults(

@@ -2,10 +2,10 @@
 import { UserRound } from '@lucide/vue'
 import { ref } from 'vue'
 
-import AuthorFollowButton from '@/features/authors/AuthorFollowButton.vue'
-import AuthorIdButton from '@/features/authors/AuthorIdButton.vue'
 import type { DiscoveryItem, RecommendedUser } from '@/features/discovery/discovery-api'
-import DiscoveryArtworkCard from '@/features/discovery/DiscoveryArtworkCard.vue'
+import AuthorFollowButton from '@/shared/components/authors/AuthorFollowButton.vue'
+import AuthorIdButton from '@/shared/components/authors/AuthorIdButton.vue'
+import DiscoveryArtworkCard from '@/shared/components/discovery/DiscoveryArtworkCard.vue'
 import Card from '@ui/Card.vue'
 
 defineProps<{

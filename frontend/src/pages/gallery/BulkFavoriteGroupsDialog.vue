@@ -2,8 +2,8 @@
 import { Plus } from '@lucide/vue'
 import { ref, watch } from 'vue'
 
-import CreateFavoriteGroupDialog from '@/features/gallery/CreateFavoriteGroupDialog.vue'
 import { createFavoriteGroup, type FavoriteGroup } from '@/features/gallery/gallery-api'
+import CreateFavoriteGroupDialog from '@/shared/components/favorites/CreateFavoriteGroupDialog.vue'
 import { errorMessage } from '@/shared/errors'
 import Button from '@ui/Button.vue'
 import Checkbox from '@ui/Checkbox.vue'

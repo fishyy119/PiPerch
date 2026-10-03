@@ -6,9 +6,9 @@ import { useRouter } from 'vue-router'
 
 import { artworkTypeLabel } from '@/features/artworks/artwork'
 import { getUserProfile, type UserProfile, userProfileKey } from '@/features/authors/author-api'
-import AuthorFollowButton from '@/features/authors/AuthorFollowButton.vue'
-import AuthorIdButton from '@/features/authors/AuthorIdButton.vue'
 import type { ArtworkDetail } from '@/features/gallery/gallery-api'
+import AuthorFollowButton from '@/shared/components/authors/AuthorFollowButton.vue'
+import AuthorIdButton from '@/shared/components/authors/AuthorIdButton.vue'
 import Card from '@ui/Card.vue'
 
 const props = defineProps<{ artwork: ArtworkDetail }>()

@@ -9,10 +9,10 @@ import {
   listRecommendedUsers,
   type RecommendedUser,
 } from '@/features/discovery/discovery-api'
-import DiscoveryArtworkCard from '@/features/discovery/DiscoveryArtworkCard.vue'
 import { useDownloadSelection } from '@/features/downloads/download-selection'
 import DiscoverAuthorCard from '@/pages/discover/DiscoverAuthorCard.vue'
 import DiscoverDownloadButton from '@/pages/discover/DiscoverDownloadButton.vue'
+import DiscoveryArtworkCard from '@/shared/components/discovery/DiscoveryArtworkCard.vue'
 import { errorMessage } from '@/shared/errors'
 import Button from '@ui/Button.vue'
 import Card from '@ui/Card.vue'
