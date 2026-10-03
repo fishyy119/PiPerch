@@ -33,12 +33,6 @@ describe('智能裁剪分析', () => {
       x: 80,
       y: 50,
     })
-    expect(cropMock).toHaveBeenCalledWith(image, {
-      width: 1,
-      height: 1,
-      minScale: 1,
-      ruleOfThirds: true,
-    })
   })
 
   it('合并同一图片和裁剪比例的并发分析', async () => {

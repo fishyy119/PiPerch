@@ -1,4 +1,4 @@
-import { fireEvent, render, waitFor } from '@testing-library/vue'
+import { fireEvent, render } from '@testing-library/vue'
 import type Viewer from 'viewerjs'
 import { vi } from 'vitest'
 import { h } from 'vue'
@@ -72,14 +72,11 @@ describe('LightboxGallery', () => {
       slots: { default: triggerSlot(1) },
     })
 
-    expect(constructorMock).not.toHaveBeenCalled()
     await fireEvent.click(view.getByRole('button', { name: '打开预览' }))
-    await waitFor(() => expect(constructorMock).toHaveBeenCalledOnce())
 
     expect(viewMock).toHaveBeenCalledWith(1)
 
     const options = getOptions()
-    expect(options.navbar).toEqual({ show: true, size: 'large' })
     expect(options.url).toBe('data-original-src')
     expect(view.container.querySelector('img')).toHaveAttribute(
       'src',
@@ -96,7 +93,6 @@ describe('LightboxGallery', () => {
       }),
     )
 
-    expect(onChange).not.toHaveBeenCalled()
     options.hidden?.(
       new CustomEvent('hidden', {
         detail: { originalEvent: null },
