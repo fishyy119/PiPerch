@@ -528,7 +528,7 @@ class ArtworkRepository:
             )
             .select_from(joined)
             .group_by(authors.c.id, authors.c.name)
-            .order_by(authors.c.name.asc())
+            .order_by(func.count(artworks.c.id).desc(), authors.c.name.asc())
         )
         if search:
             statement = statement.where(authors.c.name.contains(search, autoescape=True))
@@ -557,7 +557,7 @@ class ArtworkRepository:
             )
             .select_from(joined)
             .group_by(series.c.id, authors.c.name)
-            .order_by(series.c.title.asc())
+            .order_by(func.count(artworks.c.id).desc(), series.c.title.asc())
             .offset(page * size)
             .limit(size)
         )
