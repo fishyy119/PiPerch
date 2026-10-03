@@ -1,9 +1,11 @@
 <script setup lang="ts">
+import { computed } from 'vue'
+
 const props = withDefaults(
   defineProps<{
     as?: 'button' | 'a'
     type?: 'button' | 'submit' | 'reset'
-    variant?: 'primary' | 'secondary' | 'danger' | 'ghost'
+    variant?: 'primary' | 'secondary' | 'danger' | 'ghost' | 'blank'
     size?: 'default' | 'small' | 'icon' | 'iconSmall'
     disabled?: boolean
   }>(),
@@ -15,6 +17,7 @@ const variantClasses = {
   secondary: 'border-input bg-background hover:bg-accent hover:text-accent-foreground border',
   danger: 'bg-destructive text-destructive-foreground hover:bg-destructive/90',
   ghost: 'hover:bg-accent hover:text-accent-foreground',
+  blank: 'hover:underline underline-offset-2',
 } as const
 
 const sizeClasses = {
@@ -23,6 +26,8 @@ const sizeClasses = {
   icon: 'size-10 rounded-xl',
   iconSmall: 'size-8 rounded-lg',
 } as const
+
+const sizeClass = computed(() => (props.variant === 'blank' ? '' : sizeClasses[props.size]))
 </script>
 
 <template>
@@ -31,7 +36,7 @@ const sizeClasses = {
     :type="as === 'button' ? type : undefined"
     :disabled="as === 'button' ? disabled : undefined"
     class="inline-flex cursor-pointer items-center justify-center text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50"
-    :class="[variantClasses[props.variant], sizeClasses[props.size]]"
+    :class="[variantClasses[props.variant], sizeClass]"
   >
     <slot />
   </component>

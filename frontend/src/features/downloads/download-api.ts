@@ -32,6 +32,19 @@ export const downloadJobSchema = z.object({
 })
 export type DownloadJob = z.infer<typeof downloadJobSchema>
 
+const downloadItemSchema = z.object({
+  itemId: z.number().int(),
+  artworkId: z.number().int(),
+  state: z.enum(['queued', 'running', 'skipped', 'succeeded', 'failed', 'cancelled']),
+  attempts: z.number().int(),
+  error: z.string().nullable(),
+})
+
+const downloadJobDetailSchema = downloadJobSchema.extend({
+  items: z.array(downloadItemSchema),
+})
+export type DownloadJobDetail = z.infer<typeof downloadJobDetailSchema>
+
 const jobPageSchema = z.object({
   items: z.array(downloadJobSchema),
   page: z.number().int(),
@@ -47,6 +60,12 @@ export async function createDownloadJob(artworkIds: number[], sourceLabel: strin
 
 export async function listDownloadJobs() {
   return jobPageSchema.parse(await api.get<unknown>('/api/download-jobs?size=100'))
+}
+
+export async function getDownloadJob(jobId: string) {
+  return downloadJobDetailSchema.parse(
+    await api.get<unknown>(`/api/download-jobs/${encodeURIComponent(jobId)}`),
+  )
 }
 
 export async function cancelDownloadJob(jobId: string) {

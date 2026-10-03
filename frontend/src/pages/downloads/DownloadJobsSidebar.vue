@@ -7,6 +7,7 @@ import { discover } from '@/features/discovery/discovery-api'
 import {
   cancelDownloadJob,
   type DownloadJob,
+  getDownloadJob,
   listDownloadJobs,
   retryDownloadJob,
 } from '@/features/downloads/download-api'
@@ -15,6 +16,7 @@ import { useDownloadSubmissionStore } from '@/features/downloads/download-submis
 import { errorMessage } from '@/shared/errors'
 import Button from '@ui/Button.vue'
 import Card from '@ui/Card.vue'
+import Dialog from '@ui/Dialog.vue'
 
 const props = defineProps<{ sourceLabel: string }>()
 const queryClient = useQueryClient()
@@ -23,6 +25,7 @@ const notice = ref('')
 const submissionError = ref('')
 const previewExpanded = ref(false)
 const previewGrid = ref<HTMLElement | null>(null)
+const failureDialogJob = ref<DownloadJob | null>(null)
 
 const PREVIEW_ITEM_WIDTH_PX = 78
 const PREVIEW_GAP_PX = 8
@@ -94,6 +97,28 @@ const jobsQuery = useQuery({
   queryKey: ['download-jobs'],
   queryFn: listDownloadJobs,
   refetchInterval: 15_000,
+})
+
+const failureDetailsQuery = useQuery({
+  queryKey: computed(() => ['download-job-details', failureDialogJob.value?.jobId ?? null]),
+  queryFn: () => {
+    const job = failureDialogJob.value
+    if (job === null) throw new Error('未选择下载任务。')
+    return getDownloadJob(job.jobId)
+  },
+  enabled: computed(() => failureDialogJob.value !== null),
+})
+
+const failureGroups = computed(() => {
+  const groups = new Map<string, number[]>()
+  for (const item of failureDetailsQuery.data.value?.items ?? []) {
+    if (item.state !== 'failed') continue
+    const reason = item.error ?? '下载失败。'
+    const artworkIds = groups.get(reason) ?? []
+    artworkIds.push(item.artworkId)
+    groups.set(reason, artworkIds)
+  }
+  return [...groups].map(([reason, artworkIds]) => ({ reason, artworkIds }))
 })
 
 const submission = useDownloadSubmissionStore()
@@ -283,9 +308,6 @@ async function submitSelection() {
             已处理 {{ completedCount(job) }} / {{ totalCount(job) }} · 进行中
             {{ job.counts.running }} · 等待 {{ job.counts.queued }} · 失败 {{ job.counts.failed }}
           </p>
-          <p v-if="job.errorSummary" class="mt-2 text-xs text-destructive">
-            {{ job.errorSummary }}
-          </p>
           <div class="mt-3 flex gap-2">
             <Button
               v-if="job.state === 'queued' || job.state === 'running'"
@@ -303,10 +325,67 @@ async function submitSelection() {
             >
               重试失败项
             </Button>
+            <Button
+              v-if="job.counts.failed > 0"
+              variant="blank"
+              class="text-destructive"
+              @click="failureDialogJob = job"
+            >
+              查看失败原因
+            </Button>
           </div>
         </article>
       </div>
       <p v-else class="p-8 text-center text-sm text-muted-foreground">暂无下载任务。</p>
     </Card>
+
+    <Dialog
+      :open="failureDialogJob !== null"
+      title="下载失败原因"
+      :description="
+        failureDialogJob === null
+          ? ''
+          : `${failureDialogJob.sourceLabel} · ${String(failureDialogJob.counts.failed)} 项失败`
+      "
+      content-class="max-w-2xl!"
+      @update:open="!$event && (failureDialogJob = null)"
+    >
+      <div class="mt-5 max-h-[60vh] overflow-y-auto pr-1">
+        <p v-if="failureDetailsQuery.isPending.value" class="text-sm text-muted-foreground">
+          正在读取失败详情…
+        </p>
+        <div v-else-if="failureDetailsQuery.error.value" class="space-y-3">
+          <p class="text-sm text-destructive">
+            {{ errorMessage(failureDetailsQuery.error.value) }}
+          </p>
+          <Button variant="secondary" size="small" @click="failureDetailsQuery.refetch()">
+            重试
+          </Button>
+        </div>
+        <div v-else-if="failureGroups.length" class="space-y-3">
+          <section
+            v-for="group in failureGroups"
+            :key="group.reason"
+            class="rounded-xl border border-border p-4"
+          >
+            <div class="flex items-start justify-between gap-4">
+              <p class="min-w-0 text-sm leading-6 wrap-break-word text-destructive">
+                {{ group.reason }}
+              </p>
+              <span class="shrink-0 rounded-lg bg-muted px-2 py-1 text-xs text-muted-foreground">
+                {{ group.artworkIds.length }} 项
+              </span>
+            </div>
+            <p class="mt-2 text-xs leading-5 wrap-break-word text-muted-foreground">
+              作品 ID：{{ group.artworkIds.join('、') }}
+            </p>
+          </section>
+        </div>
+        <p v-else class="text-sm text-muted-foreground">当前任务没有失败项。</p>
+      </div>
+      <div class="mt-6 flex justify-end">
+        <Button variant="secondary" @click="failureDialogJob = null">关闭</Button>
+      </div>
+    </Dialog>
   </aside>
 </template>
