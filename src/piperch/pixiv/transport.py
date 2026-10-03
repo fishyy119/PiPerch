@@ -329,17 +329,16 @@ class PixivTransport:
                 await self._retry_delay(attempt)
         raise UpstreamError("thumbnail_failed", "缩略图加载失败。")
 
-    async def download(self, url: str, target: Path, cookie: str | None) -> tuple[str, int]:
+    async def download(self, url: str, target: Path) -> tuple[str, int]:
         self._validate_media_url(url)
         part = target.with_name(f"{target.name}.part")
         part.parent.mkdir(parents=True, exist_ok=True)
         part.unlink(missing_ok=True)
-        headers = self._cookie_headers(cookie)
         for attempt in range(3):
             try:
                 async with (
                     self._use_client() as client,
-                    client.stream("GET", url, headers=headers) as response,
+                    client.stream("GET", url) as response,
                 ):
                     await self._raise_for_status(response)
                     self._validate_media_url(str(response.url))

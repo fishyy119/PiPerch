@@ -72,7 +72,7 @@ class StubPixivClient:
         assert artwork_id == self._artwork.artwork_id
         return self._artwork
 
-    async def download(self, _url: str, target: Path, _cookie: str | None) -> tuple[str, int]:
+    async def download(self, _url: str, target: Path) -> tuple[str, int]:
         self.active_downloads += 1
         self.maximum_active_downloads = max(self.maximum_active_downloads, self.active_downloads)
         try:

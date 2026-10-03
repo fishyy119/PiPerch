@@ -790,5 +790,5 @@ class PixivClient:
     async def fetch_thumbnail(self, url: str, cookie: str | None) -> tuple[bytes, str]:
         return await self._transport.fetch_thumbnail(url, cookie)
 
-    async def download(self, url: str, target: Path, cookie: str | None) -> tuple[str, int]:
-        return await self._transport.download(url, target, cookie)
+    async def download(self, url: str, target: Path) -> tuple[str, int]:
+        return await self._transport.download(url, target)

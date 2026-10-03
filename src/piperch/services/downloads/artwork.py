@@ -90,7 +90,6 @@ class ArtworkDownloadService:
             media = await self._download_media(
                 artwork,
                 stage,
-                settings.pixiv_cookie,
                 settings.webp_enabled,
                 settings.webp_quality,
                 cancellation,
@@ -141,7 +140,6 @@ class ArtworkDownloadService:
         self,
         artwork: RemoteArtwork,
         stage: Path,
-        cookie: str | None,
         webp_enabled: bool,
         webp_quality: int,
         cancellation: DownloadCancellation,
@@ -181,7 +179,7 @@ class ArtworkDownloadService:
             if reused_cover is None:
                 cover = stage / (f"{artwork.artwork_id}_cover{self._extension(cover_url, '.jpg')}")
                 cancellation.raise_if_requested()
-                mime, size = await self._pixiv.download(cover_url, cover, cookie)
+                mime, size = await self._pixiv.download(cover_url, cover)
                 cancellation.raise_if_requested()
                 self._require_media_type(mime, "image/", "Ugoira 封面")
                 records.append(
@@ -210,7 +208,7 @@ class ArtworkDownloadService:
                 records.append(reused_archive)
             else:
                 cancellation.raise_if_requested()
-                mime, size = await self._pixiv.download(artwork.ugoira_zip_url, archive, cookie)
+                mime, size = await self._pixiv.download(artwork.ugoira_zip_url, archive)
                 cancellation.raise_if_requested()
                 if mime not in {"application/zip", "application/octet-stream"}:
                     raise UpstreamError("invalid_media_type", "Ugoira ZIP 的媒体类型无效。")
@@ -273,7 +271,7 @@ class ArtworkDownloadService:
                     return finalized
             cancellation.raise_if_requested()
             target = stage / (f"{artwork.artwork_id}_p{page_index}{self._extension(url, '.jpg')}")
-            mime, size = await self._pixiv.download(url, target, cookie)
+            mime, size = await self._pixiv.download(url, target)
             cancellation.raise_if_requested()
             self._require_media_type(mime, "image/", "作品原图")
             finalized = await self._finalize_image(
