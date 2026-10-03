@@ -4,7 +4,7 @@ from dataclasses import replace
 from typing import TYPE_CHECKING
 
 from piperch.database import Database, run_migrations
-from piperch.domain import ArtworkType, DownloadProgressPhase, ItemState, MediaRecord, RemoteArtwork, TagRecord
+from piperch.domain import ArtworkType, ItemState, MediaRecord, RemoteArtwork, TagRecord
 from piperch.paths import AppPaths
 from piperch.repositories import ArtworkRepository, DownloadRepository
 from piperch.services.library import LibraryService
@@ -202,11 +202,15 @@ def test_download_job_transitions_and_retry(tmp_path: Path) -> None:
         first = downloads.claim_next()
         assert first is not None
         _, first_item = first
-        downloads.complete_item(first_item.item_id, ItemState.SUCCEEDED)
-
         second = downloads.claim_next()
         assert second is not None
         _, second_item = second
+        assert downloads.claim_next() is None
+
+        downloads.complete_item(first_item.item_id, ItemState.SUCCEEDED)
+        running_job = downloads.get_job(job_id)
+        assert running_job.state.value == "running"
+        assert running_job.counts[ItemState.RUNNING] == 1
         downloads.complete_item(second_item.item_id, ItemState.FAILED, "模拟失败")
 
         failed_job = downloads.get_job(job_id)
@@ -214,36 +218,16 @@ def test_download_job_transitions_and_retry(tmp_path: Path) -> None:
         assert failed_job.error_summary == "模拟失败"
         downloads.retry(job_id)
         retried_job = downloads.get_job(job_id)
+        cancel_job_id = downloads.create_job([3], "取消测试")
+        downloads.request_cancel(cancel_job_id)
+        cancelled_job = downloads.get_job(cancel_job_id)
     finally:
         database.close()
 
     assert retried_job.state.value == "queued"
     assert retried_job.counts[ItemState.QUEUED] == 1
-
-
-def test_download_job_exposes_running_page_progress(tmp_path: Path) -> None:
-    _, database, _, _, downloads = _repositories(tmp_path)
-    try:
-        job_id = downloads.create_job([123, 456], "页级进度")
-        claimed = downloads.claim_next()
-        assert claimed is not None
-        _, item = claimed
-        downloads.update_item_progress(
-            item.item_id,
-            DownloadProgressPhase.DOWNLOADING,
-            37,
-            120,
-        )
-
-        job = downloads.get_job(job_id)
-    finally:
-        database.close()
-
-    assert job.progress is not None
-    assert job.progress.current_artwork_id == 123
-    assert job.progress.completed_pages == 37
-    assert job.progress.total_pages == 120
-    assert job.progress.phase is DownloadProgressPhase.DOWNLOADING
+    assert cancelled_job.state.value == "cancelled"
+    assert cancelled_job.counts[ItemState.CANCELLED] == 1
 
 
 def test_interrupted_delete_is_restored_when_metadata_still_exists(tmp_path: Path) -> None:

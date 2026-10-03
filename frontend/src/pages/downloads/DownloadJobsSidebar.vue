@@ -132,28 +132,17 @@ function stateLabel(state: string) {
 
 function jobProgress(job: DownloadJob) {
   const total = Object.values(job.counts).reduce((sum, count) => sum + count, 0)
-  const completedWorks =
+  const completed =
     job.counts.succeeded + job.counts.skipped + job.counts.failed + job.counts.cancelled
-  const progress = job.progress
-  let currentWorkProgress = 0
-  if (progress?.totalPages) {
-    currentWorkProgress = Math.min(progress.completedPages / progress.totalPages, 0.99)
-  }
-  return ((completedWorks + currentWorkProgress) / Math.max(1, total)) * 100
+  return (completed / Math.max(1, total)) * 100
 }
 
-function progressLabel(job: DownloadJob) {
-  const progress = job.progress
-  if (progress === null) return null
-  if (progress.phase === 'preparing') {
-    return `作品 ${String(progress.currentArtworkId)} · 正在读取作品信息`
-  }
-  if (progress.phase === 'finalizing') {
-    return `作品 ${String(progress.currentArtworkId)} · 图片处理与入库中`
-  }
-  return progress.totalPages === null
-    ? `作品 ${String(progress.currentArtworkId)} · 正在准备下载`
-    : `作品 ${String(progress.currentArtworkId)} · ${String(progress.completedPages)} / ${String(progress.totalPages)} 页`
+function completedCount(job: DownloadJob) {
+  return job.counts.succeeded + job.counts.skipped + job.counts.failed + job.counts.cancelled
+}
+
+function totalCount(job: DownloadJob) {
+  return Object.values(job.counts).reduce((sum, count) => sum + count, 0)
 }
 
 async function submitSelection() {
@@ -291,11 +280,8 @@ async function submitSelection() {
             />
           </div>
           <p class="mt-2 text-xs text-muted-foreground">
-            完成 {{ job.counts.succeeded }} · 跳过 {{ job.counts.skipped }} · 失败
-            {{ job.counts.failed }} · 等待 {{ job.counts.queued + job.counts.running }}
-          </p>
-          <p v-if="progressLabel(job)" class="mt-1 text-xs text-muted-foreground">
-            {{ progressLabel(job) }}
+            已处理 {{ completedCount(job) }} / {{ totalCount(job) }} · 进行中
+            {{ job.counts.running }} · 等待 {{ job.counts.queued }} · 失败 {{ job.counts.failed }}
           </p>
           <p v-if="job.errorSummary" class="mt-2 text-xs text-destructive">
             {{ job.errorSummary }}

@@ -20,13 +20,6 @@ const countsSchema = z.object({
   cancelled: z.number().int(),
 })
 
-const downloadProgressSchema = z.object({
-  currentArtworkId: z.number().int().positive(),
-  completedPages: z.number().int().nonnegative(),
-  totalPages: z.number().int().positive().nullable(),
-  phase: z.enum(['preparing', 'downloading', 'finalizing']),
-})
-
 export const downloadJobSchema = z.object({
   jobId: z.string(),
   sourceLabel: z.string(),
@@ -36,7 +29,6 @@ export const downloadJobSchema = z.object({
   finishedAt: z.string().nullable(),
   errorSummary: z.string().nullable(),
   counts: countsSchema,
-  progress: downloadProgressSchema.nullable(),
 })
 export type DownloadJob = z.infer<typeof downloadJobSchema>
 

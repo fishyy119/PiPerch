@@ -40,7 +40,7 @@ def test_initial_migration_and_sqlite_pragmas(tmp_path: Path) -> None:
         "tags",
         "ugoira_frames",
     } <= table_names
-    assert {"progress_phase", "progress_completed", "progress_total"} <= download_item_columns
+    assert not {"progress_phase", "progress_completed", "progress_total"} & download_item_columns
     assert foreign_keys == 1
     assert str(journal_mode).lower() == "wal"
     assert synchronous == 1

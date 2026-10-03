@@ -109,7 +109,7 @@ def create_app(paths: AppPaths | None = None, control: AppControl | None = None)
             thumbnail_cache,
             library_files,
         )
-        supervisor = DownloadSupervisor(download_repository, download_service, events)
+        supervisor = DownloadSupervisor(download_repository, download_service, events, settings_manager)
         mutation_lock = Lock()
         library_service = LibraryService(
             resolved_paths,

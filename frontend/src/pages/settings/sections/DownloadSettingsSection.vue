@@ -18,7 +18,7 @@ const proxyUrlField = useSettingField<'proxyUrl', string>('proxyUrl', {
 const proxyUrl = proxyUrlField.value
 
 const downloadConcurrencyField = useSettingField('downloadConcurrency', {
-  label: '媒体并发数',
+  label: '作品并发数',
   initialValue: 3,
 })
 const downloadConcurrency = downloadConcurrencyField.value
@@ -39,7 +39,7 @@ const requestIntervalMs = requestIntervalField.value
   <SettingsSection
     section-id="settings-download"
     title="下载与网络"
-    description="控制 Pixiv 请求方式和媒体下载节奏。"
+    description="控制 Pixiv 请求方式和作品下载节奏。"
     :icon="Download"
   >
     <SettingItem
@@ -54,7 +54,7 @@ const requestIntervalMs = requestIntervalField.value
         @blur="proxyUrlField.save"
       />
     </SettingItem>
-    <SettingItem title="媒体并发数" description="允许同时下载的媒体数量，范围为 1–8。">
+    <SettingItem title="作品并发数" description="允许同时处理的作品数量，范围为 1–8。">
       <div class="flex items-center gap-4">
         <Slider
           v-model="downloadConcurrency"

@@ -1,18 +1,31 @@
 from __future__ import annotations
 
 import asyncio
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, cast
 
 import pytest
 
-from piperch.domain import DownloadItemRecord, DownloadProgressPhase, ItemState
+from piperch.domain import DownloadItemRecord, ItemState
 from piperch.services.downloads import DownloadEventBroker, DownloadSupervisor
 
 if TYPE_CHECKING:
-    from collections.abc import Awaitable, Callable
-
     from piperch.repositories import DownloadRepository
     from piperch.services.downloads import ArtworkDownloadService
+    from piperch.settings import SettingsManager
+
+
+@dataclass(frozen=True)
+class StubSettingsValue:
+    download_concurrency: int
+
+
+class StubSettings:
+    def __init__(self, concurrency: int) -> None:
+        self._value = StubSettingsValue(concurrency)
+
+    def get(self) -> StubSettingsValue:
+        return self._value
 
 
 class BlockingRepository:
@@ -55,41 +68,59 @@ class BlockingDownloadService:
         return ItemState.SUCCEEDED
 
 
-class ProgressRepository(BlockingRepository):
+class ConcurrentRepository:
     def __init__(self) -> None:
-        super().__init__()
-        self.progress: list[tuple[DownloadProgressPhase, int, int | None]] = []
-        self.completed_state: ItemState | None = None
+        self.next_item_id = 1
+        self.completed = 0
 
-    def update_item_progress(
-        self,
-        _item_id: int,
-        phase: DownloadProgressPhase,
-        completed_pages: int,
-        total_pages: int | None,
-    ) -> None:
-        self.progress.append((phase, completed_pages, total_pages))
+    def recover_interrupted(self) -> None:
+        pass
 
-    def complete_item(self, _item_id: int, state: ItemState, _error: str | None = None) -> None:
-        self.completed_state = state
+    def claim_next(self) -> tuple[str, DownloadItemRecord] | None:
+        if self.next_item_id > 3:
+            return None
+        item_id = self.next_item_id
+        self.next_item_id += 1
+        return (
+            "job-id",
+            DownloadItemRecord(
+                item_id=item_id,
+                artwork_id=100 + item_id,
+                state=ItemState.RUNNING,
+                attempts=1,
+                error=None,
+            ),
+        )
+
+    def is_cancel_requested(self, _job_id: str) -> bool:
+        return False
+
+    def complete_item(self, _item_id: int, _state: ItemState, _error: str | None = None) -> None:
+        self.completed += 1
 
 
-class ProgressDownloadService:
+class ConcurrentDownloadService:
     def __init__(self) -> None:
-        self.finished = asyncio.Event()
+        self.active = 0
+        self.maximum_active = 0
+        self.limit_reached = asyncio.Event()
+        self.release = asyncio.Event()
 
     async def download_artwork(
         self,
         _artwork_id: int,
         _job_id: str,
         _is_cancel_requested: object,
-        report_progress: object,
     ) -> ItemState:
-        reporter = cast("Callable[[DownloadProgressPhase, int, int | None], Awaitable[None]]", report_progress)
-        await reporter(DownloadProgressPhase.DOWNLOADING, 3, 3)
-        await reporter(DownloadProgressPhase.FINALIZING, 3, 3)
-        self.finished.set()
-        return ItemState.SUCCEEDED
+        self.active += 1
+        self.maximum_active = max(self.maximum_active, self.active)
+        if self.active == 2:
+            self.limit_reached.set()
+        try:
+            await self.release.wait()
+            return ItemState.SUCCEEDED
+        finally:
+            self.active -= 1
 
 
 @pytest.mark.asyncio
@@ -100,6 +131,7 @@ async def test_stop_cancels_an_active_download() -> None:
         cast("DownloadRepository", repository),
         cast("ArtworkDownloadService", service),
         DownloadEventBroker(),
+        cast("SettingsManager", StubSettings(1)),
     )
 
     await supervisor.start()
@@ -111,25 +143,25 @@ async def test_stop_cancels_an_active_download() -> None:
 
 
 @pytest.mark.asyncio
-async def test_supervisor_persists_page_progress() -> None:
-    repository = ProgressRepository()
-    service = ProgressDownloadService()
+async def test_supervisor_limits_concurrent_artworks() -> None:
+    repository = ConcurrentRepository()
+    service = ConcurrentDownloadService()
     supervisor = DownloadSupervisor(
         cast("DownloadRepository", repository),
         cast("ArtworkDownloadService", service),
         DownloadEventBroker(),
+        cast("SettingsManager", StubSettings(2)),
     )
 
     await supervisor.start()
-    await asyncio.wait_for(service.finished.wait(), timeout=1)
+    await asyncio.wait_for(service.limit_reached.wait(), timeout=1)
+    assert service.maximum_active == 2
+    service.release.set()
     for _ in range(100):
-        if repository.completed_state is not None:
+        if repository.completed == 3:
             break
         await asyncio.sleep(0.01)
     await supervisor.stop()
 
-    assert repository.progress == [
-        (DownloadProgressPhase.DOWNLOADING, 3, 3),
-        (DownloadProgressPhase.FINALIZING, 3, 3),
-    ]
-    assert repository.completed_state is ItemState.SUCCEEDED
+    assert repository.completed == 3
+    assert service.maximum_active == 2

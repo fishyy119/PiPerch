@@ -48,6 +48,8 @@ async def patch_settings(
     settings = await to_thread.run_sync(lambda: container.settings.patch(**changes))
     if {"proxy_url", "request_interval_ms"} & changes.keys():
         await container.pixiv.reconfigure(settings.proxy_url, settings.request_interval_ms)
+    if "download_concurrency" in changes:
+        container.supervisor.notify()
     return _response(settings)
 
 

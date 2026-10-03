@@ -10,7 +10,6 @@ from PIL import Image
 from piperch.domain import (
     AppSettings,
     ArtworkType,
-    DownloadProgressPhase,
     ItemState,
     MediaRecord,
     RemoteArtwork,
@@ -57,15 +56,22 @@ class StubArtworkRepository:
 class StubPixivClient:
     def __init__(self, artwork: RemoteArtwork) -> None:
         self._artwork = artwork
+        self.active_downloads = 0
+        self.maximum_active_downloads = 0
 
     async def get_artwork(self, artwork_id: int, _cookie: str | None) -> RemoteArtwork:
         assert artwork_id == self._artwork.artwork_id
         return self._artwork
 
     async def download(self, _url: str, target: Path, _cookie: str | None) -> tuple[str, int]:
-        Image.new("RGBA", (8, 8), (30, 120, 210, 128)).save(target, "PNG")
-        size = await to_thread.run_sync(lambda: target.stat().st_size)
-        return "image/png", size
+        self.active_downloads += 1
+        self.maximum_active_downloads = max(self.maximum_active_downloads, self.active_downloads)
+        try:
+            Image.new("RGBA", (8, 8), (30, 120, 210, 128)).save(target, "PNG")
+            size = await to_thread.run_sync(lambda: target.stat().st_size)
+            return "image/png", size
+        finally:
+            self.active_downloads -= 1
 
 
 class FailingThumbnailCache(ArtworkThumbnailCache):
@@ -117,6 +123,7 @@ async def test_download_writes_configured_image_format(
         thumbnail_url=None,
     )
     repository = StubArtworkRepository()
+    pixiv = StubPixivClient(artwork)
     qualities: list[int] = []
     transcode = ArtworkDownloadService._transcode_to_webp  # pyright: ignore[reportPrivateUsage]
 
@@ -129,31 +136,20 @@ async def test_download_writes_configured_image_format(
         paths,
         cast("SettingsManager", StubSettings(settings)),
         cast("ArtworkRepository", repository),
-        cast("PixivClient", StubPixivClient(artwork)),
+        cast("PixivClient", pixiv),
     )
 
     async def is_cancel_requested() -> bool:
         return False
 
-    progress: list[tuple[DownloadProgressPhase, int, int | None]] = []
-
-    async def report_progress(
-        phase: DownloadProgressPhase,
-        completed_pages: int,
-        total_pages: int | None,
-    ) -> None:
-        progress.append((phase, completed_pages, total_pages))
-
     result = await service.download_artwork(
         123,
         "job-id",
         cast("Callable[[], Awaitable[bool]]", is_cancel_requested),
-        report_progress,
     )
 
     assert result is ItemState.SUCCEEDED
-    assert progress[0] == (DownloadProgressPhase.DOWNLOADING, 0, 3)
-    assert progress[-1] == (DownloadProgressPhase.FINALIZING, 3, 3)
+    assert pixiv.maximum_active_downloads == 1
     assert qualities == ([67, 67, 67] if webp_enabled else [])
     assert repository.saved_media is not None
     media = repository.saved_media[0]

@@ -188,20 +188,11 @@ download_items = Table(
     Column("error", Text, nullable=True),
     Column("started_at", String(40), nullable=True),
     Column("finished_at", String(40), nullable=True),
-    Column("progress_phase", String(24), nullable=True),
-    Column("progress_completed", Integer, nullable=False, server_default="0"),
-    Column("progress_total", Integer, nullable=True),
     UniqueConstraint("job_id", "artwork_id", name="uq_download_items_job_artwork"),
     CheckConstraint(
         "state IN ('queued', 'running', 'skipped', 'succeeded', 'failed', 'cancelled')",
         name="ck_download_items_state",
     ),
-    CheckConstraint(
-        "progress_phase IS NULL OR progress_phase IN ('preparing', 'downloading', 'finalizing')",
-        name="ck_download_items_progress_phase",
-    ),
-    CheckConstraint("progress_completed >= 0", name="ck_download_items_progress_completed"),
-    CheckConstraint("progress_total IS NULL OR progress_total >= 1", name="ck_download_items_progress_total"),
 )
 
 Index("ix_artworks_downloaded_at", artworks.c.downloaded_at)
