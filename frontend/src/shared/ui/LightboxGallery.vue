@@ -1,22 +1,22 @@
 <script lang="ts">
 export interface LightboxItem {
   src: string
-  thumbnailSrc?: string
   alt: string
 }
 </script>
 
 <script setup lang="ts">
-import 'viewerjs/dist/viewer.css'
+import { computed, ref, watch } from 'vue'
 
-import Viewer from 'viewerjs'
-import { onBeforeUnmount, ref, watch } from 'vue'
+const WHEEL_NAVIGATION_THRESHOLD_PX = 40
 
-const NAVBAR_HEIGHT = 60
-
-const props = defineProps<{
-  items: readonly LightboxItem[]
-}>()
+const props = withDefaults(
+  defineProps<{
+    items: readonly LightboxItem[]
+    activeIndex?: number
+  }>(),
+  { activeIndex: 0 },
+)
 
 defineSlots<{
   default(props: { open: (index?: number) => void }): unknown
@@ -26,216 +26,122 @@ const emit = defineEmits<{
   change: [index: number]
 }>()
 
-const galleryElement = ref<HTMLElement>()
+const dialogElement = ref<HTMLDialogElement>()
+const lightboxOpen = ref(false)
+const currentIndex = ref(0)
+const currentItem = computed(() => props.items[currentIndex.value])
 
-let instance: Viewer | undefined
-let instanceHasMultipleItems = false
-let pendingIndex = 0
-let syncOnHidden = false
+let wheelDelta = 0
+let wheelDirection = 0
 
 function normalizedIndex(index: number) {
   if (!Number.isInteger(index)) return 0
   return Math.min(Math.max(index, 0), Math.max(props.items.length - 1, 0))
 }
 
-function navbarHeight() {
-  return props.items.length > 1 ? NAVBAR_HEIGHT : 0
-}
-
-function initialCoverage() {
-  const margin = window.innerWidth >= 640 ? 32 : 16
-  const availableHeight = Math.max(window.innerHeight - navbarHeight(), 1)
-
-  return Math.max(
-    0.1,
-    Math.min(
-      1,
-      (window.innerWidth - margin * 2) / window.innerWidth,
-      (availableHeight - margin * 2) / availableHeight,
-    ),
-  )
-}
-
-function initialImageRatio(imageData: Record<string, unknown>, coverage: number) {
-  const naturalWidth = Number(imageData.naturalWidth)
-  const naturalHeight = Number(imageData.naturalHeight)
-  if (naturalWidth <= 0 || naturalHeight <= 0) return 1
-
-  const availableHeight = Math.max(window.innerHeight - navbarHeight(), 1)
-  const fittedRatio = Math.min(window.innerWidth / naturalWidth, availableHeight / naturalHeight)
-  return Math.min(1, fittedRatio * coverage)
-}
-
-function updateBoundaryNavigation(event: Viewer.ViewedEvent) {
-  const { image, index } = event.detail
-  const viewer = image.closest('.artwork-lightbox')
-  viewer?.querySelector('.viewer-prev')?.classList.toggle('viewer-hide', index <= 0)
-  viewer
-    ?.querySelector('.viewer-next')
-    ?.classList.toggle('viewer-hide', index >= props.items.length - 1)
-}
-
-function destroyViewer() {
-  const currentInstance = instance
-  instance = undefined
-  instanceHasMultipleItems = false
-  syncOnHidden = false
-  currentInstance?.destroy()
-}
-
 function openLightbox(index = 0) {
   if (props.items.length === 0) return
 
-  pendingIndex = normalizedIndex(index)
-  syncOnHidden = true
+  const nextIndex = normalizedIndex(index)
+  currentIndex.value = nextIndex
+  lightboxOpen.value = true
 
-  if (instance === undefined) {
-    const element = galleryElement.value
-    if (element === undefined) return
+  if (nextIndex !== normalizedIndex(props.activeIndex)) emit('change', nextIndex)
+  if (!dialogElement.value?.open) dialogElement.value?.showModal()
+}
 
-    const multiple = props.items.length > 1
-    const coverage = initialCoverage()
-    instanceHasMultipleItems = multiple
-    instance = new Viewer(element, {
-      className: 'artwork-lightbox',
-      initialCoverage: coverage,
-      backdrop: true,
-      button: false,
-      title: false,
-      toolbar: false,
-      navbar: multiple ? { show: true, size: 'large' } : false,
-      navigation: multiple
-        ? {
-            prev: { show: true, size: 'large' },
-            next: { show: true, size: 'large' },
-          }
-        : false,
-      keyboard: true,
-      loop: false,
-      zoomable: true,
-      zoomOnWheel: true,
-      zoomOnTouch: true,
-      zoomOnGesture: true,
-      slideOnTouch: true,
-      slideOnWheel: false,
-      rotatable: false,
-      rotateOnGesture: false,
-      rotateOnTouch: false,
-      scalable: false,
-      magnifier: false,
-      tooltip: false,
-      url: 'data-original-src',
-      minZoomRatio: (_image, imageData) => initialImageRatio(imageData, coverage) * 0.5,
-      maxZoomRatio: (_image, imageData) => initialImageRatio(imageData, coverage) * 4,
-      viewed: (event) => {
-        pendingIndex = event.detail.index
-        updateBoundaryNavigation(event)
-      },
-      hidden: () => {
-        if (!syncOnHidden) return
-        syncOnHidden = false
-        emit('change', pendingIndex)
-      },
-    })
+function closeLightbox() {
+  dialogElement.value?.close()
+}
+
+function resetWheelNavigation() {
+  wheelDelta = 0
+  wheelDirection = 0
+}
+
+function normalizedWheelDelta(event: WheelEvent) {
+  if (event.deltaMode === WheelEvent.DOM_DELTA_LINE) return event.deltaY * 16
+  if (event.deltaMode === WheelEvent.DOM_DELTA_PAGE) return event.deltaY * window.innerHeight
+  return event.deltaY
+}
+
+function handleWheel(event: WheelEvent) {
+  if (props.items.length <= 1 || event.deltaY === 0) return
+
+  event.preventDefault()
+
+  const delta = normalizedWheelDelta(event)
+  const direction = Math.sign(delta)
+  if (direction !== wheelDirection) {
+    wheelDelta = 0
+    wheelDirection = direction
   }
 
-  instance.view(pendingIndex)
+  wheelDelta += delta
+  if (Math.abs(wheelDelta) < WHEEL_NAVIGATION_THRESHOLD_PX) return
+
+  const nextIndex = currentIndex.value + (wheelDelta < 0 ? -1 : 1)
+  resetWheelNavigation()
+  if (nextIndex < 0 || nextIndex >= props.items.length) return
+
+  currentIndex.value = nextIndex
+  emit('change', nextIndex)
 }
+
+function handleClose() {
+  lightboxOpen.value = false
+  resetWheelNavigation()
+}
+
+watch(
+  () => props.activeIndex,
+  (index) => {
+    currentIndex.value = normalizedIndex(index)
+  },
+)
 
 watch(
   () => props.items,
   () => {
-    if (instance === undefined) return
-
-    const hasMultipleItems = props.items.length > 1
-    if (props.items.length === 0 || hasMultipleItems !== instanceHasMultipleItems) {
-      destroyViewer()
+    if (props.items.length === 0) {
+      closeLightbox()
       return
     }
 
-    instance.update()
+    currentIndex.value = normalizedIndex(props.activeIndex)
   },
-  { flush: 'post' },
 )
-
-onBeforeUnmount(() => {
-  destroyViewer()
-})
 </script>
 
 <template>
   <slot :open="openLightbox" />
-  <div ref="galleryElement" hidden>
-    <img
-      v-for="item in items"
-      :key="item.src"
-      :src="item.thumbnailSrc ?? item.src"
-      :data-original-src="item.src"
-      :alt="item.alt"
-      loading="lazy"
-      decoding="async"
-    />
-  </div>
+
+  <Teleport to="body">
+    <dialog
+      ref="dialogElement"
+      role="dialog"
+      class="artwork-lightbox fixed inset-0 m-0 size-full max-h-none max-w-none overflow-hidden border-0 bg-overlay/80 p-0 text-overlay-foreground"
+      @close="handleClose"
+    >
+      <div
+        v-if="lightboxOpen && currentItem"
+        class="relative flex size-full items-center justify-center p-4 sm:p-8"
+        @click.self="closeLightbox"
+        @wheel="handleWheel"
+      >
+        <img
+          class="block h-auto max-h-full w-auto max-w-full object-contain"
+          :src="currentItem.src"
+          :alt="currentItem.alt"
+          decoding="async"
+          draggable="false"
+        />
+        <output
+          class="absolute top-4 left-1/2 -translate-x-1/2 rounded-full bg-overlay/65 px-3 py-1 text-sm text-overlay-foreground tabular-nums sm:top-6"
+        >
+          {{ currentIndex + 1 }} / {{ items.length }}
+        </output>
+      </div>
+    </dialog>
+  </Teleport>
 </template>
-
-<style>
-/* 使遮罩与图片始终使用普通光标，覆盖 Viewer.js 的抓取光标。 */
-.artwork-lightbox,
-.artwork-lightbox .viewer-canvas > img {
-  cursor: default;
-}
-
-/* 缩短 Viewer.js 根容器和内部元素的过渡时间。 */
-.artwork-lightbox.viewer-transition,
-.artwork-lightbox .viewer-transition {
-  transition-duration: 120ms;
-}
-
-/* 使导航层避开底部缩略图，并让非按钮区域继续响应图片或背景操作。 */
-.artwork-lightbox .viewer-navigation {
-  inset: 0 0 60px;
-  pointer-events: none;
-}
-
-/* 将默认圆形按钮扩展为无边框的整列翻页热区。 */
-.artwork-lightbox .viewer-navigation > :is(.viewer-prev, .viewer-next) {
-  top: 0;
-  bottom: 0;
-  width: clamp(4rem, 12vw, 10rem);
-  height: auto;
-  margin: 0;
-  border-radius: 0;
-  background: transparent;
-  box-shadow: none;
-  cursor: default;
-  pointer-events: auto;
-}
-
-/* 将上一页热区贴齐左边缘，并记录渐变方向。 */
-.artwork-lightbox .viewer-navigation > .viewer-prev {
-  --navigation-gradient-direction: to right;
-
-  left: 0;
-}
-
-/* 将下一页热区贴齐右边缘，并记录渐变方向。 */
-.artwork-lightbox .viewer-navigation > .viewer-next {
-  --navigation-gradient-direction: to left;
-
-  right: 0;
-}
-
-/* 将 Viewer.js 自带的箭头图标放在侧边热区中央。 */
-.artwork-lightbox .viewer-navigation > :is(.viewer-prev, .viewer-next)::before {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  margin: 0;
-  transform: translate(-50%, -50%);
-}
-
-/* 在侧边热区悬停或键盘聚焦时，显示从窗口边缘淡出的渐变。 */
-.artwork-lightbox .viewer-navigation > :is(.viewer-prev, .viewer-next):is(:hover, :focus-visible) {
-  background: linear-gradient(var(--navigation-gradient-direction), rgb(0 0 0 / 38%), transparent);
-}
-</style>

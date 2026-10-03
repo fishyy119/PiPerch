@@ -5,6 +5,7 @@ import { computed, ref } from 'vue'
 import type { ArtworkCardTarget } from '@/features/artworks/artwork-card'
 import ArtworkCard from '@/features/artworks/ArtworkCard.vue'
 import type { ArtworkSummary, FavoriteGroup } from '@/features/gallery/gallery-api'
+import { galleryNavigationRouteState } from '@/features/gallery/gallery-navigation'
 import Checkbox from '@ui/Checkbox.vue'
 import ContextMenu, { type ContextMenuOption } from '@ui/ContextMenu.vue'
 
@@ -16,6 +17,7 @@ const props = defineProps<{
   showTitle: boolean
   showAuthor: boolean
   showFavoriteIndicator: boolean
+  navigationArtworkIds: readonly number[]
 }>()
 
 const emit = defineEmits<{
@@ -29,7 +31,10 @@ const emit = defineEmits<{
 
 const target = computed<ArtworkCardTarget>(() => ({
   kind: 'route',
-  to: `/artworks/${String(props.artwork.artworkId)}`,
+  to: {
+    path: `/artworks/${String(props.artwork.artworkId)}`,
+    state: galleryNavigationRouteState(props.navigationArtworkIds),
+  },
 }))
 const contextMenuOpen = ref(false)
 const thumbnailUrl = computed(() => `/api/artworks/${String(props.artwork.artworkId)}/thumbnail`)

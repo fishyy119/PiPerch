@@ -25,6 +25,7 @@ import LibraryArtworkCard from '@/features/gallery/LibraryArtworkCard.vue'
 import GalleryFilterPopup from '@/pages/gallery/GalleryFilterPopup.vue'
 import TopbarActions from '@/pages/gallery/TopbarActions.vue'
 import { errorMessage } from '@/shared/errors'
+import { usePageKeyboardShortcuts } from '@/shared/lib/usePageKeyboardShortcuts'
 import Button from '@ui/Button.vue'
 import Card from '@ui/Card.vue'
 import ConfirmDialog from '@ui/ConfirmDialog.vue'
@@ -169,6 +170,9 @@ const visibleFullySelected = computed(() => {
 const artworkGridStyle = computed(() => ({
   '--gallery-card-width': `${String(preferredCardWidth.value)}px`,
 }))
+const navigationArtworkIds = computed(() =>
+  (artworksQuery.data.value?.items ?? []).map((artwork) => artwork.artworkId),
+)
 watch(
   () => route.query.search,
   () => {
@@ -273,7 +277,22 @@ function clearFilters() {
 
 function setPage(page: number) {
   replaceQuery({ page: String(page) }, false)
+  window.scrollTo({ top: 0 })
 }
+
+usePageKeyboardShortcuts((event) => {
+  if (event.key !== 'PageUp' && event.key !== 'PageDown') return
+
+  event.preventDefault()
+  const currentPage = pageNumber()
+  if (event.key === 'PageUp') {
+    if (currentPage > 0) setPage(currentPage - 1)
+    return
+  }
+
+  const totalPages = artworksQuery.data.value?.totalPages ?? 0
+  if (currentPage + 1 < totalPages) setPage(currentPage + 1)
+})
 
 function setPageSize(value: string) {
   const parsed = Number(value)
@@ -586,6 +605,7 @@ function saveBulkGroups(addGroupIds: number[], removeGroupIds: number[]) {
         :show-title="preferredShowTitle"
         :show-author="preferredShowAuthor"
         :show-favorite-indicator="preferredShowFavoriteIndicator"
+        :navigation-artwork-ids="navigationArtworkIds"
         @toggle-selection="toggleSelection"
         @filter-author="replaceQuery({ authorId: String($event) })"
         @toggle-favorite="toggleFavorite"

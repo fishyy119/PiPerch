@@ -17,7 +17,13 @@ import { getUserProfile, type UserProfile, userProfileKey } from '@/features/aut
 import AuthorFollowButton from '@/features/authors/AuthorFollowButton.vue'
 import AuthorIdButton from '@/features/authors/AuthorIdButton.vue'
 import { deleteArtwork, getArtwork, listRelatedArtworks } from '@/features/gallery/gallery-api'
+import {
+  galleryNavigationRouteState,
+  type GalleryNavigationState,
+  parseGalleryNavigationState,
+} from '@/features/gallery/gallery-navigation'
 import SafeHtml from '@/pages/artworks/SafeHtml.vue'
+import { usePageKeyboardShortcuts } from '@/shared/lib/usePageKeyboardShortcuts'
 import Button from '@ui/Button.vue'
 import Card from '@ui/Card.vue'
 import ConfirmDialog from '@ui/ConfirmDialog.vue'
@@ -33,6 +39,9 @@ const route = useRoute()
 const router = useRouter()
 const queryClient = useQueryClient()
 const artworkId = computed(() => Number(route.params.artworkId))
+const galleryNavigation = ref<GalleryNavigationState | null>(
+  parseGalleryNavigationState(router.options.history.state),
+)
 const selectedPage = ref<number | null>(null)
 const pageSelectorExpanded = ref(false)
 const pageSelectorGrid = ref<HTMLElement | null>(null)
@@ -44,6 +53,7 @@ const relatedCardWidth = usePreference('artworkDetail.relatedCardWidth')
 const artworkQuery = useQuery({
   queryKey: computed(() => ['artwork', artworkId.value]),
   queryFn: () => getArtwork(artworkId.value),
+  placeholderData: (previousData) => previousData,
 })
 const relatedQuery = useQuery({
   queryKey: computed(() => ['related-artworks', artworkId.value]),
@@ -63,7 +73,7 @@ const relatedGridStyle = computed(() => ({
 }))
 
 const deleteMutation = useMutation({
-  mutationFn: () => deleteArtwork(artworkId.value),
+  mutationFn: () => deleteArtwork(artworkQuery.data.value?.artworkId ?? artworkId.value),
   onSuccess: async () => {
     await queryClient.invalidateQueries({ queryKey: ['artworks'] })
     await router.replace('/gallery')
@@ -88,8 +98,9 @@ const pageIndexes = computed(() => {
 })
 const currentPage = computed(() => selectedPage.value ?? pageIndexes.value[0] ?? null)
 const previewUrl = computed(() => {
-  if (artworkQuery.data.value?.artworkType === 'ugoira') {
-    return `/api/artworks/${String(artworkId.value)}/cover`
+  const artwork = artworkQuery.data.value
+  if (artwork?.artworkType === 'ugoira') {
+    return `/api/artworks/${String(artwork.artworkId)}/cover`
   }
   return currentPage.value === null ? '' : mediaUrl(currentPage.value)
 })
@@ -101,7 +112,6 @@ const lightboxItems = computed<LightboxItem[]>(() => {
   }
   return pageIndexes.value.map((page, index) => ({
     src: mediaUrl(page),
-    thumbnailSrc: mediaThumbnailUrl(page),
     alt:
       pageIndexes.value.length > 1 ? `${artwork.title} 第 ${String(index + 1)} 页` : artwork.title,
   }))
@@ -121,10 +131,13 @@ const pageSelectorCanExpand = computed(
     pageIndexes.value.length > pageSelectorColumns.value,
 )
 
-watch(artworkId, () => {
+watch(artworkId, (currentArtworkId) => {
   selectedPage.value = null
   pageSelectorExpanded.value = false
   authorAvatarFailed.value = false
+
+  const navigation = parseGalleryNavigationState(router.options.history.state)
+  galleryNavigation.value = navigation?.artworkIds.includes(currentArtworkId) ? navigation : null
 })
 
 watch(
@@ -154,7 +167,8 @@ watch(
 )
 
 function mediaUrl(page: number) {
-  return `/api/artworks/${String(artworkId.value)}/pages/${String(page)}`
+  const mediaArtworkId = artworkQuery.data.value?.artworkId ?? artworkId.value
+  return `/api/artworks/${String(mediaArtworkId)}/pages/${String(page)}`
 }
 
 function mediaThumbnailUrl(page: number) {
@@ -166,6 +180,51 @@ function handleLightboxIndexChange(index: number) {
   const page = pageIndexes.value[index]
   if (page !== undefined) selectedPage.value = page
 }
+
+function selectAdjacentPage(offset: -1 | 1) {
+  if (artworkQuery.data.value?.artworkType === 'ugoira') return
+
+  const currentIndex = pageIndexes.value.indexOf(currentPage.value ?? -1)
+  const nextPage = pageIndexes.value[currentIndex + offset]
+  if (nextPage !== undefined) selectedPage.value = nextPage
+}
+
+function selectAdjacentArtwork(offset: -1 | 1) {
+  const navigation = galleryNavigation.value
+  if (navigation === null) return
+
+  const currentIndex = navigation.artworkIds.indexOf(artworkId.value)
+  if (currentIndex < 0) return
+
+  const nextArtworkId = navigation.artworkIds[currentIndex + offset]
+  if (nextArtworkId === undefined) return
+
+  void router
+    .replace({
+      path: `/artworks/${String(nextArtworkId)}`,
+      state: galleryNavigationRouteState(navigation.artworkIds),
+    })
+    .then(() => window.scrollTo({ top: 0 }))
+}
+
+usePageKeyboardShortcuts(
+  (event) => {
+    if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+      if (artworkQuery.data.value?.artworkType === 'ugoira' || pageIndexes.value.length <= 1) return
+      event.preventDefault()
+      selectAdjacentPage(event.key === 'ArrowLeft' ? -1 : 1)
+      return
+    }
+
+    if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return
+    const navigation = galleryNavigation.value
+    if (!navigation?.artworkIds.includes(artworkId.value)) return
+
+    event.preventDefault()
+    selectAdjacentArtwork(event.key === 'ArrowUp' ? -1 : 1)
+  },
+  { allowOverlay: (overlay) => overlay.classList.contains('artwork-lightbox') },
+)
 
 function filterByTag(tagId: number) {
   void router.push({ path: '/gallery', query: { tagId: String(tagId) } })
@@ -208,9 +267,9 @@ function typeLabel(type: string) {
       <div class="min-w-0 space-y-5">
         <Card as="section" class="overflow-hidden">
           <LightboxGallery
-            :key="artworkId"
             v-slot="{ open }"
             :items="lightboxItems"
+            :active-index="lightboxInitialIndex"
             @change="handleLightboxIndexChange"
           >
             <div class="h-80 bg-muted sm:h-120">
@@ -295,7 +354,7 @@ function typeLabel(type: string) {
               <a
                 v-if="artworkQuery.data.value.artworkType === 'ugoira'"
                 class="detail-action"
-                :href="`/api/artworks/${String(artworkId)}/ugoira`"
+                :href="`/api/artworks/${String(artworkQuery.data.value.artworkId)}/ugoira`"
                 download
               >
                 <Download :size="16" />原始 ZIP
