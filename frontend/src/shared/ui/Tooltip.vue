@@ -20,7 +20,8 @@ withDefaults(
     </TooltipTrigger>
     <TooltipPortal>
       <TooltipContent
-        class="z-70 max-w-72 rounded-lg bg-overlay px-2.5 py-1.5 text-xs text-overlay-foreground shadow-lg"
+        class="z-70 max-w-72 origin-(--reka-tooltip-content-transform-origin) rounded-lg bg-overlay px-2.5 py-1.5 text-xs text-overlay-foreground shadow-lg"
+        data-app-floating-content
         :side="side"
         :align="align"
         :side-offset="6"

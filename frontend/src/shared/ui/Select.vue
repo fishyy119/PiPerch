@@ -47,7 +47,11 @@ const model = defineModel<string>({ default: '' })
     <SelectPortal>
       <SelectContent
         position="popper"
-        class="z-50 min-w-(--reka-select-trigger-width) overflow-hidden rounded-xl border border-border bg-popover p-1 text-popover-foreground shadow-xl"
+        :class="[
+          'z-50 min-w-(--reka-select-trigger-width) origin-(--reka-select-content-transform-origin) overflow-hidden rounded-xl',
+          'border border-border bg-popover p-1 text-popover-foreground shadow-xl',
+        ]"
+        data-app-floating-content
         :side-offset="4"
       >
         <SelectViewport>

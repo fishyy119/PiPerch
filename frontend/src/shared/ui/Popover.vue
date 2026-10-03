@@ -21,8 +21,12 @@ const open = defineModel<boolean>('open', { default: false })
     </PopoverTrigger>
     <PopoverPortal>
       <PopoverContent
-        class="z-50 w-72 rounded-xl border border-border bg-popover p-4 text-popover-foreground shadow-xl"
-        :class="contentClass"
+        :class="[
+          'z-50 w-72 origin-(--reka-popover-content-transform-origin) rounded-xl',
+          'border border-border bg-popover p-4 text-popover-foreground shadow-xl',
+          contentClass,
+        ]"
+        data-app-floating-content
         :side="side"
         :align="align"
         :side-offset="6"

@@ -41,11 +41,11 @@ const open = defineModel<boolean>('open', { default: false })
     <HoverCardPortal>
       <HoverCardContent
         :class="[
-          $style.content,
           'z-60 origin-(--reka-hover-card-content-transform-origin) rounded-xl',
           'border border-border bg-popover text-popover-foreground shadow-2xl',
           contentClass,
         ]"
+        data-app-floating-content
         data-app-hover-card-content
         :side="side"
         :align="align"
@@ -57,41 +57,3 @@ const open = defineModel<boolean>('open', { default: false })
     </HoverCardPortal>
   </HoverCardRoot>
 </template>
-
-<style module>
-.content[data-state='open'] {
-  animation: hover-card-in 100ms ease-out;
-}
-
-.content[data-state='closed'] {
-  animation: hover-card-out 75ms ease-in;
-}
-
-@keyframes hover-card-in {
-  from {
-    opacity: 0;
-    transform: scale(0.98);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
-}
-
-@keyframes hover-card-out {
-  from {
-    opacity: 1;
-    transform: scale(1);
-  }
-  to {
-    opacity: 0;
-    transform: scale(0.98);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .content {
-    animation: none;
-  }
-}
-</style>

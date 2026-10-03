@@ -24,7 +24,8 @@ const emit = defineEmits<{ select: [value: string] }>()
     </ContextMenuTrigger>
     <ContextMenuPortal>
       <ContextMenuContent
-        class="z-50 min-w-48 rounded-xl border border-border bg-popover p-1 text-popover-foreground shadow-xl"
+        class="z-50 min-w-48 origin-(--reka-context-menu-content-transform-origin) rounded-xl border border-border bg-popover p-1 text-popover-foreground shadow-xl"
+        data-app-floating-content
       >
         <ContextMenuItems :items="items" @select="emit('select', $event)" />
       </ContextMenuContent>

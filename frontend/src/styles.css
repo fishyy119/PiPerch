@@ -151,3 +151,42 @@
     outline-color: var(--ring);
   }
 }
+
+/* Reka 锚点浮层共用短促的淡入缩放动效。 */
+[data-app-floating-content][data-state='open'],
+[data-app-floating-content][data-state='delayed-open'],
+[data-app-floating-content][data-state='instant-open'] {
+  animation: floating-content-in 100ms ease-out;
+}
+
+[data-app-floating-content][data-state='closed'] {
+  animation: floating-content-out 75ms ease-in;
+}
+
+@keyframes floating-content-in {
+  from {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes floating-content-out {
+  from {
+    opacity: 1;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-app-floating-content][data-state] {
+    animation: none;
+  }
+}

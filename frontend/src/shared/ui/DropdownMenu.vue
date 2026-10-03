@@ -35,7 +35,8 @@ const emit = defineEmits<{ select: [value: string] }>()
     </DropdownMenuTrigger>
     <DropdownMenuPortal>
       <DropdownMenuContent
-        class="z-50 min-w-44 rounded-xl border border-border bg-popover p-1 text-popover-foreground shadow-xl"
+        class="z-50 min-w-44 origin-(--reka-dropdown-menu-content-transform-origin) rounded-xl border border-border bg-popover p-1 text-popover-foreground shadow-xl"
+        data-app-floating-content
         :align="align"
         :side-offset="6"
       >
