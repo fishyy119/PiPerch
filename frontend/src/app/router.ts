@@ -1,12 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 
 import AppLayout from '@/layouts/AppLayout.vue'
-import ArtworkDetailPage from '@/pages/artworks/ArtworkDetailPage.vue'
-import DiscoverPage from '@/pages/discover/DiscoverPage.vue'
-import DownloadPage from '@/pages/downloads/DownloadPage.vue'
-import FavoritesPage from '@/pages/favorites/FavoritesPage.vue'
-import GalleryPage from '@/pages/gallery/GalleryPage.vue'
-import SettingsPage from '@/pages/settings/SettingsPage.vue'
 
 export const router = createRouter({
   history: createWebHistory(),
@@ -16,30 +10,34 @@ export const router = createRouter({
       component: AppLayout,
       children: [
         { path: '', redirect: '/gallery' },
-        { path: 'discover', component: DiscoverPage, meta: { title: '发现', hideTitle: true } },
+        {
+          path: 'discover',
+          component: () => import('@/pages/discover/DiscoverPage.vue'),
+          meta: { title: '发现', hideTitle: true },
+        },
         {
           path: 'downloads',
-          component: DownloadPage,
+          component: () => import('@/pages/downloads/DownloadPage.vue'),
           meta: { title: '下载工作台', hideTitle: true },
         },
         {
           path: 'gallery',
-          component: GalleryPage,
+          component: () => import('@/pages/gallery/GalleryPage.vue'),
           meta: { title: '本地图库', hideTitle: true },
         },
         {
           path: 'favorites',
-          component: FavoritesPage,
+          component: () => import('@/pages/favorites/FavoritesPage.vue'),
           meta: { title: '收藏' },
         },
         {
           path: 'artworks/:artworkId(\\d+)',
-          component: ArtworkDetailPage,
+          component: () => import('@/pages/artworks/ArtworkDetailPage.vue'),
           meta: { title: '作品详情' },
         },
         {
           path: 'settings',
-          component: SettingsPage,
+          component: () => import('@/pages/settings/SettingsPage.vue'),
           meta: { title: '设置', flushContent: true },
         },
       ],

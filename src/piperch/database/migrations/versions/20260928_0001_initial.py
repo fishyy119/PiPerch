@@ -87,6 +87,40 @@ def upgrade() -> None:
         ),
     )
     op.create_table(
+        "favorite_artworks",
+        sa.Column(
+            "artwork_id",
+            sa.BigInteger(),
+            sa.ForeignKey("artworks.id", ondelete="CASCADE"),
+            primary_key=True,
+        ),
+        sa.Column("created_at", sa.String(40), nullable=False),
+        sa.Column("updated_at", sa.String(40), nullable=False),
+    )
+    op.create_table(
+        "favorite_groups",
+        sa.Column("id", sa.Integer(), autoincrement=True, primary_key=True),
+        sa.Column("name", sa.Text(), nullable=False),
+        sa.Column("created_at", sa.String(40), nullable=False),
+        sa.Column("updated_at", sa.String(40), nullable=False),
+        sa.UniqueConstraint("name", name="uq_favorite_groups_name"),
+    )
+    op.create_table(
+        "favorite_group_items",
+        sa.Column(
+            "artwork_id",
+            sa.BigInteger(),
+            sa.ForeignKey("favorite_artworks.artwork_id", ondelete="CASCADE"),
+            primary_key=True,
+        ),
+        sa.Column(
+            "group_id",
+            sa.Integer(),
+            sa.ForeignKey("favorite_groups.id", ondelete="CASCADE"),
+            primary_key=True,
+        ),
+    )
+    op.create_table(
         "media_files",
         sa.Column("id", sa.Integer(), autoincrement=True, primary_key=True),
         sa.Column(
@@ -154,10 +188,30 @@ def upgrade() -> None:
         sa.Column("error", sa.Text(), nullable=True),
         sa.Column("started_at", sa.String(40), nullable=True),
         sa.Column("finished_at", sa.String(40), nullable=True),
+        sa.Column("progress_phase", sa.String(24), nullable=True),
+        sa.Column(
+            "progress_completed",
+            sa.Integer(),
+            server_default=sa.text("0"),
+            nullable=False,
+        ),
+        sa.Column("progress_total", sa.Integer(), nullable=True),
         sa.UniqueConstraint("job_id", "artwork_id", name="uq_download_items_job_artwork"),
         sa.CheckConstraint(
             "state IN ('queued', 'running', 'skipped', 'succeeded', 'failed', 'cancelled')",
             name="ck_download_items_state",
+        ),
+        sa.CheckConstraint(
+            "progress_phase IS NULL OR progress_phase IN ('preparing', 'downloading', 'finalizing')",
+            name="ck_download_items_progress_phase",
+        ),
+        sa.CheckConstraint(
+            "progress_completed >= 0",
+            name="ck_download_items_progress_completed",
+        ),
+        sa.CheckConstraint(
+            "progress_total IS NULL OR progress_total >= 1",
+            name="ck_download_items_progress_total",
         ),
     )
 
@@ -172,6 +226,11 @@ def upgrade() -> None:
         "ix_artwork_tags_tag_artwork",
         "artwork_tags",
         ["tag_id", "artwork_id"],
+    )
+    op.create_index(
+        "ix_favorite_group_items_group_artwork",
+        "favorite_group_items",
+        ["group_id", "artwork_id"],
     )
     op.create_index(
         "ix_download_jobs_state_created",
@@ -190,6 +249,9 @@ def downgrade() -> None:
     op.drop_table("download_jobs")
     op.drop_table("ugoira_frames")
     op.drop_table("media_files")
+    op.drop_table("favorite_group_items")
+    op.drop_table("favorite_groups")
+    op.drop_table("favorite_artworks")
     op.drop_table("artwork_tags")
     op.drop_table("tags")
     op.drop_table("artworks")

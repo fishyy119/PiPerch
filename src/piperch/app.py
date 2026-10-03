@@ -19,6 +19,7 @@ from fastapi.responses import JSONResponse, Response
 from sqlalchemy import text
 from starlette.exceptions import HTTPException
 
+from piperch import __version__
 from piperch.api import authors, discovery, downloads, favorites, gallery, pixiv_images, settings
 from piperch.api.models import ErrorBody, ErrorResponse, HealthResponse
 from piperch.container import AppContainer
@@ -153,7 +154,7 @@ def create_app(paths: AppPaths | None = None, control: AppControl | None = None)
 
     application = FastAPI(
         title="PiPerch API",
-        version="0.1.0",
+        version=__version__,
         lifespan=lifespan,
         docs_url="/api/docs",
         openapi_url="/api/openapi.json",

@@ -1,5 +1,9 @@
 # PiPerch
 
+[![Python 3.12](https://img.shields.io/badge/Python-3.12-3776AB?style=flat-square&logo=python&logoColor=white&labelColor=3776AB)](https://www.python.org/)
+[![Vue](https://img.shields.io/badge/Vue-4FC08D?style=flat-square&logo=vuedotjs&logoColor=white&labelColor=4FC08D)](https://vuejs.org/)
+[![License: GPL v3](https://img.shields.io/badge/License-GPL_v3-blue.svg?style=flat-square)](LICENSE)
+
 ## 使用
 
 ### 环境安装

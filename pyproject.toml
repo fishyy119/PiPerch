@@ -8,7 +8,7 @@ version = "0.1.0"
 description = "本地优先的 Pixiv 下载、浏览与管理工具"
 readme = "README.md"
 requires-python = ">=3.12,<3.13"
-license = "MIT"
+license = "GPL-3.0-only"
 authors = [{ name = "fishyy119" }]
 dependencies = [
     "alembic>=1.14,<2",

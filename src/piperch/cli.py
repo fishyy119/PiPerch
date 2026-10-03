@@ -4,6 +4,7 @@ import argparse
 import os
 import sys
 import threading
+import webbrowser
 from copy import deepcopy
 from pathlib import Path
 from typing import TYPE_CHECKING, NoReturn, Protocol
@@ -115,7 +116,7 @@ def _start_terminal_interrupt_watcher(server: _ServerLifecycle) -> None:
     ).start()
 
 
-def run_server(paths: AppPaths, port: int) -> None:
+def run_server(paths: AppPaths, port: int, *, open_browser: bool = False) -> None:
     lifecycle = _ServerLifecycle()
     watcher_started = False
     while True:
@@ -129,6 +130,13 @@ def run_server(paths: AppPaths, port: int) -> None:
             log_config=_PIPERCH_LOGGING_CONFIG,
         )
         server = uvicorn.Server(config)
+        if open_browser:
+            threading.Timer(
+                1,
+                webbrowser.open,
+                args=(f"http://{config.host}:{config.port}",),
+            ).start()
+        open_browser = False
         lifecycle.bind(server)
         if not watcher_started:
             _start_terminal_interrupt_watcher(lifecycle)
@@ -163,5 +171,5 @@ def main() -> NoReturn:
         raise SystemExit(0)
     if not 1 <= arguments.port <= 65535:
         _parser().error("端口必须位于 1 到 65535 之间。")
-    run_server(paths, arguments.port)
+    run_server(paths, arguments.port, open_browser=True)
     raise SystemExit(0)
