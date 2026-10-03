@@ -22,6 +22,8 @@ function artworkPayload(overrides: Record<string, unknown> = {}) {
     isAi: false,
     publishedAt: '2026-09-28T00:00:00Z',
     downloadedAt: '2026-09-28T01:00:00Z',
+    isFavorite: false,
+    favoriteGroupIds: [],
     tags: [],
     description: '作品说明',
     width: 1000,

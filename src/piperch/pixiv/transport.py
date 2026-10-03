@@ -180,6 +180,26 @@ class PixivTransport:
         data: Mapping[str, str | int],
     ) -> None:
         """携带当前会话的 CSRF token 提交 Pixiv 表单写请求。"""
+        await self._post_with_csrf(path, cookie=cookie, data=data)
+
+    async def post_json(
+        self,
+        path: str,
+        *,
+        cookie: str | None,
+        json_body: Mapping[str, object],
+    ) -> None:
+        """携带当前会话的 CSRF token 提交 Pixiv JSON 写请求。"""
+        await self._post_with_csrf(path, cookie=cookie, json_body=json_body)
+
+    async def _post_with_csrf(
+        self,
+        path: str,
+        *,
+        cookie: str | None,
+        data: Mapping[str, str | int] | None = None,
+        json_body: Mapping[str, object] | None = None,
+    ) -> None:
         if not cookie:
             raise UpstreamError(
                 "pixiv_cookie_required",
@@ -194,16 +214,26 @@ class PixivTransport:
                     remaining = self._request_interval - (time.monotonic() - self._last_metadata_request)
                     if remaining > 0:
                         await asyncio.sleep(remaining)
-                    response = await self._request(
-                        "POST",
-                        f"https://{_PIXIV_API_HOST}{path}",
-                        cookie=cookie,
-                        data=data,
-                        headers={
-                            "Origin": f"https://{_PIXIV_API_HOST}",
-                            "X-CSRF-TOKEN": token,
-                        },
-                    )
+                    headers = {
+                        "Origin": f"https://{_PIXIV_API_HOST}",
+                        "X-CSRF-TOKEN": token,
+                    }
+                    if json_body is None:
+                        response = await self._request(
+                            "POST",
+                            f"https://{_PIXIV_API_HOST}{path}",
+                            cookie=cookie,
+                            data=data,
+                            headers=headers,
+                        )
+                    else:
+                        response = await self._request(
+                            "POST",
+                            f"https://{_PIXIV_API_HOST}{path}",
+                            cookie=cookie,
+                            json=json_body,
+                            headers=headers,
+                        )
                     self._last_metadata_request = time.monotonic()
             except UpstreamError as error:
                 if error.status_code == 403 and attempt == 0:
@@ -244,7 +274,7 @@ class PixivTransport:
         if token is None:
             raise UpstreamError(
                 "pixiv_csrf_unavailable",
-                "无法从 Pixiv 页面读取关注操作所需的安全令牌。",
+                "无法从 Pixiv 页面读取写操作所需的安全令牌。",
             )
         self._csrf_cookie = cookie
         self._cached_csrf_token = token
@@ -356,6 +386,7 @@ class PixivTransport:
         cookie: str | None,
         params: httpx.QueryParams | Mapping[str, str | int] | None = None,
         data: Mapping[str, str | int] | None = None,
+        json: Mapping[str, object] | None = None,
         headers: Mapping[str, str] | None = None,
     ) -> httpx.Response:
         for attempt in range(3):
@@ -369,6 +400,7 @@ class PixivTransport:
                         url,
                         params=params,
                         data=data,
+                        json=json,
                         headers=request_headers,
                     )
                 self._validate_api_url(str(response.url))

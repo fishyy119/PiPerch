@@ -9,6 +9,8 @@ from piperch.database.tables import (
     artwork_tags,
     artworks,
     authors,
+    favorite_artworks,
+    favorite_group_items,
     media_files,
     series,
     tags,
@@ -37,6 +39,7 @@ from piperch.repositories._rows import (
 from piperch.repositories._rows import (
     string as _string,
 )
+from piperch.repositories.favorites import FavoriteRepository
 from piperch.utils.datetime import utc_now_text
 
 if TYPE_CHECKING:
@@ -124,6 +127,7 @@ class ArtworkRepository:
         self,
         artwork: RemoteArtwork,
         media: Sequence[MediaRecord],
+        bookmark_tags: Sequence[str] | None = None,
     ) -> None:
         now = utc_now_text()
         with self._database.begin() as connection:
@@ -200,6 +204,14 @@ class ArtworkRepository:
                     ],
                 )
 
+            if existing_downloaded_at is None and bookmark_tags is not None:
+                FavoriteRepository.import_public_bookmark(
+                    connection,
+                    artwork.artwork_id,
+                    bookmark_tags,
+                    now,
+                )
+
     @staticmethod
     def _upsert_author(connection: Connection, artwork: RemoteArtwork, now: str) -> None:
         values = {
@@ -245,6 +257,8 @@ class ArtworkRepository:
         ai: str,
         sort: str,
         order: str,
+        favorite: str = "all",
+        favorite_group_ids: Sequence[int] = (),
     ) -> tuple[list[ArtworkSummary], int]:
         conditions: list[ColumnElement[bool]] = []
         if search:
@@ -270,6 +284,18 @@ class ArtworkRepository:
             conditions.append(artworks.c.is_ai.is_(True))
         elif ai == "no":
             conditions.append(artworks.c.is_ai.is_(False))
+        favorite_exists = select(favorite_artworks.c.artwork_id).where(favorite_artworks.c.artwork_id == artworks.c.id)
+        if favorite == "yes":
+            conditions.append(favorite_exists.exists())
+        elif favorite == "no":
+            conditions.append(~favorite_exists.exists())
+        if favorite_group_ids:
+            matching_favorite_groups = (
+                select(favorite_group_items.c.artwork_id)
+                .where(favorite_group_items.c.group_id.in_(favorite_group_ids))
+                .distinct()
+            )
+            conditions.append(artworks.c.id.in_(matching_favorite_groups))
         if tag_ids:
             matching_tags = (
                 select(artwork_tags.c.artwork_id)
@@ -299,6 +325,7 @@ class ArtworkRepository:
             total = int(connection.scalar(count_statement) or 0)
             rows = connection.execute(statement).mappings().all()
             summaries = [self._summary_from_row(row) for row in rows]
+            summaries = self._summaries_with_favorites(connection, summaries)
         return summaries, total
 
     def list_related_artworks(self, artwork_id: int, limit: int) -> list[ArtworkSummary]:
@@ -374,6 +401,7 @@ class ArtworkRepository:
             )
             rows = connection.execute(statement).mappings().all()
             summaries = [self._summary_from_row(row) for row in rows]
+            summaries = self._summaries_with_favorites(connection, summaries)
         return summaries
 
     def get_detail(self, artwork_id: int) -> ArtworkDetail:
@@ -393,7 +421,8 @@ class ArtworkRepository:
             row = connection.execute(statement).mappings().first()
             if row is None:
                 raise NotFoundError("未找到该作品。")
-            summary = self._summary_with_tags(connection, self._summary_from_row(row))
+            summary = self._summaries_with_favorites(connection, [self._summary_from_row(row)])[0]
+            summary = self._summary_with_tags(connection, summary)
             media_rows = connection.execute(
                 select(media_files)
                 .where(media_files.c.artwork_id == artwork_id)
@@ -573,6 +602,42 @@ class ArtworkRepository:
                 for row in rows
             ),
         )
+
+    @staticmethod
+    def _summaries_with_favorites(
+        connection: Connection,
+        summaries: Sequence[ArtworkSummary],
+    ) -> list[ArtworkSummary]:
+        if not summaries:
+            return []
+        artwork_ids = [summary.artwork_id for summary in summaries]
+        rows = connection.execute(
+            select(
+                favorite_artworks.c.artwork_id,
+                favorite_group_items.c.group_id,
+            )
+            .select_from(
+                favorite_artworks.outerjoin(
+                    favorite_group_items,
+                    favorite_artworks.c.artwork_id == favorite_group_items.c.artwork_id,
+                )
+            )
+            .where(favorite_artworks.c.artwork_id.in_(artwork_ids))
+            .order_by(favorite_group_items.c.group_id.asc())
+        )
+        favorites: dict[int, list[int]] = {}
+        for artwork_id, group_id in rows:
+            groups = favorites.setdefault(int(artwork_id), [])
+            if group_id is not None:
+                groups.append(int(group_id))
+        return [
+            replace(
+                summary,
+                is_favorite=summary.artwork_id in favorites,
+                favorite_group_ids=tuple(favorites.get(summary.artwork_id, ())),
+            )
+            for summary in summaries
+        ]
 
     def _list_named(
         self,

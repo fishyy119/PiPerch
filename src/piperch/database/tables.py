@@ -80,6 +80,45 @@ artwork_tags = Table(
     Column("tag_id", Integer, ForeignKey("tags.id", ondelete="CASCADE"), primary_key=True),
 )
 
+favorite_artworks = Table(
+    "favorite_artworks",
+    metadata,
+    Column(
+        "artwork_id",
+        BigInteger,
+        ForeignKey("artworks.id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
+    Column("created_at", String(40), nullable=False),
+    Column("updated_at", String(40), nullable=False),
+)
+
+favorite_groups = Table(
+    "favorite_groups",
+    metadata,
+    Column("id", Integer, primary_key=True, autoincrement=True),
+    Column("name", Text, nullable=False, unique=True),
+    Column("created_at", String(40), nullable=False),
+    Column("updated_at", String(40), nullable=False),
+)
+
+favorite_group_items = Table(
+    "favorite_group_items",
+    metadata,
+    Column(
+        "artwork_id",
+        BigInteger,
+        ForeignKey("favorite_artworks.artwork_id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
+    Column(
+        "group_id",
+        Integer,
+        ForeignKey("favorite_groups.id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
+)
+
 media_files = Table(
     "media_files",
     metadata,
@@ -173,5 +212,6 @@ Index("ix_artworks_type", artworks.c.artwork_type)
 Index("ix_artworks_restrict", artworks.c.x_restrict)
 Index("ix_artworks_ai", artworks.c.is_ai)
 Index("ix_artwork_tags_tag_artwork", artwork_tags.c.tag_id, artwork_tags.c.artwork_id)
+Index("ix_favorite_group_items_group_artwork", favorite_group_items.c.group_id, favorite_group_items.c.artwork_id)
 Index("ix_download_jobs_state_created", download_jobs.c.state, download_jobs.c.created_at)
 Index("ix_download_items_job_state", download_items.c.job_id, download_items.c.state)

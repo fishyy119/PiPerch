@@ -96,7 +96,7 @@ function hidePreviewOnFocusOut(event: FocusEvent) {
           'bg-overlay/55 shadow-sm backdrop-blur-sm transition',
           previewOpen
             ? 'opacity-100'
-            : 'opacity-0 group-focus-within:opacity-100 group-hover:opacity-100',
+            : 'opacity-0 group-hover:opacity-100 focus-within:opacity-100',
         ]"
         @focusout="hidePreviewOnFocusOut"
       >

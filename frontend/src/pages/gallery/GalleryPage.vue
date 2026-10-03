@@ -1,20 +1,30 @@
 <script setup lang="ts">
-import { CheckSquare, ChevronLeft, ChevronRight, Trash2 } from '@lucide/vue'
+import { CheckSquare, ChevronLeft, ChevronRight, Heart, HeartOff, Tags, Trash2 } from '@lucide/vue'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query'
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import { usePreference } from '@/app/usePreference'
+import BulkFavoriteGroupsDialog from '@/features/gallery/BulkFavoriteGroupsDialog.vue'
+import CreateFavoriteGroupDialog from '@/features/gallery/CreateFavoriteGroupDialog.vue'
 import {
+  type ArtworkSummary,
   bulkDeleteArtworks,
+  bulkSetFavorite,
+  bulkUpdateFavoriteGroups,
+  createFavoriteGroup,
   type GalleryFilters,
   listArtworks,
+  listFavoriteGroups,
   listNamed,
   listTags,
+  replaceFavoriteState,
+  syncFavorite,
 } from '@/features/gallery/gallery-api'
 import LibraryArtworkCard from '@/features/gallery/LibraryArtworkCard.vue'
 import GalleryFilterPopup from '@/pages/gallery/GalleryFilterPopup.vue'
 import TopbarActions from '@/pages/gallery/TopbarActions.vue'
+import { errorMessage } from '@/shared/errors'
 import Button from '@ui/Button.vue'
 import Card from '@ui/Card.vue'
 import ConfirmDialog from '@ui/ConfirmDialog.vue'
@@ -24,6 +34,7 @@ import Select from '@ui/Select.vue'
 import SettingsPopover from '@ui/SettingsPopover.vue'
 import Slider from '@ui/Slider.vue'
 import Switch from '@ui/Switch.vue'
+import { toast } from '@ui/toast'
 
 const route = useRoute()
 const router = useRouter()
@@ -33,12 +44,16 @@ const selected = ref<number[]>([])
 const deleteOpen = ref(false)
 const filterOpen = ref(false)
 const selectionMode = ref(false)
+const syncConfirmationArtwork = ref<ArtworkSummary | null>(null)
+const newFavoriteGroupArtwork = ref<ArtworkSummary | null>(null)
+const bulkFavoriteGroupsOpen = ref(false)
 const authorFilterSearch = ref('')
 const seriesFilterSearch = ref('')
 const preferredCardWidth = usePreference('gallery.cardWidth')
 const preferredPageSize = usePreference('gallery.pageSize')
 const preferredShowTitle = usePreference('gallery.showTitle')
 const preferredShowAuthor = usePreference('gallery.showAuthor')
+const preferredShowFavoriteIndicator = usePreference('gallery.showFavoriteIndicator')
 const GALLERY_PAGE_SIZE_OPTIONS = [24, 48, 96] as const
 const pageSizeOptions = GALLERY_PAGE_SIZE_OPTIONS.map((size) => ({
   value: String(size),
@@ -68,6 +83,14 @@ function selectedTagIds() {
     .filter((value): value is number => value !== undefined)
 }
 
+function selectedFavoriteGroupIds() {
+  const raw = route.query.favoriteGroupId
+  const values = Array.isArray(raw) ? raw : raw === undefined ? [] : [raw]
+  return values
+    .map((value) => positiveInt(value))
+    .filter((value): value is number => value !== undefined)
+}
+
 function artworkFilters(): GalleryFilters {
   const authorId = positiveInt(singleQuery('authorId'))
   const seriesId = positiveInt(singleQuery('seriesId'))
@@ -82,6 +105,8 @@ function artworkFilters(): GalleryFilters {
     ...(artworkType ? { artworkType } : {}),
     rating: singleQuery('rating') || 'all',
     ai: singleQuery('ai') || 'all',
+    favorite: singleQuery('favorite') || 'all',
+    favoriteGroupIds: selectedFavoriteGroupIds(),
     sort: singleQuery('sort') || 'downloadedAt',
     order: singleQuery('order') || 'desc',
   }
@@ -93,6 +118,10 @@ const artworksQuery = useQuery({
 })
 
 const tagsQuery = useQuery({ queryKey: ['tags'], queryFn: () => listTags() })
+const favoriteGroupsQuery = useQuery({
+  queryKey: ['favorite-groups'],
+  queryFn: listFavoriteGroups,
+})
 const filterAuthorsQuery = useQuery({
   queryKey: computed(() => ['filter-authors', authorFilterSearch.value]),
   queryFn: () => listNamed('authors', 0, authorFilterSearch.value),
@@ -110,8 +139,13 @@ const activeFilterCount = computed(() => {
     singleQuery('artworkType'),
     singleQuery('rating') && singleQuery('rating') !== 'all' ? singleQuery('rating') : '',
     singleQuery('ai') && singleQuery('ai') !== 'all' ? singleQuery('ai') : '',
+    singleQuery('favorite') && singleQuery('favorite') !== 'all' ? singleQuery('favorite') : '',
   ]
-  return selectedTagIds().length + scalarFilters.filter(Boolean).length
+  return (
+    selectedTagIds().length +
+    selectedFavoriteGroupIds().length +
+    scalarFilters.filter(Boolean).length
+  )
 })
 const resultRange = computed(() => {
   const data = artworksQuery.data.value
@@ -137,6 +171,18 @@ watch(
   () => route.fullPath,
   () => {
     selected.value = []
+  },
+)
+watch(
+  () => favoriteGroupsQuery.data.value,
+  (groups) => {
+    if (groups === undefined) return
+    const validIds = new Set(groups.map((group) => group.groupId))
+    const selectedIds = selectedFavoriteGroupIds()
+    const retainedIds = selectedIds.filter((groupId) => validIds.has(groupId))
+    if (retainedIds.length !== selectedIds.length) {
+      replaceQuery({ favoriteGroupId: retainedIds.map(String) })
+    }
   },
 )
 
@@ -168,15 +214,28 @@ function toggleTag(tagId: number) {
   })
 }
 
+function toggleFavoriteGroup(groupId: number) {
+  replaceQuery({
+    favorite: undefined,
+    favoriteGroupId: selectedFavoriteGroupIds().includes(groupId)
+      ? selectedFavoriteGroupIds()
+          .filter((id) => id !== groupId)
+          .map(String)
+      : [...selectedFavoriteGroupIds(), groupId].map(String),
+  })
+}
+
 function updateSort(sort: string, order: string) {
   replaceQuery({ sort, order })
 }
 
 function updateFilter(
-  name: 'authorId' | 'seriesId' | 'artworkType' | 'rating' | 'ai',
+  name: 'authorId' | 'seriesId' | 'artworkType' | 'rating' | 'ai' | 'favorite',
   value: string | undefined,
 ) {
-  replaceQuery({ [name]: value })
+  replaceQuery(
+    name === 'favorite' ? { favorite: value, favoriteGroupId: undefined } : { [name]: value },
+  )
 }
 
 function clearFilters() {
@@ -187,6 +246,8 @@ function clearFilters() {
     artworkType: undefined,
     rating: undefined,
     ai: undefined,
+    favorite: undefined,
+    favoriteGroupId: undefined,
     sort: undefined,
     order: undefined,
   })
@@ -232,6 +293,125 @@ const deleteMutation = useMutation({
     await queryClient.invalidateQueries({ queryKey: ['tags'] })
   },
 })
+
+async function invalidateFavoriteData() {
+  await Promise.all([
+    queryClient.invalidateQueries({ queryKey: ['artworks'] }),
+    queryClient.invalidateQueries({ queryKey: ['favorite-groups'] }),
+  ])
+}
+
+const favoriteMutation = useMutation({
+  mutationFn: (request: { artworkId: number; isFavorite: boolean; groupIds: number[] }) =>
+    replaceFavoriteState(request.artworkId, request.isFavorite, request.groupIds),
+  onSuccess: async () => {
+    await invalidateFavoriteData()
+    toast.success('本地收藏已更新')
+  },
+  onError: (error) => {
+    toast.error('更新本地收藏失败', { description: errorMessage(error) })
+  },
+})
+
+const singleGroupMutation = useMutation({
+  mutationFn: (request: { artwork: ArtworkSummary; groupId: number; mode: 'add' | 'remove' }) =>
+    bulkUpdateFavoriteGroups(
+      [request.artwork.artworkId],
+      request.mode === 'add' ? [request.groupId] : [],
+      request.mode === 'remove' ? [request.groupId] : [],
+    ),
+  onSuccess: async (_result, request) => {
+    await invalidateFavoriteData()
+    toast.success(request.mode === 'add' ? '已添加到收藏分组' : '已从收藏分组移除')
+  },
+  onError: (error) => {
+    toast.error('修改收藏分组失败', { description: errorMessage(error) })
+  },
+})
+
+const createAndAddGroupMutation = useMutation({
+  mutationFn: async (request: { artwork: ArtworkSummary; name: string }) => {
+    const group = await createFavoriteGroup(request.name)
+    await bulkUpdateFavoriteGroups([request.artwork.artworkId], [group.groupId], [])
+    return group
+  },
+  onSuccess: async () => {
+    newFavoriteGroupArtwork.value = null
+    await invalidateFavoriteData()
+    toast.success('已创建收藏分组并添加作品')
+  },
+  onError: async (error) => {
+    await invalidateFavoriteData()
+    toast.error('添加到新分组失败', { description: errorMessage(error) })
+  },
+})
+
+const bulkFavoriteMutation = useMutation({
+  mutationFn: (isFavorite: boolean) => bulkSetFavorite(selected.value, isFavorite),
+  onSuccess: async (_result, isFavorite) => {
+    await invalidateFavoriteData()
+    toast.success(isFavorite ? '已批量收藏' : '已批量取消收藏')
+  },
+  onError: (error) => {
+    toast.error('批量修改收藏失败', { description: errorMessage(error) })
+  },
+})
+
+const bulkGroupsMutation = useMutation({
+  mutationFn: (change: { addGroupIds: number[]; removeGroupIds: number[] }) =>
+    bulkUpdateFavoriteGroups(selected.value, change.addGroupIds, change.removeGroupIds),
+  onSuccess: async () => {
+    bulkFavoriteGroupsOpen.value = false
+    await invalidateFavoriteData()
+    toast.success('收藏分组已批量更新')
+  },
+  onError: (error) => {
+    toast.error('批量修改收藏分组失败', { description: errorMessage(error) })
+  },
+})
+
+const syncMutation = useMutation({
+  mutationFn: (artwork: ArtworkSummary) => syncFavorite(artwork.artworkId),
+  onSuccess: (result) => {
+    syncConfirmationArtwork.value = null
+    if (result.isFavorite) {
+      toast.success('已同步到 Pixiv 公开收藏', {
+        description: `远端标签：${result.tags.join('、') || '无'}`,
+      })
+    } else {
+      toast.success('已解除 Pixiv 收藏')
+    }
+  },
+  onError: (error) => {
+    toast.error('同步到 Pixiv 失败', { description: errorMessage(error) })
+  },
+})
+
+function toggleFavorite(artwork: ArtworkSummary) {
+  favoriteMutation.mutate({
+    artworkId: artwork.artworkId,
+    isFavorite: !artwork.isFavorite,
+    groupIds: artwork.isFavorite ? [] : artwork.favoriteGroupIds,
+  })
+}
+
+function changeFavoriteGroup(artwork: ArtworkSummary, groupId: number, mode: 'add' | 'remove') {
+  singleGroupMutation.mutate({ artwork, groupId, mode })
+}
+
+function saveNewFavoriteGroup(name: string) {
+  if (newFavoriteGroupArtwork.value === null) return
+  createAndAddGroupMutation.mutate({ artwork: newFavoriteGroupArtwork.value, name })
+}
+
+function requestSync(artwork: ArtworkSummary) {
+  if (artwork.isFavorite) syncMutation.mutate(artwork)
+  else syncConfirmationArtwork.value = artwork
+}
+
+function saveBulkGroups(addGroupIds: number[], removeGroupIds: number[]) {
+  bulkGroupsMutation.mutate({ addGroupIds, removeGroupIds })
+}
 </script>
 
 <template>
@@ -299,6 +479,10 @@ const deleteMutation = useMutation({
             <p class="text-sm font-medium">显示作者</p>
             <Switch v-model="preferredShowAuthor" />
           </div>
+          <div class="flex items-center justify-between gap-3">
+            <p class="text-sm font-medium">显示收藏标记</p>
+            <Switch v-model="preferredShowFavoriteIndicator" />
+          </div>
         </div>
       </SettingsPopover>
     </div>
@@ -309,18 +493,22 @@ const deleteMutation = useMutation({
     :tags="tagsQuery.data.value ?? []"
     :authors="filterAuthorsQuery.data.value?.items ?? []"
     :series="filterSeriesQuery.data.value?.items ?? []"
+    :favorite-groups="favoriteGroupsQuery.data.value ?? []"
     :selected-tag-ids="selectedTagIds()"
     :author-id="positiveInt(singleQuery('authorId'))"
     :series-id="positiveInt(singleQuery('seriesId'))"
     :artwork-type="singleQuery('artworkType')"
     :rating="singleQuery('rating') || 'all'"
     :ai="singleQuery('ai') || 'all'"
+    :favorite="singleQuery('favorite') || 'all'"
+    :selected-favorite-group-ids="selectedFavoriteGroupIds()"
     :sort="singleQuery('sort') || 'downloadedAt'"
     :order="singleQuery('order') || 'desc'"
     :author-search="authorFilterSearch"
     :series-search="seriesFilterSearch"
     @close="filterOpen = false"
     @toggle-tag="toggleTag"
+    @toggle-favorite-group="toggleFavoriteGroup"
     @update-filter="updateFilter"
     @update-sort="updateSort"
     @update-author-search="authorFilterSearch = $event"
@@ -374,12 +562,18 @@ const deleteMutation = useMutation({
         v-for="artwork in artworksQuery.data.value.items"
         :key="artwork.artworkId"
         :artwork="artwork"
+        :favorite-groups="favoriteGroupsQuery.data.value ?? []"
         :selected="selected.includes(artwork.artworkId)"
         :selection-mode="selectionMode"
         :show-title="preferredShowTitle"
         :show-author="preferredShowAuthor"
+        :show-favorite-indicator="preferredShowFavoriteIndicator"
         @toggle-selection="toggleSelection"
         @filter-author="replaceQuery({ authorId: String($event) })"
+        @toggle-favorite="toggleFavorite"
+        @change-favorite-group="changeFavoriteGroup"
+        @add-to-new-favorite-group="newFavoriteGroupArtwork = $event"
+        @sync-favorite="requestSync"
       />
     </div>
     <Card v-else class="py-20 text-center text-muted-foreground"> 图库中没有符合条件的作品。 </Card>
@@ -433,6 +627,27 @@ const deleteMutation = useMutation({
           <Button variant="ghost" :disabled="selected.length === 0" @click="selected = []">
             清空
           </Button>
+          <Button
+            variant="secondary"
+            :disabled="selected.length === 0 || bulkFavoriteMutation.isPending.value"
+            @click="bulkFavoriteMutation.mutate(true)"
+          >
+            <Heart :size="17" />收藏
+          </Button>
+          <Button
+            variant="secondary"
+            :disabled="selected.length === 0 || bulkFavoriteMutation.isPending.value"
+            @click="bulkFavoriteMutation.mutate(false)"
+          >
+            <HeartOff :size="17" />取消收藏
+          </Button>
+          <Button
+            variant="secondary"
+            :disabled="selected.length === 0"
+            @click="bulkFavoriteGroupsOpen = true"
+          >
+            <Tags :size="17" />修改分组
+          </Button>
           <Button variant="danger" :disabled="selected.length === 0" @click="deleteOpen = true">
             <Trash2 :size="17" />永久删除
           </Button>
@@ -449,6 +664,34 @@ const deleteMutation = useMutation({
     :busy="deleteMutation.isPending.value"
     @close="deleteOpen = false"
     @confirm="deleteMutation.mutate()"
+  />
+
+  <BulkFavoriteGroupsDialog
+    :open="bulkFavoriteGroupsOpen"
+    :groups="favoriteGroupsQuery.data.value ?? []"
+    :selection-count="selected.length"
+    :busy="bulkGroupsMutation.isPending.value"
+    @close="bulkFavoriteGroupsOpen = false"
+    @groups-changed="invalidateFavoriteData"
+    @save="saveBulkGroups"
+  />
+
+  <CreateFavoriteGroupDialog
+    :open="newFavoriteGroupArtwork !== null"
+    :description="`创建收藏分组，并将“${newFavoriteGroupArtwork?.title ?? ''}”添加到该分组。`"
+    :busy="createAndAddGroupMutation.isPending.value"
+    @close="newFavoriteGroupArtwork = null"
+    @save="saveNewFavoriteGroup"
+  />
+
+  <ConfirmDialog
+    :open="syncConfirmationArtwork !== null"
+    title="解除 Pixiv 收藏"
+    description="本地未收藏该作品。继续同步会解除 Pixiv 上的公开收藏；若远端本就未收藏则不会产生写入。"
+    confirm-text="继续同步"
+    :busy="syncMutation.isPending.value"
+    @close="syncConfirmationArtwork = null"
+    @confirm="syncConfirmationArtwork && syncMutation.mutate(syncConfirmationArtwork)"
   />
 </template>
 

@@ -7,7 +7,7 @@ if TYPE_CHECKING:
     from piperch.database import Database
     from piperch.paths import AppPaths
     from piperch.pixiv import PixivClient
-    from piperch.repositories import ArtworkRepository, DownloadRepository
+    from piperch.repositories import ArtworkRepository, DownloadRepository, FavoriteRepository
     from piperch.services.downloads import (
         DownloadEventBroker,
         DownloadSupervisor,
@@ -24,6 +24,7 @@ class AppContainer:
     database: Database
     settings: SettingsManager
     artworks: ArtworkRepository
+    favorites: FavoriteRepository
     downloads: DownloadRepository
     pixiv: PixivClient
     supervisor: DownloadSupervisor

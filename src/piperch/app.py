@@ -19,14 +19,14 @@ from fastapi.responses import JSONResponse, Response
 from sqlalchemy import text
 from starlette.exceptions import HTTPException
 
-from piperch.api import authors, discovery, downloads, gallery, pixiv_images, settings
+from piperch.api import authors, discovery, downloads, favorites, gallery, pixiv_images, settings
 from piperch.api.models import ErrorBody, ErrorResponse, HealthResponse
 from piperch.container import AppContainer
 from piperch.database import Database, run_migrations
 from piperch.errors import AppError, NotFoundError
 from piperch.paths import AppPaths
 from piperch.pixiv import PixivClient
-from piperch.repositories import ArtworkRepository, DownloadRepository
+from piperch.repositories import ArtworkRepository, DownloadRepository, FavoriteRepository
 from piperch.runtime import AppControl
 from piperch.services.downloads import (
     ArtworkDownloadService,
@@ -95,6 +95,7 @@ def create_app(paths: AppPaths | None = None, control: AppControl | None = None)
             request_interval_ms=current_settings.request_interval_ms,
         )
         artwork_repository = ArtworkRepository(database)
+        favorite_repository = FavoriteRepository(database)
         download_repository = DownloadRepository(database)
         events = DownloadEventBroker()
         thumbnail_cache = ArtworkThumbnailCache(resolved_paths)
@@ -133,6 +134,7 @@ def create_app(paths: AppPaths | None = None, control: AppControl | None = None)
             database=database,
             settings=settings_manager,
             artworks=artwork_repository,
+            favorites=favorite_repository,
             downloads=download_repository,
             pixiv=pixiv,
             supervisor=supervisor,
@@ -217,6 +219,7 @@ def create_app(paths: AppPaths | None = None, control: AppControl | None = None)
     application.include_router(pixiv_images.router, prefix="/api")
     application.include_router(downloads.router, prefix="/api")
     application.include_router(downloads.events_router, prefix="/api")
+    application.include_router(favorites.router, prefix="/api")
     application.include_router(gallery.router, prefix="/api")
 
     @application.get("/{full_path:path}", include_in_schema=False)

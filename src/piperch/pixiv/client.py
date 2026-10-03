@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from typing import TYPE_CHECKING
 
 import httpx
@@ -11,14 +12,17 @@ from piperch.domain import (
     BookmarkFolderReference,
     BookmarkVisibility,
     DiscoveryCandidate,
+    FavoriteSyncResult,
     FollowedUser,
+    PublicBookmark,
     RecommendedUser,
     RemoteArtwork,
+    RemoteBookmarkReference,
     TagRecord,
     UgoiraFrame,
     UserProfile,
 )
-from piperch.errors import UpstreamError
+from piperch.errors import ConflictError, UpstreamError
 from piperch.pixiv.parsing import (
     artwork_type as _artwork_type,
 )
@@ -58,6 +62,12 @@ class PixivClient:
             proxy_url=proxy_url,
             request_interval_ms=request_interval_ms,
         )
+        self._bookmark_cache_lock = asyncio.Lock()
+        self._bookmark_cache_cookie: str | None = None
+        self._public_bookmarks: dict[int, PublicBookmark] = {}
+        self._bookmark_cache_offset = 0
+        self._bookmark_cache_total: int | None = None
+        self._bookmark_cache_complete = False
 
     async def reconfigure(self, proxy_url: str | None, request_interval_ms: int) -> None:
         await self._transport.reconfigure(proxy_url, request_interval_ms)
@@ -523,6 +533,165 @@ class PixivClient:
             )
         )
 
+    async def get_public_bookmark(
+        self,
+        artwork_id: int,
+        bookmark_id: int,
+        cookie: str | None,
+    ) -> PublicBookmark:
+        """按需扫描公开收藏页，读取一件作品的收藏标签。"""
+        user_id = self._require_current_user_id(cookie)
+        if cookie is None:
+            raise UpstreamError("pixiv_cookie_required", "请先设置 Pixiv Cookie。", 401)
+        async with self._bookmark_cache_lock:
+            if cookie != self._bookmark_cache_cookie:
+                self._reset_public_bookmark_cache(cookie)
+            cached = self._public_bookmarks.get(artwork_id)
+            if cached is not None and cached.bookmark_id == bookmark_id:
+                return cached
+
+            while not self._bookmark_cache_complete:
+                body = await self._bookmark_page(
+                    user_id,
+                    BookmarkFolderReference(BookmarkVisibility.PUBLIC, None),
+                    self._bookmark_cache_offset,
+                    100,
+                    cookie,
+                )
+                works = _sequence(body.get("works"))
+                bookmark_tags = body.get("bookmarkTags")
+                if not isinstance(bookmark_tags, (dict, list)) or (isinstance(bookmark_tags, list) and bookmark_tags):
+                    raise UpstreamError("invalid_pixiv_response", "Pixiv 公开收藏标签结构无效。")
+                tags_by_bookmark = _mapping(bookmark_tags)
+                for raw_work in works:
+                    work = _mapping(raw_work)
+                    work_id = _integer(work.get("id"))
+                    reference = self._bookmark_reference(work.get("bookmarkData"))
+                    if work_id <= 0 or reference is None or reference.private:
+                        continue
+                    raw_tags: object = []
+                    has_tag_entry = False
+                    for key, value in tags_by_bookmark.items():
+                        if str(key) == str(reference.bookmark_id):
+                            raw_tags = value
+                            has_tag_entry = True
+                            break
+                    if has_tag_entry and not isinstance(raw_tags, list):
+                        raise UpstreamError("invalid_pixiv_response", "Pixiv 公开收藏标签结构无效。")
+                    parsed_tags: list[str] = []
+                    for raw_tag in _sequence(raw_tags):
+                        tag = raw_tag if isinstance(raw_tag, str) else _text(_mapping(raw_tag).get("tag"))
+                        if not tag:
+                            raise UpstreamError("invalid_pixiv_response", "Pixiv 公开收藏标签结构无效。")
+                        parsed_tags.append(tag)
+                    self._public_bookmarks[work_id] = PublicBookmark(
+                        artwork_id=work_id,
+                        bookmark_id=reference.bookmark_id,
+                        tags=tuple(dict.fromkeys(parsed_tags)),
+                    )
+
+                self._bookmark_cache_offset += len(works)
+                total = max(0, _integer(body.get("total")))
+                self._bookmark_cache_total = total
+                if not works or len(works) < 100 or (total > 0 and self._bookmark_cache_offset >= total):
+                    self._bookmark_cache_complete = True
+                cached = self._public_bookmarks.get(artwork_id)
+                if cached is not None and cached.bookmark_id == bookmark_id:
+                    return cached
+
+            raise UpstreamError(
+                "bookmark_tags_unavailable",
+                "未能在 Pixiv 公开收藏中找到该作品的收藏标签。",
+            )
+
+    async def sync_public_bookmark(
+        self,
+        artwork_id: int,
+        desired_tags: Sequence[str] | None,
+        cookie: str | None,
+    ) -> FavoriteSyncResult:
+        """将一件作品的本地收藏状态收敛到 Pixiv 公开收藏。"""
+        self._require_current_user_id(cookie)
+        await self._invalidate_public_bookmark_cache()
+        body = _mapping(await self._transport.get_body(f"/ajax/illust/{artwork_id}", cookie=cookie))
+        reference = self._bookmark_reference(body.get("bookmarkData"))
+        if reference is not None and reference.private:
+            raise ConflictError("private_bookmark_conflict", "Pixiv 上存在私密收藏，无法用本地公开收藏覆盖。")
+
+        if desired_tags is None:
+            if reference is None:
+                return FavoriteSyncResult(is_favorite=False, tags=())
+            await self._transport.post_form(
+                "/ajax/illusts/bookmarks/delete",
+                cookie=cookie,
+                data={"bookmark_id": reference.bookmark_id},
+            )
+            await self._invalidate_public_bookmark_cache()
+            return FavoriteSyncResult(is_favorite=False, tags=())
+
+        normalized_tags = tuple(dict.fromkeys(desired_tags))
+        if reference is None:
+            await self._transport.post_json(
+                "/ajax/illusts/bookmarks/add",
+                cookie=cookie,
+                json_body={
+                    "illust_id": str(artwork_id),
+                    "restrict": 0,
+                    "comment": "",
+                    "tags": list(normalized_tags),
+                },
+            )
+            await self._invalidate_public_bookmark_cache()
+            return FavoriteSyncResult(is_favorite=True, tags=normalized_tags)
+
+        bookmark = await self.get_public_bookmark(artwork_id, reference.bookmark_id, cookie)
+        current_tags = set(bookmark.tags)
+        desired_tag_set = set(normalized_tags)
+        removed = [tag for tag in bookmark.tags if tag not in desired_tag_set]
+        added = [tag for tag in normalized_tags if tag not in current_tags]
+        if removed:
+            await self._transport.post_json(
+                "/ajax/illusts/bookmarks/remove_tags",
+                cookie=cookie,
+                json_body={
+                    "removeTags": removed,
+                    "bookmarkIds": [str(reference.bookmark_id)],
+                },
+            )
+            await self._invalidate_public_bookmark_cache()
+        if added:
+            await self._transport.post_json(
+                "/ajax/illusts/bookmarks/add_tags",
+                cookie=cookie,
+                json_body={
+                    "tags": added,
+                    "bookmarkIds": [str(reference.bookmark_id)],
+                },
+            )
+            await self._invalidate_public_bookmark_cache()
+        return FavoriteSyncResult(is_favorite=True, tags=normalized_tags)
+
+    @staticmethod
+    def _bookmark_reference(value: object) -> RemoteBookmarkReference | None:
+        data = _mapping(value)
+        bookmark_id = _integer(data.get("id"))
+        if bookmark_id <= 0:
+            return None
+        raw_private = data.get("private")
+        private = raw_private if isinstance(raw_private, bool) else _integer(raw_private) > 0
+        return RemoteBookmarkReference(bookmark_id=bookmark_id, private=private)
+
+    def _reset_public_bookmark_cache(self, cookie: str | None) -> None:
+        self._bookmark_cache_cookie = cookie
+        self._public_bookmarks.clear()
+        self._bookmark_cache_offset = 0
+        self._bookmark_cache_total = None
+        self._bookmark_cache_complete = False
+
+    async def _invalidate_public_bookmark_cache(self) -> None:
+        async with self._bookmark_cache_lock:
+            self._reset_public_bookmark_cache(None)
+
     async def discover_series(
         self,
         series_id: int,
@@ -612,6 +781,7 @@ class PixivClient:
             published_at=_text(body.get("createDate")) or None,
             original_urls=original_urls,
             thumbnail_url=_text(urls.get("regular")) or _text(urls.get("small")) or None,
+            bookmark_data=self._bookmark_reference(body.get("bookmarkData")),
             ugoira_zip_url=ugoira_zip_url,
             ugoira_frames=frames,
             tags=parsed_tags,

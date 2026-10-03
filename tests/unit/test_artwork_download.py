@@ -44,6 +44,9 @@ class StubArtworkRepository:
     def is_complete(self, _artwork_id: int, _library_root: Path) -> bool:
         return False
 
+    def find_existing_ids(self, _artwork_ids: Sequence[int]) -> set[int]:
+        return set()
+
     def list_media(self, _artwork_id: int) -> tuple[MediaRecord, ...]:
         return ()
 

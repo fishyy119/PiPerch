@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 from io import BytesIO
 from typing import TYPE_CHECKING
 
@@ -16,6 +17,7 @@ from piperch.domain import (
     DownloadProgressPhase,
     FollowedUser,
     MediaRecord,
+    PublicBookmark,
     RemoteArtwork,
     TagRecord,
 )
@@ -596,3 +598,150 @@ def test_gallery_accepts_camel_case_filter_parameters(
     payload = response.json()
     assert payload["totalElements"] == 1
     assert [item["artworkId"] for item in payload["items"]] == [101]
+
+
+def test_local_favorite_import_filter_and_single_pixiv_sync(
+    app_client: tuple[ApiTestClient, AppContainer],
+    monkeypatch: MonkeyPatch,
+) -> None:
+    client, container = app_client
+    artwork = RemoteArtwork(
+        artwork_id=701,
+        artwork_type=ArtworkType.ILLUST,
+        title="收藏同步作品",
+        description="",
+        author_id=801,
+        author_name="收藏作者",
+        author_account=None,
+        author_avatar_url=None,
+        series_id=None,
+        series_title=None,
+        page_count=1,
+        width=1000,
+        height=1200,
+        x_restrict=0,
+        is_ai=False,
+        published_at=None,
+        original_urls=("https://i.pximg.net/favorite.jpg",),
+        thumbnail_url=None,
+    )
+    media = [MediaRecord("page", "801/701/701_p0.jpg", "image/jpeg", 10, 0)]
+    container.artworks.save_download(artwork, media, ("参考", "精选"))
+    container.artworks.save_download(artwork, media, ("不应覆盖",))
+    another_artwork = replace(
+        artwork,
+        artwork_id=702,
+        title="另一件收藏作品",
+        original_urls=("https://i.pximg.net/favorite-702.jpg",),
+    )
+    container.artworks.save_download(
+        another_artwork,
+        [MediaRecord("page", "801/702/702_p0.jpg", "image/jpeg", 10, 0)],
+        ("参考",),
+    )
+
+    groups = client.get("/api/favorite-groups").json()
+    group_ids = {item["name"]: item["groupId"] for item in groups}
+    filtered = client.get(
+        "/api/artworks",
+        params=[
+            ("favorite", "yes"),
+            ("favoriteGroupId", group_ids["参考"]),
+            ("favoriteGroupId", group_ids["精选"]),
+        ],
+    )
+    assert filtered.status_code == 200
+    assert {item["artworkId"] for item in filtered.json()["items"]} == {701, 702}
+    assert "不应覆盖" not in group_ids
+
+    created = client.post("/api/favorite-groups", json={"name": "待同步"})
+    assert created.status_code == 200
+    desired_group_ids = [group_ids["精选"], created.json()["groupId"]]
+    replaced = client.put(
+        "/api/artworks/701/favorite",
+        json={"isFavorite": True, "groupIds": desired_group_ids},
+    )
+    assert replaced.status_code == 200
+
+    remote_tags = ["参考", "精选"]
+    remote_favorite = True
+    writes: list[str] = []
+    cookie = "PHPSESSID=42_secret"
+    assert client.patch("/api/settings", json={"pixivCookie": cookie}).status_code == 200
+
+    async def get_body(
+        path: str,
+        *,
+        cookie: str | None,
+        params: object = None,
+    ) -> dict[str, object]:
+        assert path == "/ajax/illust/701"
+        assert cookie == "PHPSESSID=42_secret"
+        assert params is None
+        return {
+            "bookmarkData": {"id": "9001", "private": False} if remote_favorite else None,
+        }
+
+    async def get_public_bookmark(
+        artwork_id: int,
+        bookmark_id: int,
+        cookie: str | None,
+    ) -> PublicBookmark:
+        assert artwork_id == 701
+        assert bookmark_id == 9001
+        assert cookie == "PHPSESSID=42_secret"
+        return PublicBookmark(artwork_id=701, bookmark_id=9001, tags=tuple(remote_tags))
+
+    async def post_json(
+        path: str,
+        *,
+        cookie: str | None,
+        json_body: dict[str, object],
+    ) -> None:
+        assert cookie == "PHPSESSID=42_secret"
+        writes.append(path)
+        if path.endswith("/remove_tags"):
+            removed = json_body["removeTags"]
+            assert isinstance(removed, list)
+            remote_tags[:] = [tag for tag in remote_tags if tag not in removed]
+        elif path.endswith("/add_tags"):
+            added = json_body["tags"]
+            assert isinstance(added, list)
+            remote_tags.extend(str(tag) for tag in added)
+
+    async def post_form(
+        path: str,
+        *,
+        cookie: str | None,
+        data: dict[str, str | int],
+    ) -> None:
+        nonlocal remote_favorite
+        assert cookie == "PHPSESSID=42_secret"
+        assert data == {"bookmark_id": 9001}
+        writes.append(path)
+        remote_favorite = False
+
+    transport = container.pixiv._transport  # pyright: ignore[reportPrivateUsage]
+    monkeypatch.setattr(transport, "get_body", get_body)
+    monkeypatch.setattr(transport, "post_json", post_json)
+    monkeypatch.setattr(transport, "post_form", post_form)
+    monkeypatch.setattr(container.pixiv, "get_public_bookmark", get_public_bookmark)
+    sync_response = client.post("/api/artworks/701/favorite/sync")
+    assert sync_response.status_code == 200
+    assert sync_response.json() == {"isFavorite": True, "tags": ["精选", "待同步"]}
+    assert remote_tags == ["精选", "待同步"]
+    assert writes == [
+        "/ajax/illusts/bookmarks/remove_tags",
+        "/ajax/illusts/bookmarks/add_tags",
+    ]
+
+    cancelled = client.put(
+        "/api/artworks/701/favorite",
+        json={"isFavorite": False, "groupIds": []},
+    )
+    assert cancelled.status_code == 200
+    unsync_response = client.post("/api/artworks/701/favorite/sync")
+    assert unsync_response.status_code == 200
+    assert unsync_response.json() == {"isFavorite": False, "tags": []}
+    assert remote_favorite is False
+    assert writes[-1] == "/ajax/illusts/bookmarks/delete"

@@ -13,7 +13,8 @@ from anyio import to_thread
 from PIL import Image, ImageOps
 
 from piperch.domain import ArtworkType, DownloadProgressPhase, ItemState, MediaRecord, RemoteArtwork
-from piperch.errors import UpstreamError
+from piperch.errors import AppError, UpstreamError
+from piperch.repositories.favorites import validate_imported_favorite_groups
 from piperch.services.library_files import LibraryFileOperations
 from piperch.services.thumbnails import ArtworkThumbnailCache
 
@@ -64,7 +65,25 @@ class ArtworkDownloadService:
         ):
             return ItemState.SKIPPED
 
+        is_new_artwork = not await to_thread.run_sync(
+            lambda: artwork_id in self._artworks.find_existing_ids((artwork_id,))
+        )
         artwork = await self._pixiv.get_artwork(artwork_id, settings.pixiv_cookie)
+        bookmark_tags: tuple[str, ...] | None = None
+        if is_new_artwork and artwork.bookmark_data is not None and not artwork.bookmark_data.private:
+            try:
+                bookmark = await self._pixiv.get_public_bookmark(
+                    artwork_id,
+                    artwork.bookmark_data.bookmark_id,
+                    settings.pixiv_cookie,
+                )
+                bookmark_tags = validate_imported_favorite_groups(bookmark.tags)
+            except AppError as error:
+                logger.warning(
+                    "作品 %d 的 Pixiv 收藏信息导入失败，媒体将继续入库: %s",
+                    artwork_id,
+                    error.message,
+                )
         await self._raise_if_cancelled(is_cancel_requested)
         total_pages = max(1, artwork.page_count)
         await self._report_progress(
@@ -118,7 +137,15 @@ class ArtworkDownloadService:
             )
             published = await to_thread.run_sync(self._files.publish, stage, final_dir)
             try:
-                await to_thread.run_sync(self._artworks.save_download, artwork, final_media)
+                if bookmark_tags is None:
+                    await to_thread.run_sync(self._artworks.save_download, artwork, final_media)
+                else:
+                    await to_thread.run_sync(
+                        self._artworks.save_download,
+                        artwork,
+                        final_media,
+                        bookmark_tags,
+                    )
             except Exception:
                 await to_thread.run_sync(published.rollback)
                 raise

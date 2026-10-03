@@ -51,6 +51,9 @@ export const api = {
   post<T>(url: string, body?: unknown): Promise<T> {
     return request<T>(url, { method: 'POST', body })
   },
+  put<T>(url: string, body?: unknown): Promise<T> {
+    return request<T>(url, { method: 'PUT', body })
+  },
   patch<T>(url: string, body?: unknown): Promise<T> {
     return request<T>(url, { method: 'PATCH', body })
   },

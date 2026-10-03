@@ -67,6 +67,19 @@ class TagRecord:
 
 
 @dataclass(frozen=True, slots=True)
+class RemoteBookmarkReference:
+    bookmark_id: int
+    private: bool
+
+
+@dataclass(frozen=True, slots=True)
+class PublicBookmark:
+    artwork_id: int
+    bookmark_id: int
+    tags: tuple[str, ...]
+
+
+@dataclass(frozen=True, slots=True)
 class UgoiraFrame:
     file_name: str
     delay_ms: int
@@ -92,6 +105,7 @@ class RemoteArtwork:
     published_at: str | None
     original_urls: tuple[str, ...]
     thumbnail_url: str | None
+    bookmark_data: RemoteBookmarkReference | None = None
     ugoira_zip_url: str | None = None
     ugoira_frames: tuple[UgoiraFrame, ...] = ()
     tags: tuple[TagRecord, ...] = ()
@@ -169,7 +183,30 @@ class ArtworkSummary:
     is_ai: bool
     published_at: str | None
     downloaded_at: str
+    is_favorite: bool = False
+    favorite_group_ids: tuple[int, ...] = ()
     tags: tuple[tuple[int, TagRecord], ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
+class FavoriteGroup:
+    group_id: int
+    name: str
+    artwork_count: int
+
+
+@dataclass(frozen=True, slots=True)
+class FavoriteState:
+    artwork_id: int
+    is_favorite: bool
+    group_ids: tuple[int, ...]
+    group_names: tuple[str, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class FavoriteSyncResult:
+    is_favorite: bool
+    tags: tuple[str, ...]
 
 
 @dataclass(frozen=True, slots=True)

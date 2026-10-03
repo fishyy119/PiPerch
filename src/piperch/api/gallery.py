@@ -40,6 +40,8 @@ def list_artworks(
     artwork_type: ArtworkType | None = Query(default=None, alias="artworkType"),
     rating: str = Query(default="all", pattern="^(all|safe|r18)$"),
     ai: str = Query(default="all", pattern="^(all|yes|no)$"),
+    favorite: str = Query(default="all", pattern="^(all|yes|no)$"),
+    favorite_group_id: list[PositiveId] = Query(default=[], alias="favoriteGroupId"),
     sort: str = Query(default="downloadedAt", pattern="^(downloadedAt|publishedAt|title|id)$"),
     order: str = Query(default="desc", pattern="^(asc|desc)$"),
     container: AppContainer = Depends(get_container),
@@ -54,6 +56,8 @@ def list_artworks(
         artwork_type=artwork_type,
         rating=rating,
         ai=ai,
+        favorite=favorite,
+        favorite_group_ids=favorite_group_id,
         sort=sort,
         order=order,
     )

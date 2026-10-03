@@ -6,6 +6,7 @@ export interface PreferenceConfig {
     pageSize: number
     showTitle: boolean
     showAuthor: boolean
+    showFavoriteIndicator: boolean
   }
   discovery: {
     cardWidth: number
@@ -26,6 +27,7 @@ export const PREFERENCE_DEFAULTS: PreferenceConfig = {
     pageSize: 24,
     showTitle: true,
     showAuthor: true,
+    showFavoriteIndicator: true,
   },
   discovery: {
     cardWidth: 220,

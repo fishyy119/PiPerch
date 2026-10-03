@@ -2,26 +2,29 @@
 import { ArrowDown, ArrowUp } from '@lucide/vue'
 import { computed, ref } from 'vue'
 
-import type { NamedCount, Tag } from '@/features/gallery/gallery-api'
+import type { FavoriteGroup, NamedCount, Tag } from '@/features/gallery/gallery-api'
 import CollapsibleFilterOptions from '@/pages/gallery/CollapsibleFilterOptions.vue'
 import FilterOptionButton from '@/pages/gallery/FilterOptionButton.vue'
 import Button from '@ui/Button.vue'
 import Dialog from '@ui/Dialog.vue'
 import SearchInput from '@ui/SearchInput.vue'
 
-type FilterName = 'authorId' | 'seriesId' | 'artworkType' | 'rating' | 'ai'
+type FilterName = 'authorId' | 'seriesId' | 'artworkType' | 'rating' | 'ai' | 'favorite'
 
 const props = defineProps<{
   open: boolean
   tags: Tag[]
   authors: NamedCount[]
   series: NamedCount[]
+  favoriteGroups: FavoriteGroup[]
   selectedTagIds: number[]
   authorId: number | undefined
   seriesId: number | undefined
   artworkType: string
   rating: string
   ai: string
+  favorite: string
+  selectedFavoriteGroupIds: number[]
   sort: string
   order: string
   authorSearch: string
@@ -31,6 +34,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   close: []
   toggleTag: [tagId: number]
+  toggleFavoriteGroup: [groupId: number]
   updateFilter: [name: FilterName, value: string | undefined]
   updateSort: [sort: string, order: string]
   updateAuthorSearch: [value: string]
@@ -142,6 +146,41 @@ const visibleTags = computed(() => {
           >
             {{ option.label }}
           </FilterOptionButton>
+        </div>
+      </section>
+
+      <section class="filter-row border-t pt-5">
+        <h3 class="filter-row-title">收藏</h3>
+        <div class="space-y-3">
+          <div class="flex flex-wrap gap-2">
+            <FilterOptionButton
+              v-for="option in [
+                { value: 'all', label: '全部' },
+                { value: 'yes', label: '已收藏' },
+                { value: 'no', label: '未收藏' },
+              ]"
+              :key="option.value"
+              :active="selectedFavoriteGroupIds.length === 0 && favorite === option.value"
+              @click="emit('updateFilter', 'favorite', option.value)"
+            >
+              {{ option.label }}
+            </FilterOptionButton>
+          </div>
+          <p class="text-xs text-muted-foreground">选择多个分组时，属于任一分组即可</p>
+          <div class="flex flex-wrap gap-2">
+            <FilterOptionButton
+              v-for="group in favoriteGroups"
+              :key="group.groupId"
+              :active="selectedFavoriteGroupIds.includes(group.groupId)"
+              @click="emit('toggleFavoriteGroup', group.groupId)"
+            >
+              {{ group.name }}
+              <span class="text-xs text-muted-foreground">{{ group.artworkCount }}</span>
+            </FilterOptionButton>
+            <span v-if="favoriteGroups.length === 0" class="text-sm text-muted-foreground">
+              还没有收藏分组。
+            </span>
+          </div>
         </div>
       </section>
 

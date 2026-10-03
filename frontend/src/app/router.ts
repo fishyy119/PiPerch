@@ -4,6 +4,7 @@ import AppLayout from '@/layouts/AppLayout.vue'
 import ArtworkDetailPage from '@/pages/artworks/ArtworkDetailPage.vue'
 import DiscoverPage from '@/pages/discover/DiscoverPage.vue'
 import DownloadPage from '@/pages/downloads/DownloadPage.vue'
+import FavoritesPage from '@/pages/favorites/FavoritesPage.vue'
 import GalleryPage from '@/pages/gallery/GalleryPage.vue'
 import SettingsPage from '@/pages/settings/SettingsPage.vue'
 
@@ -25,6 +26,11 @@ export const router = createRouter({
           path: 'gallery',
           component: GalleryPage,
           meta: { title: '本地图库', hideTitle: true },
+        },
+        {
+          path: 'favorites',
+          component: FavoritesPage,
+          meta: { title: '收藏' },
         },
         {
           path: 'artworks/:artworkId(\\d+)',

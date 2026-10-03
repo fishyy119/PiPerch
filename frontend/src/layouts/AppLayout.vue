@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Compass, Download, Images, Menu, Settings, X } from '@lucide/vue'
+import { Compass, Download, Heart, Images, Menu, Settings, X } from '@lucide/vue'
 import { computed, ref } from 'vue'
 import { RouterLink, RouterView, useRoute } from 'vue-router'
 
@@ -13,6 +13,7 @@ const navigation = [
   { to: '/discover', label: '发现', icon: Compass },
   { to: '/downloads', label: '下载', icon: Download },
   { to: '/gallery', label: '图库', icon: Images },
+  { to: '/favorites', label: '收藏', icon: Heart },
   { to: '/settings', label: '设置', icon: Settings },
 ]
 </script>
