@@ -14,6 +14,7 @@ export interface PreferenceConfig {
   }
   artworkDetail: {
     relatedCardWidth: number
+    relatedCount: number
   }
   downloadCandidates: {
     viewStyle: string
@@ -35,6 +36,7 @@ export const PREFERENCE_DEFAULTS: PreferenceConfig = {
   },
   artworkDetail: {
     relatedCardWidth: 160,
+    relatedCount: 12,
   },
   downloadCandidates: {
     viewStyle: 'list',

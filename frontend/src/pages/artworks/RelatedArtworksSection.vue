@@ -13,9 +13,10 @@ import SmartCropImage from '@ui/SmartCropImage.vue'
 const props = defineProps<{ artworkId: number }>()
 
 const cardWidth = usePreference('artworkDetail.relatedCardWidth')
+const relatedCount = usePreference('artworkDetail.relatedCount')
 const relatedQuery = useQuery({
-  queryKey: computed(() => ['related-artworks', props.artworkId]),
-  queryFn: () => listRelatedArtworks(props.artworkId),
+  queryKey: computed(() => ['related-artworks', props.artworkId, relatedCount.value]),
+  queryFn: () => listRelatedArtworks(props.artworkId, relatedCount.value),
 })
 const gridStyle = computed(() => ({
   gridTemplateColumns: `repeat(auto-fill, minmax(min(100%, ${String(cardWidth.value)}px), ${String(cardWidth.value)}px))`,
@@ -30,11 +31,23 @@ const gridStyle = computed(() => ({
         <p class="mt-1 text-xs text-muted-foreground">根据本地作品的作者和共享标签推荐。</p>
       </div>
       <SettingsPopover title="相关作品显示设置">
-        <div class="space-y-2">
-          <p class="text-sm font-medium">卡片大小</p>
-          <div class="flex items-center gap-3">
-            <Slider v-model="cardWidth" class="flex-1" :min="120" :max="320" :step="10" />
-            <output class="w-11 text-right text-xs tabular-nums">{{ cardWidth }}px</output>
+        <div class="w-64 space-y-4">
+          <div class="space-y-2">
+            <p class="text-sm font-medium">卡片大小</p>
+            <div class="flex items-center gap-3">
+              <Slider v-model="cardWidth" class="flex-1" :min="120" :max="320" :step="10" />
+              <output class="w-11 text-right text-xs tabular-nums">{{ cardWidth }}px</output>
+            </div>
+          </div>
+          <div class="space-y-2">
+            <p class="text-sm font-medium">显示数量</p>
+            <div class="flex items-center gap-3">
+              <Slider v-model.lazy="relatedCount" class="flex-1" :min="10" :max="50">
+                <template #value="{ value }">
+                  <output class="w-11 text-right text-xs tabular-nums">{{ value }}</output>
+                </template>
+              </Slider>
+            </div>
           </div>
         </div>
       </SettingsPopover>

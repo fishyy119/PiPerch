@@ -1,6 +1,12 @@
 <script setup lang="ts">
 import { SliderRange, SliderRoot, SliderThumb, SliderTrack } from 'reka-ui'
-import { computed } from 'vue'
+import { computed, ref, useAttrs, watch } from 'vue'
+
+defineOptions({ inheritAttrs: false })
+
+defineSlots<{
+  value?: (props: { value: number }) => unknown
+}>()
 
 const props = withDefaults(
   defineProps<{
@@ -12,24 +18,37 @@ const props = withDefaults(
   { min: 0, max: 100, step: 1, disabled: false },
 )
 
-const model = defineModel<number>({ default: 0 })
+const [model, modelModifiers] = defineModel<number, 'lazy'>({ default: 0 })
 const emit = defineEmits<{ commit: [value: number] }>()
+const attrs = useAttrs()
+const draftValue = ref(model.value)
+
+watch(model, (nextValue) => {
+  draftValue.value = nextValue
+})
+
+const currentValue = computed(() => (modelModifiers.lazy ? draftValue.value : model.value))
 const values = computed<number[]>({
-  get: () => [model.value],
+  get: () => [currentValue.value],
   set: (nextValues) => {
     const nextValue = nextValues[0]
-    if (nextValue !== undefined) model.value = nextValue
+    if (nextValue === undefined) return
+    draftValue.value = nextValue
+    if (!modelModifiers.lazy) model.value = nextValue
   },
 })
 
 function commitValue(nextValues: number[] | undefined) {
   const nextValue = nextValues?.[0]
-  if (nextValue !== undefined) emit('commit', nextValue)
+  if (nextValue === undefined) return
+  if (modelModifiers.lazy) model.value = nextValue
+  emit('commit', nextValue)
 }
 </script>
 
 <template>
   <SliderRoot
+    v-bind="attrs"
     v-model="values"
     class="relative flex h-5 touch-none items-center select-none data-disabled:cursor-not-allowed data-disabled:opacity-50"
     :min="props.min"
@@ -49,4 +68,5 @@ function commitValue(nextValues: number[] | undefined) {
       ]"
     />
   </SliderRoot>
+  <slot name="value" :value="currentValue" />
 </template>
