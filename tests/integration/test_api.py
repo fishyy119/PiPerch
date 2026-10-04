@@ -19,6 +19,7 @@ from piperch.domain import (
     RemoteArtwork,
     TagRecord,
 )
+from piperch.errors import UpstreamError
 from piperch.services.storage import StorageMigrationSelection
 
 if TYPE_CHECKING:
@@ -625,6 +626,49 @@ def test_local_groups_can_organize_non_favorite_artworks(
     )
     assert filtered.status_code == 200
     assert [item["artworkId"] for item in filtered.json()["items"]] == [701]
+
+
+def test_favorite_update_keeps_local_state_when_pixiv_sync_fails(
+    app_client: tuple[ApiTestClient, AppContainer],
+    monkeypatch: MonkeyPatch,
+) -> None:
+    client, container = app_client
+    artwork = RemoteArtwork(
+        artwork_id=702,
+        artwork_type=ArtworkType.ILLUST,
+        title="收藏同步失败作品",
+        description="",
+        author_id=802,
+        author_name="测试作者",
+        author_account=None,
+        author_avatar_url=None,
+        series_id=None,
+        series_title=None,
+        page_count=1,
+        width=1000,
+        height=1200,
+        x_restrict=0,
+        is_ai=False,
+        published_at=None,
+        original_urls=("https://i.pximg.net/702.jpg",),
+        thumbnail_url=None,
+    )
+    container.download_commits.commit(
+        artwork,
+        [MediaRecord("page", "802/702/702_p0.jpg", "image/jpeg", 10, 0)],
+    )
+
+    async def fail_sync(artwork_id: int, is_favorite: bool, cookie: str | None) -> None:
+        assert (artwork_id, is_favorite, cookie) == (702, True, None)
+        raise UpstreamError("pixiv_write_failed", "Pixiv 收藏更新失败。")
+
+    monkeypatch.setattr(container.pixiv, "sync_bookmark_state", fail_sync)
+
+    response = client.put("/api/artworks/702/favorite", json={"isFavorite": True})
+
+    assert response.status_code == 502
+    assert response.json()["error"]["code"] == "pixiv_write_failed"
+    assert container.favorites.get_state(702).is_favorite is False
 
 
 def test_manual_favorite_sync_previews_before_updating_local_state(

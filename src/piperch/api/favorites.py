@@ -63,17 +63,18 @@ async def replace_favorite_state(
     artwork_id: int = PathParameter(gt=0),
     container: AppContainer = Depends(get_container),
 ) -> FavoriteStateResponse:
+    await to_thread.run_sync(container.favorites.get_state, artwork_id)
+    settings = await to_thread.run_sync(container.settings.get)
+    await container.pixiv.sync_bookmark_state(
+        artwork_id,
+        request.is_favorite,
+        settings.pixiv_cookie,
+    )
     state = await to_thread.run_sync(
         lambda: container.favorites.replace_state(
             artwork_id,
             is_favorite=request.is_favorite,
         )
-    )
-    settings = await to_thread.run_sync(container.settings.get)
-    await container.pixiv.sync_bookmark_state(
-        artwork_id,
-        state.is_favorite,
-        settings.pixiv_cookie,
     )
     return FavoriteStateResponse(
         artwork_id=state.artwork_id,
