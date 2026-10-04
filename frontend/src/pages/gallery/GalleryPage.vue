@@ -137,9 +137,6 @@ const resultRange = computed(() => {
   const last = Math.min((data.page + 1) * data.size, data.totalElements)
   return `共 ${String(data.totalElements)} 项，第 ${String(first)}–${String(last)} 项`
 })
-const artworkGridStyle = computed(() => ({
-  '--gallery-card-width': `${String(preferredCardWidth.value)}px`,
-}))
 const navigationArtworkIds = computed(() =>
   (artworksQuery.data.value?.items ?? []).map((artwork) => artwork.artworkId),
 )
@@ -152,20 +149,19 @@ watch(
     selection.clear()
   },
 )
-watch(preferredPageSize, () => replaceQuery({}))
+watch(preferredPageSize, () => pushQuery({}))
 onBeforeUnmount(selection.reset)
 
-function replaceQuery(changes: Record<string, string | string[] | undefined>, resetPage = true) {
+function pushQuery(changes: Record<string, string | string[] | undefined>, resetPage = true) {
   const entries = Object.entries({ ...route.query, ...changes }).filter(([key, value]) => {
     if (resetPage && key === 'page') return false
-    if (key === 'size' || key === 'cardWidth' || key === 'cardSize') return false
     return value !== '' && value !== undefined && (!Array.isArray(value) || value.length > 0)
   })
-  void router.replace({ query: Object.fromEntries(entries) })
+  void router.push({ query: Object.fromEntries(entries) })
 }
 
 function submitSearch() {
-  replaceQuery({ search: searchInput.value.trim() })
+  pushQuery({ search: searchInput.value.trim() })
 }
 
 function clearSearch() {
@@ -174,7 +170,7 @@ function clearSearch() {
 }
 
 function updateGalleryFilters(filters: GalleryFilterValues) {
-  replaceQuery({
+  pushQuery({
     tagId: filters.selectedTagIds.map(String),
     authorId: filters.authorId === undefined ? undefined : String(filters.authorId),
     seriesId: filters.seriesId === undefined ? undefined : String(filters.seriesId),
@@ -194,16 +190,18 @@ function clearFilters() {
 }
 
 function setPage(page: number) {
-  replaceQuery({ page: String(page) }, false)
+  pushQuery({ page: String(page) }, false)
   window.scrollTo({ top: 0 })
 }
 
 usePageKeyboardShortcuts((event) => {
-  if (event.key !== 'PageUp' && event.key !== 'PageDown') return
+  const previousPage = event.key === 'PageUp' || event.key === 'ArrowLeft'
+  const nextPage = event.key === 'PageDown' || event.key === 'ArrowRight'
+  if (!previousPage && !nextPage) return
 
   event.preventDefault()
   const currentPage = pageNumber()
-  if (event.key === 'PageUp') {
+  if (previousPage) {
     if (currentPage > 0) setPage(currentPage - 1)
     return
   }
@@ -292,7 +290,7 @@ usePageKeyboardShortcuts((event) => {
     <div
       v-else-if="artworksQuery.data.value?.items.length"
       class="gallery-grid"
-      :style="artworkGridStyle"
+      :style="{ '--gallery-card-width': `${String(preferredCardWidth)}px` }"
     >
       <LibraryArtworkCard
         v-for="artwork in artworksQuery.data.value.items"
