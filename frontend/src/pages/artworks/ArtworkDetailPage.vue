@@ -26,7 +26,6 @@ const galleryNavigation = ref<GalleryNavigationState | null>(
 const artworkQuery = useQuery({
   queryKey: computed(() => artworkQueryKeys.detail(artworkId.value)),
   queryFn: () => getArtwork(artworkId.value),
-  placeholderData: (previousData) => previousData,
 })
 
 watch(artworkId, (currentArtworkId) => {
