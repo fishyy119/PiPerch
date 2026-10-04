@@ -68,7 +68,7 @@ export const artworkDetailSchema = artworkSummarySchema.extend({
 })
 export type ArtworkDetail = z.infer<typeof artworkDetailSchema>
 
-export interface GalleryFilters {
+export interface ArtworkListFilters {
   page: number
   size: number
   search: string
@@ -85,7 +85,7 @@ export interface GalleryFilters {
   randomSeed?: number
 }
 
-function galleryQuery(filters: GalleryFilters) {
+function artworkListQuery(filters: ArtworkListFilters) {
   const params = new URLSearchParams({
     page: String(filters.page),
     size: String(filters.size),
@@ -105,9 +105,9 @@ function galleryQuery(filters: GalleryFilters) {
   return params
 }
 
-export async function listArtworks(filters: GalleryFilters) {
+export async function listArtworks(filters: ArtworkListFilters) {
   return artworkPageSchema.parse(
-    await api.get<unknown>(`/api/artworks?${galleryQuery(filters).toString()}`),
+    await api.get<unknown>(`/api/artworks?${artworkListQuery(filters).toString()}`),
   )
 }
 
@@ -152,90 +152,4 @@ export async function bulkDeleteArtworks(artworkIds: number[]) {
   return z
     .object({ deleted: z.number().int() })
     .parse(await api.post<unknown>('/api/artworks/bulk-delete', { artworkIds }))
-}
-
-export const artworkGroupSchema = z.object({
-  groupId: z.number().int().positive(),
-  name: z.string(),
-  artworkCount: z.number().int().nonnegative(),
-})
-export type ArtworkGroup = z.infer<typeof artworkGroupSchema>
-
-const favoriteStateSchema = z.object({
-  artworkId: z.number().int().positive(),
-  isFavorite: z.boolean(),
-})
-
-const favoriteSyncPlanSchema = z.object({
-  planId: z.string(),
-  pixivFavoriteCount: z.number().int().nonnegative(),
-  localArtworkCount: z.number().int().nonnegative(),
-  localFavoriteCount: z.number().int().nonnegative(),
-  matchedFavoriteCount: z.number().int().nonnegative(),
-  unavailableLocallyCount: z.number().int().nonnegative(),
-  addCount: z.number().int().nonnegative(),
-  removeCount: z.number().int().nonnegative(),
-})
-export type FavoriteSyncPlan = z.infer<typeof favoriteSyncPlanSchema>
-
-const favoriteSyncResultSchema = z.object({
-  added: z.number().int().nonnegative(),
-  removed: z.number().int().nonnegative(),
-})
-
-const artworkGroupsSchema = z.object({
-  artworkId: z.number().int().positive(),
-  groupIds: z.array(z.number().int().positive()),
-})
-
-export async function listGroups() {
-  return z.array(artworkGroupSchema).parse(await api.get<unknown>('/api/groups'))
-}
-
-export async function createGroup(name: string) {
-  return artworkGroupSchema.parse(await api.post<unknown>('/api/groups', { name }))
-}
-
-export async function renameGroup(groupId: number, name: string) {
-  return artworkGroupSchema.parse(
-    await api.patch<unknown>(`/api/groups/${String(groupId)}`, { name }),
-  )
-}
-
-export async function deleteGroup(groupId: number) {
-  return z
-    .object({ deleted: z.number().int() })
-    .parse(await api.delete<unknown>(`/api/groups/${String(groupId)}`))
-}
-
-export async function replaceFavoriteState(artworkId: number, isFavorite: boolean) {
-  return favoriteStateSchema.parse(
-    await api.put<unknown>(`/api/artworks/${String(artworkId)}/favorite`, {
-      isFavorite,
-    }),
-  )
-}
-
-export async function createFavoriteSyncPlan() {
-  return favoriteSyncPlanSchema.parse(await api.post<unknown>('/api/favorite-sync-plans'))
-}
-
-export async function applyFavoriteSyncPlan(planId: string) {
-  return favoriteSyncResultSchema.parse(
-    await api.post<unknown>(`/api/favorite-sync-plans/${encodeURIComponent(planId)}/apply`),
-  )
-}
-
-export async function replaceArtworkGroups(artworkId: number, groupIds: number[]) {
-  return artworkGroupsSchema.parse(
-    await api.put<unknown>(`/api/artworks/${String(artworkId)}/groups`, { groupIds }),
-  )
-}
-
-export async function bulkUpdateArtworkGroups(
-  artworkIds: number[],
-  addGroupIds: number[],
-  removeGroupIds: number[],
-) {
-  await api.patch<undefined>('/api/artworks/groups', { artworkIds, addGroupIds, removeGroupIds })
 }

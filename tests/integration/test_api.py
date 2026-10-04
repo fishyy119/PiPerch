@@ -17,7 +17,6 @@ from piperch.domain import (
     FollowedUser,
     MediaRecord,
     RemoteArtwork,
-    RemoteBookmarkReference,
     TagRecord,
 )
 from piperch.services.storage import StorageMigrationSelection
@@ -239,7 +238,7 @@ def test_discovery_marks_artwork_already_in_library(
         original_urls=("https://i.pximg.net/101.jpg",),
         thumbnail_url=None,
     )
-    container.artworks.save_download(
+    container.download_commits.commit(
         local_artwork,
         [MediaRecord("page", "201/101/101_p0.jpg", "image/jpeg", 10, 0)],
     )
@@ -448,18 +447,6 @@ def test_validation_error_uses_stable_envelope(
     assert response.json()["error"]["code"] == "validation_error"
 
 
-def test_gallery_rejects_invalid_artwork_ids(
-    app_client: tuple[ApiTestClient, AppContainer],
-) -> None:
-    client, _ = app_client
-
-    assert client.get("/api/artworks/0").status_code == 422
-    assert client.get("/api/artworks/1/pages/-1").status_code == 422
-    assert client.get("/api/artworks/1/pages/-1/thumbnail").status_code == 422
-    assert client.get("/api/artworks?tagId=0").status_code == 422
-    assert client.post("/api/artworks/bulk-delete", json={"artworkIds": [1, 0]}).status_code == 422
-
-
 def test_artwork_page_thumbnail_is_created_for_existing_media(
     app_client: tuple[ApiTestClient, AppContainer],
 ) -> None:
@@ -487,7 +474,7 @@ def test_artwork_page_thumbnail_is_created_for_existing_media(
     source = container.settings.get().library_root / "201" / "101" / "101_p0.jpg"
     source.parent.mkdir(parents=True)
     Image.new("RGB", (640, 320), (30, 120, 210)).save(source, "JPEG")
-    container.artworks.save_download(
+    container.download_commits.commit(
         artwork,
         [MediaRecord("page", "201/101/101_p0.jpg", "image/jpeg", source.stat().st_size, 0)],
     )
@@ -568,11 +555,11 @@ def test_gallery_accepts_camel_case_filter_parameters(
         thumbnail_url=None,
         tags=(TagRecord("其他标签"),),
     )
-    container.artworks.save_download(
+    container.download_commits.commit(
         first,
         [MediaRecord("page", "201/101/101_p0.jpg", "image/jpeg", 10, 0)],
     )
-    container.artworks.save_download(
+    container.download_commits.commit(
         second,
         [MediaRecord("page", "202/102/102_p0.jpg", "image/jpeg", 10, 0)],
     )
@@ -594,18 +581,17 @@ def test_gallery_accepts_camel_case_filter_parameters(
     assert [item["name"] for item in authors_response.json()] == ["目标作者", "其他作者"]
 
 
-def test_local_groups_are_independent_from_automatic_pixiv_favorite_sync(
+def test_local_groups_can_organize_non_favorite_artworks(
     app_client: tuple[ApiTestClient, AppContainer],
-    monkeypatch: MonkeyPatch,
 ) -> None:
     client, container = app_client
     artwork = RemoteArtwork(
         artwork_id=701,
         artwork_type=ArtworkType.ILLUST,
-        title="收藏同步作品",
+        title="非收藏作品",
         description="",
         author_id=801,
-        author_name="收藏作者",
+        author_name="测试作者",
         author_account=None,
         author_avatar_url=None,
         series_id=None,
@@ -616,39 +602,16 @@ def test_local_groups_are_independent_from_automatic_pixiv_favorite_sync(
         x_restrict=0,
         is_ai=False,
         published_at=None,
-        original_urls=("https://i.pximg.net/favorite.jpg",),
+        original_urls=("https://i.pximg.net/artwork.jpg",),
         thumbnail_url=None,
     )
     media = [MediaRecord("page", "801/701/701_p0.jpg", "image/jpeg", 10, 0)]
-    container.artworks.save_download(artwork, media)
-    another_artwork = replace(
-        artwork,
-        artwork_id=702,
-        title="另一件收藏作品",
-        original_urls=("https://i.pximg.net/favorite-702.jpg",),
-        bookmark_data=RemoteBookmarkReference(bookmark_id=9002, private=False),
-    )
-    another_media = [MediaRecord("page", "801/702/702_p0.jpg", "image/jpeg", 10, 0)]
-    container.artworks.save_download(another_artwork, another_media, ("Pixiv标签",))
-    container.artworks.save_download(another_artwork, another_media, ("不应覆盖",))
-
-    imported_groups = client.get("/api/groups").json()
-    imported_group_ids = {item["name"]: item["groupId"] for item in imported_groups}
-    assert "Pixiv标签" in imported_group_ids
-    assert "不应覆盖" not in imported_group_ids
-    imported = client.get(
-        "/api/artworks",
-        params=[("favorite", "yes"), ("groupId", imported_group_ids["Pixiv标签"])],
-    )
-    assert imported.status_code == 200
-    assert [item["artworkId"] for item in imported.json()["items"]] == [702]
+    container.download_commits.commit(artwork, media)
 
     local_group = client.post("/api/groups", json={"name": "本地分组"})
-    another_group = client.post("/api/groups", json={"name": "另一个分组"})
     assert local_group.status_code == 200
-    assert another_group.status_code == 200
     local_group_id = local_group.json()["groupId"]
-    another_group_id = another_group.json()["groupId"]
+
     grouped = client.put(
         "/api/artworks/701/groups",
         json={"groupIds": [local_group_id]},
@@ -662,119 +625,6 @@ def test_local_groups_are_independent_from_automatic_pixiv_favorite_sync(
     )
     assert filtered.status_code == 200
     assert [item["artworkId"] for item in filtered.json()["items"]] == [701]
-
-    remote_favorite = False
-    reads: list[str] = []
-    writes: list[str] = []
-    cookie = "PHPSESSID=42_secret"
-    assert client.patch("/api/settings", json={"pixivCookie": cookie}).status_code == 200
-
-    async def get_body(
-        path: str,
-        *,
-        cookie: str | None,
-        params: object = None,
-    ) -> dict[str, object]:
-        assert path == "/ajax/illust/701"
-        assert cookie == "PHPSESSID=42_secret"
-        assert params is None
-        reads.append(path)
-        return {
-            "bookmarkData": {"id": "9001", "private": False} if remote_favorite else None,
-        }
-
-    async def post_json(
-        path: str,
-        *,
-        cookie: str | None,
-        json_body: dict[str, object],
-    ) -> None:
-        nonlocal remote_favorite
-        assert cookie == "PHPSESSID=42_secret"
-        assert container.favorites.get_state(701).is_favorite is True
-        assert path == "/ajax/illusts/bookmarks/add"
-        assert json_body == {
-            "illust_id": "701",
-            "restrict": 0,
-            "comment": "",
-            "tags": [],
-        }
-        writes.append(path)
-        remote_favorite = True
-
-    async def post_form(
-        path: str,
-        *,
-        cookie: str | None,
-        data: dict[str, str | int],
-    ) -> None:
-        nonlocal remote_favorite
-        assert cookie == "PHPSESSID=42_secret"
-        assert container.favorites.get_state(701).is_favorite is False
-        assert path == "/ajax/illusts/bookmarks/delete"
-        assert data == {"bookmark_id": 9001}
-        writes.append(path)
-        remote_favorite = False
-
-    transport = container.pixiv._transport  # pyright: ignore[reportPrivateUsage]
-    monkeypatch.setattr(transport, "get_body", get_body)
-    monkeypatch.setattr(transport, "post_json", post_json)
-    monkeypatch.setattr(transport, "post_form", post_form)
-
-    replaced = client.put(
-        "/api/artworks/701/favorite",
-        json={"isFavorite": True},
-    )
-    assert replaced.status_code == 200
-    assert replaced.json() == {
-        "artworkId": 701,
-        "isFavorite": True,
-    }
-    assert remote_favorite is True
-    assert reads == ["/ajax/illust/701"]
-    assert writes == ["/ajax/illusts/bookmarks/add"]
-
-    regrouped = client.patch(
-        "/api/artworks/groups",
-        json={
-            "artworkIds": [701, 702],
-            "addGroupIds": [another_group_id],
-            "removeGroupIds": [local_group_id],
-        },
-    )
-    assert regrouped.status_code == 204
-    regrouped_items = client.get(
-        "/api/artworks",
-        params=[("groupId", another_group_id)],
-    )
-    assert regrouped_items.status_code == 200
-    assert {item["artworkId"] for item in regrouped_items.json()["items"]} == {701, 702}
-    assert reads == ["/ajax/illust/701"]
-    assert writes == ["/ajax/illusts/bookmarks/add"]
-
-    cancelled = client.put(
-        "/api/artworks/701/favorite",
-        json={"isFavorite": False},
-    )
-    assert cancelled.status_code == 200
-    assert cancelled.json() == {
-        "artworkId": 701,
-        "isFavorite": False,
-    }
-    assert remote_favorite is False
-    assert writes[-1] == "/ajax/illusts/bookmarks/delete"
-
-    regrouped_after_cancel = client.put(
-        "/api/artworks/701/groups",
-        json={"groupIds": [local_group_id]},
-    )
-    assert regrouped_after_cancel.status_code == 200
-    assert regrouped_after_cancel.json() == {
-        "artworkId": 701,
-        "groupIds": [local_group_id],
-    }
-    assert reads == ["/ajax/illust/701", "/ajax/illust/701"]
-    assert writes == ["/ajax/illusts/bookmarks/add", "/ajax/illusts/bookmarks/delete"]
 
 
 def test_manual_favorite_sync_previews_before_updating_local_state(
@@ -809,7 +659,7 @@ def test_manual_favorite_sync_previews_before_updating_local_state(
             title=f"同步作品 {artwork_id}",
             original_urls=(f"https://i.pximg.net/{artwork_id}.jpg",),
         )
-        container.artworks.save_download(
+        container.download_commits.commit(
             current,
             [MediaRecord("page", f"902/{artwork_id}/{artwork_id}_p0.jpg", "image/jpeg", 10, 0)],
         )

@@ -3,12 +3,13 @@ import { useQuery } from '@tanstack/vue-query'
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
-import { getArtwork } from '@/features/gallery/gallery-api'
+import { getArtwork } from '@/features/artworks/artworks-api'
 import {
   galleryNavigationRouteState,
   type GalleryNavigationState,
   parseGalleryNavigationState,
 } from '@/features/gallery/gallery-navigation'
+import { artworkQueryKeys } from '@/features/library/library-query-cache'
 import ArtworkDescriptionSection from '@/pages/artworks/ArtworkDescriptionSection.vue'
 import ArtworkInfoSidebar from '@/pages/artworks/ArtworkInfoSidebar.vue'
 import ArtworkMediaSection from '@/pages/artworks/ArtworkMediaSection.vue'
@@ -23,7 +24,7 @@ const galleryNavigation = ref<GalleryNavigationState | null>(
 )
 
 const artworkQuery = useQuery({
-  queryKey: computed(() => ['artwork', artworkId.value]),
+  queryKey: computed(() => artworkQueryKeys.detail(artworkId.value)),
   queryFn: () => getArtwork(artworkId.value),
   placeholderData: (previousData) => previousData,
 })

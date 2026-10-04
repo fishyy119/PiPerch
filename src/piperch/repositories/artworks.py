@@ -40,9 +40,7 @@ from piperch.repositories._rows import (
 from piperch.repositories._rows import (
     string as _string,
 )
-from piperch.repositories.groups import ArtworkGroupRepository
-from piperch.services.tag_search import TagSearchIndex
-from piperch.utils.datetime import utc_now_text
+from piperch.utils.text import normalize_search_text
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -63,9 +61,8 @@ class ArtworkRepository:
         "id": artworks.c.id,
     }
 
-    def __init__(self, database: Database, tag_search_index: TagSearchIndex | None = None) -> None:
+    def __init__(self, database: Database) -> None:
         self._database = database
-        self._tag_search_index = tag_search_index or TagSearchIndex(database)
 
     def find_existing_ids(self, artwork_ids: Sequence[int]) -> set[int]:
         """返回已经保存到本地图库的作品 ID。"""
@@ -126,105 +123,8 @@ class ArtworkRepository:
                 for row in rows
             )
 
-    def save_download(
-        self,
-        artwork: RemoteArtwork,
-        media: Sequence[MediaRecord],
-        bookmark_tags: Sequence[str] | None = None,
-    ) -> None:
-        now = utc_now_text()
-        prepared_tag_search = self._tag_search_index.prepare([tag.name for tag in artwork.tags])
-        with self._database.begin() as connection:
-            self._upsert_author(connection, artwork, now)
-            self._upsert_series(connection, artwork, now)
-            existing_downloaded_at = connection.scalar(
-                select(artworks.c.downloaded_at).where(artworks.c.id == artwork.artwork_id)
-            )
-            values = {
-                "id": artwork.artwork_id,
-                "artwork_type": artwork.artwork_type.value,
-                "title": artwork.title,
-                "description": artwork.description,
-                "author_id": artwork.author_id,
-                "series_id": artwork.series_id,
-                "page_count": artwork.page_count,
-                "width": artwork.width,
-                "height": artwork.height,
-                "x_restrict": artwork.x_restrict,
-                "is_ai": artwork.is_ai,
-                "published_at": artwork.published_at,
-                "downloaded_at": existing_downloaded_at or now,
-                "metadata_updated_at": now,
-            }
-            if existing_downloaded_at is None:
-                connection.execute(insert(artworks).values(**values))
-            else:
-                connection.execute(update(artworks).where(artworks.c.id == artwork.artwork_id).values(**values))
-
-            connection.execute(delete(artwork_tags).where(artwork_tags.c.artwork_id == artwork.artwork_id))
-            indexed_tags: list[tuple[int, str]] = []
-            for tag in artwork.tags:
-                tag_id = connection.scalar(select(tags.c.id).where(tags.c.name == tag.name))
-                if tag_id is None:
-                    connection.execute(insert(tags).values(name=tag.name))
-                    tag_id = connection.scalar(select(tags.c.id).where(tags.c.name == tag.name))
-                    if tag_id is None:
-                        raise RuntimeError("写入标签后未能读取主键。")
-                indexed_tags.append((tag_id, tag.name))
-                connection.execute(insert(artwork_tags).values(artwork_id=artwork.artwork_id, tag_id=tag_id))
-            self._tag_search_index.store(connection, indexed_tags, prepared_tag_search)
-
-            connection.execute(delete(media_files).where(media_files.c.artwork_id == artwork.artwork_id))
-            if media:
-                connection.execute(
-                    insert(media_files),
-                    [
-                        {
-                            "artwork_id": artwork.artwork_id,
-                            "role": item.role,
-                            "page_index": item.page_index,
-                            "relative_path": item.relative_path,
-                            "mime_type": item.mime_type,
-                            "byte_size": item.byte_size,
-                            "downloaded_at": now,
-                        }
-                        for item in media
-                    ],
-                )
-
-            connection.execute(delete(ugoira_frames).where(ugoira_frames.c.artwork_id == artwork.artwork_id))
-            if artwork.ugoira_frames:
-                connection.execute(
-                    insert(ugoira_frames),
-                    [
-                        {
-                            "artwork_id": artwork.artwork_id,
-                            "sequence": index,
-                            "file_name": frame.file_name,
-                            "delay_ms": frame.delay_ms,
-                        }
-                        for index, frame in enumerate(artwork.ugoira_frames)
-                    ],
-                )
-
-            if existing_downloaded_at is None and artwork.bookmark_data is not None:
-                connection.execute(
-                    insert(favorite_artworks).values(
-                        artwork_id=artwork.artwork_id,
-                        created_at=now,
-                        updated_at=now,
-                    )
-                )
-            if existing_downloaded_at is None and bookmark_tags is not None:
-                ArtworkGroupRepository.import_bookmark_groups(
-                    connection,
-                    artwork.artwork_id,
-                    bookmark_tags,
-                    now,
-                )
-
     @staticmethod
-    def _upsert_author(connection: Connection, artwork: RemoteArtwork, now: str) -> None:
+    def upsert_author(connection: Connection, artwork: RemoteArtwork, now: str) -> None:
         values = {
             "id": artwork.author_id,
             "name": artwork.author_name,
@@ -239,7 +139,7 @@ class ArtworkRepository:
             connection.execute(update(authors).where(authors.c.id == artwork.author_id).values(**values))
 
     @staticmethod
-    def _upsert_series(connection: Connection, artwork: RemoteArtwork, now: str) -> None:
+    def upsert_series(connection: Connection, artwork: RemoteArtwork, now: str) -> None:
         if artwork.series_id is None or artwork.series_title is None:
             return
         values = {
@@ -253,6 +153,98 @@ class ArtworkRepository:
             connection.execute(insert(series).values(**values))
         else:
             connection.execute(update(series).where(series.c.id == artwork.series_id).values(**values))
+
+    @staticmethod
+    def upsert_artwork(connection: Connection, artwork: RemoteArtwork, now: str) -> bool:
+        existing_downloaded_at = connection.scalar(
+            select(artworks.c.downloaded_at).where(artworks.c.id == artwork.artwork_id)
+        )
+        values = {
+            "id": artwork.artwork_id,
+            "artwork_type": artwork.artwork_type.value,
+            "title": artwork.title,
+            "description": artwork.description,
+            "author_id": artwork.author_id,
+            "series_id": artwork.series_id,
+            "page_count": artwork.page_count,
+            "width": artwork.width,
+            "height": artwork.height,
+            "x_restrict": artwork.x_restrict,
+            "is_ai": artwork.is_ai,
+            "published_at": artwork.published_at,
+            "downloaded_at": existing_downloaded_at or now,
+            "metadata_updated_at": now,
+        }
+        if existing_downloaded_at is None:
+            connection.execute(insert(artworks).values(**values))
+            return True
+        connection.execute(update(artworks).where(artworks.c.id == artwork.artwork_id).values(**values))
+        return False
+
+    @staticmethod
+    def replace_tags(
+        connection: Connection,
+        artwork_id: int,
+        tag_records: Sequence[TagRecord],
+    ) -> list[tuple[int, str]]:
+        connection.execute(delete(artwork_tags).where(artwork_tags.c.artwork_id == artwork_id))
+        indexed_tags: list[tuple[int, str]] = []
+        for tag in tag_records:
+            tag_id = connection.scalar(select(tags.c.id).where(tags.c.name == tag.name))
+            if tag_id is None:
+                connection.execute(insert(tags).values(name=tag.name))
+                tag_id = connection.scalar(select(tags.c.id).where(tags.c.name == tag.name))
+                if tag_id is None:
+                    raise RuntimeError("写入标签后未能读取主键。")
+            indexed_tags.append((tag_id, tag.name))
+            connection.execute(insert(artwork_tags).values(artwork_id=artwork_id, tag_id=tag_id))
+        return indexed_tags
+
+    @staticmethod
+    def replace_media(
+        connection: Connection,
+        artwork_id: int,
+        media: Sequence[MediaRecord],
+        now: str,
+    ) -> None:
+        connection.execute(delete(media_files).where(media_files.c.artwork_id == artwork_id))
+        if media:
+            connection.execute(
+                insert(media_files),
+                [
+                    {
+                        "artwork_id": artwork_id,
+                        "role": item.role,
+                        "page_index": item.page_index,
+                        "relative_path": item.relative_path,
+                        "mime_type": item.mime_type,
+                        "byte_size": item.byte_size,
+                        "downloaded_at": now,
+                    }
+                    for item in media
+                ],
+            )
+
+    @staticmethod
+    def replace_ugoira_frames(
+        connection: Connection,
+        artwork_id: int,
+        frames: Sequence[UgoiraFrame],
+    ) -> None:
+        connection.execute(delete(ugoira_frames).where(ugoira_frames.c.artwork_id == artwork_id))
+        if frames:
+            connection.execute(
+                insert(ugoira_frames),
+                [
+                    {
+                        "artwork_id": artwork_id,
+                        "sequence": index,
+                        "file_name": frame.file_name,
+                        "delay_ms": frame.delay_ms,
+                    }
+                    for index, frame in enumerate(frames)
+                ],
+            )
 
     def list_artworks(
         self,
@@ -529,7 +521,7 @@ class ArtworkRepository:
                 tags.c.name.asc(),
             )
         statement = statement.limit(limit + len(included_ids))
-        normalized_search = self._tag_search_index.normalize(search)
+        normalized_search = normalize_search_text(search)
         if normalized_search:
             search_condition = or_(
                 tag_search_cache.c.name_nfkc.contains(normalized_search, autoescape=True),

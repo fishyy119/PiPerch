@@ -2,10 +2,7 @@
 import { Plus } from '@lucide/vue'
 import { ref, watch } from 'vue'
 
-import {
-  type ArtworkGroup,
-  createGroup as createArtworkGroup,
-} from '@/features/gallery/gallery-api'
+import { type ArtworkGroup, createGroup as createArtworkGroup } from '@/features/groups/groups-api'
 import CreateGroupDialog from '@/shared/components/groups/CreateGroupDialog.vue'
 import { errorMessage } from '@/shared/errors'
 import Button from '@ui/Button.vue'

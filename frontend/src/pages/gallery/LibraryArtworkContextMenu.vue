@@ -2,14 +2,19 @@
 import { useQueryClient } from '@tanstack/vue-query'
 import { computed, ref, watch } from 'vue'
 
+import type { ArtworkSummary } from '@/features/artworks/artworks-api'
+import { replaceFavoriteState } from '@/features/favorites/favorites-api'
 import {
   type ArtworkGroup,
-  type ArtworkSummary,
   createGroup,
   listGroups,
   replaceArtworkGroups,
-  replaceFavoriteState,
-} from '@/features/gallery/gallery-api'
+} from '@/features/groups/groups-api'
+import {
+  groupQueryKeys,
+  invalidateArtworkData,
+  invalidateArtworkGroupData,
+} from '@/features/library/library-query-cache'
 import CreateGroupDialog from '@/shared/components/groups/CreateGroupDialog.vue'
 import { errorMessage } from '@/shared/errors'
 import ContextMenu, { type ContextMenuOption } from '@ui/ContextMenu.vue'
@@ -73,7 +78,7 @@ watch(open, (isOpen) => {
 async function loadGroups() {
   try {
     groups.value = await queryClient.query({
-      queryKey: ['groups'],
+      queryKey: groupQueryKeys.list(),
       queryFn: listGroups,
     })
   } catch (error) {
@@ -81,19 +86,12 @@ async function loadGroups() {
   }
 }
 
-async function invalidateArtworkData() {
-  await Promise.all([
-    queryClient.invalidateQueries({ queryKey: ['artworks'] }),
-    queryClient.invalidateQueries({ queryKey: ['groups'] }),
-  ])
-}
-
 async function toggleFavorite() {
   if (actionPending.value) return
   actionPending.value = true
   try {
     await replaceFavoriteState(props.artwork.artworkId, !props.artwork.isFavorite)
-    await invalidateArtworkData()
+    await invalidateArtworkData(queryClient)
     toast.success('收藏已更新并同步到 Pixiv')
   } catch (error) {
     toast.error('更新收藏失败', { description: errorMessage(error) })
@@ -111,7 +109,7 @@ async function changeGroup(groupId: number, mode: 'add' | 'remove') {
         ? [...new Set([...props.artwork.groupIds, groupId])]
         : props.artwork.groupIds.filter((currentGroupId) => currentGroupId !== groupId)
     await replaceArtworkGroups(props.artwork.artworkId, groupIds)
-    await invalidateArtworkData()
+    await invalidateArtworkGroupData(queryClient)
     toast.success(mode === 'add' ? '已添加到本地分组' : '已从本地分组移除')
   } catch (error) {
     toast.error('修改本地分组失败', { description: errorMessage(error) })
@@ -128,10 +126,10 @@ async function createAndAddGroup(name: string) {
     const groupIds = [...props.artwork.groupIds, group.groupId]
     await replaceArtworkGroups(props.artwork.artworkId, groupIds)
     createGroupOpen.value = false
-    await invalidateArtworkData()
+    await invalidateArtworkGroupData(queryClient)
     toast.success('已创建本地分组并添加作品')
   } catch (error) {
-    await invalidateArtworkData()
+    await invalidateArtworkGroupData(queryClient)
     toast.error('添加到新分组失败', { description: errorMessage(error) })
   } finally {
     actionPending.value = false

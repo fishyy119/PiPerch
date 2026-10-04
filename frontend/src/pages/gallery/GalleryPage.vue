@@ -5,7 +5,7 @@ import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import { usePreference } from '@/app/usePreference'
-import { type GalleryFilters, listArtworks } from '@/features/gallery/gallery-api'
+import { type ArtworkListFilters, listArtworks } from '@/features/artworks/artworks-api'
 import type { GalleryFilterValues } from '@/features/gallery/gallery-filter'
 import {
   defaultGalleryFilterValues,
@@ -13,6 +13,7 @@ import {
   provideGalleryFilters,
 } from '@/features/gallery/gallery-filter'
 import { useGallerySelectionStore } from '@/features/gallery/gallery-selection'
+import { artworkQueryKeys } from '@/features/library/library-query-cache'
 import GalleryBulkSelectionBar from '@/pages/gallery/GalleryBulkSelectionBar.vue'
 import GalleryFilterPopup from '@/pages/gallery/GalleryFilterPopup.vue'
 import GalleryPreferencesPopover from '@/pages/gallery/GalleryPreferencesPopover.vue'
@@ -89,7 +90,7 @@ const galleryFilterValues = computed<GalleryFilterValues>({
 })
 provideGalleryFilters(galleryFilterValues)
 
-function artworkFilters(): GalleryFilters {
+function artworkFilters(): ArtworkListFilters {
   const filters = galleryFilterValues.value
   return {
     page: pageNumber(),
@@ -110,7 +111,7 @@ function artworkFilters(): GalleryFilters {
 }
 
 const artworksQuery = useQuery({
-  queryKey: computed(() => ['artworks', artworkFilters()]),
+  queryKey: computed(() => artworkQueryKeys.list(artworkFilters())),
   queryFn: () => listArtworks(artworkFilters()),
 })
 

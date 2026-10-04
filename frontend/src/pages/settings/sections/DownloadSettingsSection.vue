@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import { Download } from '@lucide/vue'
 
+import { useSettingField } from '@/features/settings/useSettingField'
 import Input from '@ui/Input.vue'
 import NumberInput from '@ui/NumberInput.vue'
 import Slider from '@ui/Slider.vue'
 
 import SettingItem from '../SettingItem.vue'
 import SettingsSection from '../SettingsSection.vue'
-import { useSettingField } from '../useSettingField'
 
 const proxyUrlField = useSettingField<'proxyUrl', string>('proxyUrl', {
   label: 'HTTP/HTTPS 代理',

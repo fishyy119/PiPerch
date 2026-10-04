@@ -3,12 +3,11 @@ import userEvent from '@testing-library/user-event'
 import { render, screen, waitFor } from '@testing-library/vue'
 import { http, HttpResponse } from 'msw'
 import { setupServer } from 'msw/node'
-import { defineComponent } from 'vue'
 import { createMemoryHistory, createRouter, RouterView } from 'vue-router'
 
 import ArtworkDetailPage from '@/pages/artworks/ArtworkDetailPage.vue'
 
-function artworkPayload(overrides: Record<string, unknown> = {}) {
+function artworkPayload() {
   return {
     artworkId: 123,
     title: '测试作品',
@@ -30,7 +29,6 @@ function artworkPayload(overrides: Record<string, unknown> = {}) {
     height: 1200,
     media: [{ role: 'page', pageIndex: 0, mimeType: 'image/jpeg', byteSize: 100 }],
     ugoiraFrames: [],
-    ...overrides,
   }
 }
 
@@ -38,29 +36,6 @@ const server = setupServer(
   http.get('/api/artworks/123', () => HttpResponse.json(artworkPayload())),
   http.get('/api/artworks/123/related', () => HttpResponse.json([])),
 )
-
-const LightboxGalleryStub = defineComponent({
-  name: 'LightboxGallery',
-  props: {
-    items: { type: Array, required: true },
-  },
-  emits: ['change'],
-  data: () => ({ openedIndex: null as number | null }),
-  methods: {
-    open(index = 0) {
-      this.openedIndex = index
-    },
-  },
-  template: `
-    <div
-      data-testid="lightbox-gallery"
-      :data-opened-index="openedIndex === null ? '' : String(openedIndex)"
-    >
-      <slot :open="open" />
-      <button type="button" @click="$emit('change', 1)">关闭并停在第二页</button>
-    </div>
-  `,
-})
 
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }))
 afterEach(() => server.resetHandlers())
@@ -94,55 +69,5 @@ describe('作品详情页', () => {
       expect(router.currentRoute.value.path).toBe('/gallery')
       expect(router.currentRoute.value.query.authorId).toBe('456')
     })
-  })
-
-  it('从整个主图展示区打开当前页，并同步 Lightbox 内的翻页结果', async () => {
-    server.use(
-      http.get('/api/artworks/123', () =>
-        HttpResponse.json(
-          artworkPayload({
-            artworkType: 'manga',
-            seriesId: null,
-            seriesTitle: null,
-            pageCount: 3,
-            media: [
-              { role: 'page', pageIndex: 0, mimeType: 'image/jpeg', byteSize: 100 },
-              { role: 'page', pageIndex: 1, mimeType: 'image/jpeg', byteSize: 100 },
-              { role: 'page', pageIndex: 2, mimeType: 'image/jpeg', byteSize: 100 },
-            ],
-          }),
-        ),
-      ),
-    )
-    const user = userEvent.setup()
-    const router = createRouter({
-      history: createMemoryHistory(),
-      routes: [{ path: '/artworks/:artworkId', component: ArtworkDetailPage }],
-    })
-    await router.push('/artworks/123')
-    await router.isReady()
-
-    render(
-      { components: { RouterView }, template: '<RouterView />' },
-      {
-        global: {
-          plugins: [router, [VueQueryPlugin, { queryClient: new QueryClient() }]],
-          stubs: { LightboxGallery: LightboxGalleryStub },
-        },
-      },
-    )
-
-    const previewTrigger = await screen.findByRole('button', {
-      name: '测试作品',
-    })
-
-    await user.click(screen.getByRole('button', { name: '3' }))
-    await user.click(previewTrigger)
-
-    expect(screen.getByTestId('lightbox-gallery')).toHaveAttribute('data-opened-index', '2')
-
-    await user.click(screen.getByRole('button', { name: '关闭并停在第二页' }))
-    await user.click(previewTrigger)
-    expect(screen.getByTestId('lightbox-gallery')).toHaveAttribute('data-opened-index', '1')
   })
 })

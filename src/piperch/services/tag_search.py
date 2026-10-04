@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import logging
 import sqlite3
-import unicodedata
 from dataclasses import dataclass
 from importlib.resources import as_file, files
 from typing import TYPE_CHECKING
@@ -11,6 +10,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 
 from piperch.database.tables import tag_search_cache, tag_search_cache_state, tags
+from piperch.utils.text import normalize_search_text
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -86,10 +86,6 @@ class TagSearchIndex:
         self._database = database
         self._catalog = catalog or TagCatalog.bundled()
 
-    @staticmethod
-    def normalize(text: str) -> str:
-        return unicodedata.normalize("NFKC", text.strip())
-
     def prepare(self, names: Sequence[str]) -> PreparedTagSearch:
         try:
             raw_aliases = self._catalog.lookup(names)
@@ -97,7 +93,7 @@ class TagSearchIndex:
             logger.exception("标签词典不可用，本次仅更新原始标签搜索缓存。")
             return PreparedTagSearch({}, False)
         return PreparedTagSearch(
-            {name: normalized for name, alias in raw_aliases.items() if (normalized := self.normalize(alias))},
+            {name: normalized for name, alias in raw_aliases.items() if (normalized := normalize_search_text(alias))},
             True,
         )
 
@@ -153,7 +149,7 @@ class TagSearchIndex:
             rows = [
                 {
                     "tag_id": tag_id,
-                    "name_nfkc": TagSearchIndex.normalize(name),
+                    "name_nfkc": normalize_search_text(name),
                     "cn_name_nfkc": prepared.aliases.get(name),
                 }
                 for tag_id, name in unique_entries.items()

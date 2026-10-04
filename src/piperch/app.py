@@ -30,6 +30,7 @@ from piperch.pixiv import PixivClient
 from piperch.repositories import ArtworkGroupRepository, ArtworkRepository, DownloadRepository, FavoriteRepository
 from piperch.runtime import AppControl
 from piperch.services.downloads import (
+    ArtworkDownloadCommitService,
     ArtworkDownloadService,
     DownloadEventBroker,
     DownloadSupervisor,
@@ -99,7 +100,7 @@ def create_app(paths: AppPaths | None = None, control: AppControl | None = None)
             proxy_url=current_settings.proxy_url,
             request_interval_ms=current_settings.request_interval_ms,
         )
-        artwork_repository = ArtworkRepository(database, tag_search_index)
+        artwork_repository = ArtworkRepository(database)
         favorite_repository = FavoriteRepository(database)
         favorite_sync_service = FavoriteSyncService(favorite_repository)
         group_repository = ArtworkGroupRepository(database)
@@ -107,11 +108,19 @@ def create_app(paths: AppPaths | None = None, control: AppControl | None = None)
         events = DownloadEventBroker()
         thumbnail_cache = ArtworkThumbnailCache(resolved_paths)
         library_files = LibraryFileOperations()
+        download_commit_service = ArtworkDownloadCommitService(
+            database,
+            artwork_repository,
+            favorite_repository,
+            group_repository,
+            tag_search_index,
+        )
         download_service = ArtworkDownloadService(
             resolved_paths,
             settings_manager,
             artwork_repository,
             pixiv,
+            download_commit_service,
             thumbnail_cache,
             library_files,
         )
@@ -145,6 +154,7 @@ def create_app(paths: AppPaths | None = None, control: AppControl | None = None)
             favorite_sync=favorite_sync_service,
             groups=group_repository,
             downloads=download_repository,
+            download_commits=download_commit_service,
             pixiv=pixiv,
             supervisor=supervisor,
             events=events,

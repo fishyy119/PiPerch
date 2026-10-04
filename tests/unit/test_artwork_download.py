@@ -29,6 +29,7 @@ if TYPE_CHECKING:
 
     from piperch.pixiv import PixivClient
     from piperch.repositories import ArtworkRepository
+    from piperch.services.downloads import ArtworkDownloadCommitService
     from piperch.settings import SettingsManager
 
 
@@ -41,9 +42,6 @@ class StubSettings:
 
 
 class StubArtworkRepository:
-    def __init__(self) -> None:
-        self.saved_media: tuple[MediaRecord, ...] | None = None
-
     def is_complete(self, _artwork_id: int, _library_root: Path) -> bool:
         return False
 
@@ -53,7 +51,12 @@ class StubArtworkRepository:
     def list_media(self, _artwork_id: int) -> tuple[MediaRecord, ...]:
         return ()
 
-    def save_download(self, _artwork: RemoteArtwork, media: Sequence[MediaRecord]) -> None:
+
+class StubArtworkDownloadCommitService:
+    def __init__(self) -> None:
+        self.saved_media: tuple[MediaRecord, ...] | None = None
+
+    def commit(self, _artwork: RemoteArtwork, media: Sequence[MediaRecord]) -> None:
         self.saved_media = tuple(media)
 
 
@@ -134,6 +137,7 @@ async def test_download_writes_configured_image_format(
         thumbnail_url=None,
     )
     repository = StubArtworkRepository()
+    commits = StubArtworkDownloadCommitService()
     pixiv = StubPixivClient(artwork)
     qualities: list[int] = []
     transcode = ArtworkDownloadService._transcode_to_webp  # pyright: ignore[reportPrivateUsage]
@@ -148,6 +152,7 @@ async def test_download_writes_configured_image_format(
         cast("SettingsManager", StubSettings(settings)),
         cast("ArtworkRepository", repository),
         cast("PixivClient", pixiv),
+        cast("ArtworkDownloadCommitService", commits),
     )
 
     result = await service.download_artwork(123, "job-id", DownloadCancellation())
@@ -155,8 +160,8 @@ async def test_download_writes_configured_image_format(
     assert result is ItemState.SUCCEEDED
     assert pixiv.maximum_active_downloads == 1
     assert qualities == ([67, 67, 67] if webp_enabled else [])
-    assert repository.saved_media is not None
-    media = repository.saved_media[0]
+    assert commits.saved_media is not None
+    media = commits.saved_media[0]
     assert Path(media.relative_path).suffix == expected_suffix
     assert media.mime_type == ("image/webp" if webp_enabled else "image/png")
     saved = settings.library_root / media.relative_path
@@ -206,19 +211,21 @@ async def test_thumbnail_failure_keeps_committed_artwork_files(tmp_path: Path) -
         thumbnail_url=None,
     )
     repository = StubArtworkRepository()
+    commits = StubArtworkDownloadCommitService()
     service = ArtworkDownloadService(
         paths,
         cast("SettingsManager", StubSettings(settings)),
         cast("ArtworkRepository", repository),
         cast("PixivClient", StubPixivClient(artwork)),
+        cast("ArtworkDownloadCommitService", commits),
         FailingThumbnailCache(paths),
     )
 
     result = await service.download_artwork(123, "job-id", DownloadCancellation())
 
     assert result is ItemState.SUCCEEDED
-    assert repository.saved_media is not None
-    assert (settings.library_root / repository.saved_media[0].relative_path).is_file()
+    assert commits.saved_media is not None
+    assert (settings.library_root / commits.saved_media[0].relative_path).is_file()
 
 
 @pytest.mark.asyncio
@@ -255,6 +262,7 @@ async def test_cancellation_before_commit_discards_staged_media(tmp_path: Path) 
         thumbnail_url=None,
     )
     repository = StubArtworkRepository()
+    commits = StubArtworkDownloadCommitService()
     cancellation = DownloadCancellation()
 
     def request_cancel() -> None:
@@ -265,10 +273,11 @@ async def test_cancellation_before_commit_discards_staged_media(tmp_path: Path) 
         cast("SettingsManager", StubSettings(settings)),
         cast("ArtworkRepository", repository),
         cast("PixivClient", StubPixivClient(artwork, request_cancel)),
+        cast("ArtworkDownloadCommitService", commits),
     )
 
     with pytest.raises(DownloadCancelledError):
         await service.download_artwork(123, "job-id", cancellation)
 
-    assert repository.saved_media is None
+    assert commits.saved_media is None
     assert not (settings.library_root / "456" / "123").exists()

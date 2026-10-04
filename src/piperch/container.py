@@ -9,6 +9,7 @@ if TYPE_CHECKING:
     from piperch.pixiv import PixivClient
     from piperch.repositories import ArtworkGroupRepository, ArtworkRepository, DownloadRepository, FavoriteRepository
     from piperch.services.downloads import (
+        ArtworkDownloadCommitService,
         DownloadEventBroker,
         DownloadSupervisor,
     )
@@ -29,6 +30,7 @@ class AppContainer:
     favorite_sync: FavoriteSyncService
     groups: ArtworkGroupRepository
     downloads: DownloadRepository
+    download_commits: ArtworkDownloadCommitService
     pixiv: PixivClient
     supervisor: DownloadSupervisor
     events: DownloadEventBroker

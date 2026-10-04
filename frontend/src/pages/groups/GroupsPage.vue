@@ -6,14 +6,21 @@ import { useRouter } from 'vue-router'
 
 import {
   applyFavoriteSyncPlan,
-  type ArtworkGroup,
   createFavoriteSyncPlan,
+  type FavoriteSyncPlan,
+} from '@/features/favorites/favorites-api'
+import {
+  type ArtworkGroup,
   createGroup as createArtworkGroup,
   deleteGroup,
-  type FavoriteSyncPlan,
   listGroups,
   renameGroup,
-} from '@/features/gallery/gallery-api'
+} from '@/features/groups/groups-api'
+import {
+  groupQueryKeys,
+  invalidateArtworkData,
+  invalidateArtworkGroupData,
+} from '@/features/library/library-query-cache'
 import { errorMessage } from '@/shared/errors'
 import Button from '@ui/Button.vue'
 import Card from '@ui/Card.vue'
@@ -24,7 +31,7 @@ import { toast } from '@ui/toast'
 
 const router = useRouter()
 const queryClient = useQueryClient()
-const groupsQuery = useQuery({ queryKey: ['groups'], queryFn: listGroups })
+const groupsQuery = useQuery({ queryKey: groupQueryKeys.list(), queryFn: listGroups })
 const newName = ref('')
 const editingId = ref<number | null>(null)
 const editingName = ref('')
@@ -35,18 +42,11 @@ const favoriteSyncDialogOpen = ref(false)
 const checkingFavoriteSync = ref(false)
 const applyingFavoriteSync = ref(false)
 
-async function invalidateGroupData() {
-  await Promise.all([
-    queryClient.invalidateQueries({ queryKey: ['groups'] }),
-    queryClient.invalidateQueries({ queryKey: ['artworks'] }),
-  ])
-}
-
 async function run(label: string, operation: () => Promise<unknown>) {
   busy.value = true
   try {
     await operation()
-    await invalidateGroupData()
+    await invalidateArtworkGroupData(queryClient)
     toast.success(label)
     return true
   } catch (error) {
@@ -120,10 +120,7 @@ async function applyFavoriteSync() {
   applyingFavoriteSync.value = true
   try {
     const result = await applyFavoriteSyncPlan(plan.planId)
-    await Promise.all([
-      queryClient.invalidateQueries({ queryKey: ['artworks'] }),
-      queryClient.invalidateQueries({ queryKey: ['artwork'] }),
-    ])
+    await invalidateArtworkData(queryClient)
     favoriteSyncDialogOpen.value = false
     favoriteSyncPlan.value = null
     toast.success(

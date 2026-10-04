@@ -5,9 +5,22 @@ from typing import TYPE_CHECKING
 
 from piperch.database import Database, run_migrations
 from piperch.database.tables import tag_search_cache
-from piperch.domain import ArtworkType, ItemState, MediaRecord, RemoteArtwork, TagRecord
+from piperch.domain import (
+    ArtworkType,
+    ItemState,
+    MediaRecord,
+    RemoteArtwork,
+    RemoteBookmarkReference,
+    TagRecord,
+)
 from piperch.paths import AppPaths
-from piperch.repositories import ArtworkRepository, DownloadRepository
+from piperch.repositories import (
+    ArtworkGroupRepository,
+    ArtworkRepository,
+    DownloadRepository,
+    FavoriteRepository,
+)
+from piperch.services.downloads import ArtworkDownloadCommitService
 from piperch.services.library import LibraryService
 from piperch.services.tag_search import TagSearchIndex
 from piperch.settings import SettingsManager
@@ -42,24 +55,39 @@ def _artwork(artwork_id: int, tags: tuple[TagRecord, ...]) -> RemoteArtwork:
 
 def _repositories(
     tmp_path: Path,
-) -> tuple[AppPaths, Database, SettingsManager, ArtworkRepository, DownloadRepository]:
+) -> tuple[
+    AppPaths,
+    Database,
+    SettingsManager,
+    ArtworkRepository,
+    ArtworkDownloadCommitService,
+    DownloadRepository,
+]:
     paths = AppPaths.from_data_dir(tmp_path / "repository")
     paths.ensure_directories()
     run_migrations(paths)
     database = Database(paths.database)
     settings = SettingsManager(paths.settings, paths.default_library)
     settings.initialize()
-    return paths, database, settings, ArtworkRepository(database), DownloadRepository(database)
+    artworks = ArtworkRepository(database)
+    commits = ArtworkDownloadCommitService(
+        database,
+        artworks,
+        FavoriteRepository(database),
+        ArtworkGroupRepository(database),
+        TagSearchIndex(database),
+    )
+    return paths, database, settings, artworks, commits, DownloadRepository(database)
 
 
 def test_gallery_tag_filter_uses_and_semantics(tmp_path: Path) -> None:
-    _, database, _, artworks, _ = _repositories(tmp_path)
+    _, database, _, artworks, commits, _ = _repositories(tmp_path)
     try:
-        artworks.save_download(
+        commits.commit(
             _artwork(1, (TagRecord("风景"), TagRecord("蓝天"))),
             [MediaRecord("page", "100/1/1_p0.jpg", "image/jpeg", 10, 0)],
         )
-        artworks.save_download(
+        commits.commit(
             _artwork(2, (TagRecord("风景"),)),
             [MediaRecord("page", "100/2/2_p0.jpg", "image/jpeg", 10, 0)],
         )
@@ -87,9 +115,9 @@ def test_gallery_tag_filter_uses_and_semantics(tmp_path: Path) -> None:
 
 
 def test_tag_search_cache_supports_incremental_and_startup_sync(tmp_path: Path) -> None:
-    _, database, _, artworks, _ = _repositories(tmp_path)
+    _, database, _, artworks, commits, _ = _repositories(tmp_path)
     try:
-        artworks.save_download(
+        commits.commit(
             _artwork(1, (TagRecord("女戦闘員"),)),
             [MediaRecord("page", "100/1/1_p0.jpg", "image/jpeg", 10, 0)],
         )
@@ -111,8 +139,30 @@ def test_tag_search_cache_supports_incremental_and_startup_sync(tmp_path: Path) 
     assert after_startup_sync[0][1].name == "女戦闘員"
 
 
+def test_download_commit_initializes_bookmark_state_only_for_new_artwork(tmp_path: Path) -> None:
+    _, database, _, _, commits, _ = _repositories(tmp_path)
+    artwork = replace(
+        _artwork(101, ()),
+        bookmark_data=RemoteBookmarkReference(bookmark_id=9001, private=False),
+    )
+    media = [MediaRecord("page", "100/101/101_p0.jpg", "image/jpeg", 10, 0)]
+    favorites = FavoriteRepository(database)
+    groups = ArtworkGroupRepository(database)
+    try:
+        commits.commit(artwork, media, ("Pixiv标签",))
+        commits.commit(artwork, media, ("不应覆盖",))
+
+        favorite = favorites.get_state(101)
+        imported_groups = groups.list_groups()
+    finally:
+        database.close()
+
+    assert favorite.is_favorite is True
+    assert [(group.name, group.artwork_count) for group in imported_groups] == [("Pixiv标签", 1)]
+
+
 def test_related_artworks_combine_author_and_shared_tags(tmp_path: Path) -> None:
-    _, database, _, artworks, _ = _repositories(tmp_path)
+    _, database, _, artworks, commits, _ = _repositories(tmp_path)
     target = _artwork(1, (TagRecord("风景"), TagRecord("蓝天")))
     candidates = (
         _artwork(2, (TagRecord("人物"),)),
@@ -134,7 +184,7 @@ def test_related_artworks_combine_author_and_shared_tags(tmp_path: Path) -> None
     )
     try:
         for artwork in (target, *candidates):
-            artworks.save_download(
+            commits.commit(
                 artwork,
                 [
                     MediaRecord(
@@ -154,9 +204,9 @@ def test_related_artworks_combine_author_and_shared_tags(tmp_path: Path) -> None
 
 
 def test_find_existing_artwork_ids_ignores_unknown_and_duplicate_ids(tmp_path: Path) -> None:
-    _, database, _, artworks, _ = _repositories(tmp_path)
+    _, database, _, artworks, commits, _ = _repositories(tmp_path)
     try:
-        artworks.save_download(
+        commits.commit(
             _artwork(101, ()),
             [MediaRecord("page", "100/101/101_p0.jpg", "image/jpeg", 10, 0)],
         )
@@ -168,7 +218,7 @@ def test_find_existing_artwork_ids_ignores_unknown_and_duplicate_ids(tmp_path: P
 
 
 def test_download_completeness_requires_every_page(tmp_path: Path) -> None:
-    _, database, settings, artworks, _ = _repositories(tmp_path)
+    _, database, settings, artworks, commits, _ = _repositories(tmp_path)
     artwork = replace(
         _artwork(101, ()),
         page_count=2,
@@ -181,12 +231,12 @@ def test_download_completeness_requires_every_page(tmp_path: Path) -> None:
     first_path.write_bytes(b"first")
     try:
         first_page = MediaRecord("page", "100/101/101_p0.jpg", "image/jpeg", 5, 0)
-        artworks.save_download(artwork, [first_page])
+        commits.commit(artwork, [first_page])
         incomplete = artworks.is_complete(101, library_root)
 
         second_path.write_bytes(b"second")
         second_page = MediaRecord("page", "100/101/101_p1.jpg", "image/jpeg", 6, 1)
-        artworks.save_download(artwork, [first_page, second_page])
+        commits.commit(artwork, [first_page, second_page])
         complete = artworks.is_complete(101, library_root)
     finally:
         database.close()
@@ -196,14 +246,14 @@ def test_download_completeness_requires_every_page(tmp_path: Path) -> None:
 
 
 def test_delete_metadata_removes_unused_gallery_facets(tmp_path: Path) -> None:
-    _, database, _, artworks, _ = _repositories(tmp_path)
+    _, database, _, artworks, commits, _ = _repositories(tmp_path)
     artwork = replace(
         _artwork(101, (TagRecord("风景"),)),
         series_id=200,
         series_title="测试系列",
     )
     try:
-        artworks.save_download(
+        commits.commit(
             artwork,
             [MediaRecord("page", "100/101/101_p0.jpg", "image/jpeg", 10, 0)],
         )
@@ -222,7 +272,7 @@ def test_delete_metadata_removes_unused_gallery_facets(tmp_path: Path) -> None:
 
 
 def test_download_job_transitions_and_retry(tmp_path: Path) -> None:
-    _, database, _, _, downloads = _repositories(tmp_path)
+    _, database, _, _, _, downloads = _repositories(tmp_path)
     try:
         job_id = downloads.create_job([1, 1, 2], "测试任务")
         first = downloads.claim_next()
@@ -257,11 +307,11 @@ def test_download_job_transitions_and_retry(tmp_path: Path) -> None:
 
 
 def test_interrupted_delete_is_restored_when_metadata_still_exists(tmp_path: Path) -> None:
-    paths, database, settings, artworks, _ = _repositories(tmp_path)
+    paths, database, settings, artworks, commits, _ = _repositories(tmp_path)
     source = settings.get().library_root / "100" / "1"
     pending = paths.staging / "delete" / "100" / "1-interrupted"
     try:
-        artworks.save_download(
+        commits.commit(
             _artwork(1, (TagRecord("风景"),)),
             [MediaRecord("page", "100/1/1_p0.jpg", "image/jpeg", 4, 0)],
         )
@@ -279,7 +329,7 @@ def test_interrupted_delete_is_restored_when_metadata_still_exists(tmp_path: Pat
 
 
 def test_running_download_is_requeued_during_recovery(tmp_path: Path) -> None:
-    _, database, _, _, downloads = _repositories(tmp_path)
+    _, database, _, _, _, downloads = _repositories(tmp_path)
     try:
         job_id = downloads.create_job([123], "中断任务")
         assert downloads.claim_next() is not None

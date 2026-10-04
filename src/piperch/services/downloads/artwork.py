@@ -24,6 +24,7 @@ if TYPE_CHECKING:
     from piperch.pixiv import PixivClient
     from piperch.repositories import ArtworkRepository
     from piperch.services.downloads.cancellation import DownloadCancellation
+    from piperch.services.downloads.commit import ArtworkDownloadCommitService
     from piperch.settings import SettingsManager
 
 _IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp"}
@@ -37,12 +38,14 @@ class ArtworkDownloadService:
         settings: SettingsManager,
         artworks: ArtworkRepository,
         pixiv: PixivClient,
+        commits: ArtworkDownloadCommitService,
         thumbnails: ArtworkThumbnailCache | None = None,
         files: LibraryFileOperations | None = None,
     ) -> None:
         self._settings = settings
         self._artworks = artworks
         self._pixiv = pixiv
+        self._commits = commits
         self._thumbnails = thumbnails or ArtworkThumbnailCache(paths)
         self._files = files or LibraryFileOperations()
 
@@ -116,10 +119,10 @@ class ArtworkDownloadService:
             published = await to_thread.run_sync(self._files.publish, stage, final_dir)
             try:
                 if bookmark_tags is None:
-                    await to_thread.run_sync(self._artworks.save_download, artwork, final_media)
+                    await to_thread.run_sync(self._commits.commit, artwork, final_media)
                 else:
                     await to_thread.run_sync(
-                        self._artworks.save_download,
+                        self._commits.commit,
                         artwork,
                         final_media,
                         bookmark_tags,

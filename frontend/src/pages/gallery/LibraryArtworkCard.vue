@@ -4,7 +4,7 @@ import { computed, ref } from 'vue'
 
 import { usePreference } from '@/app/usePreference'
 import type { ArtworkCardTarget } from '@/features/artworks/artwork-card'
-import type { ArtworkSummary } from '@/features/gallery/gallery-api'
+import type { ArtworkSummary } from '@/features/artworks/artworks-api'
 import { useGalleryFilters } from '@/features/gallery/gallery-filter'
 import { galleryNavigationRouteState } from '@/features/gallery/gallery-navigation'
 import { useGallerySelectionStore } from '@/features/gallery/gallery-selection'

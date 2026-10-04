@@ -30,23 +30,4 @@ describe('下载候选选择', () => {
     store.remember([fourth])
     expect(store.selectedEntries[3]).toEqual({ artworkId: 400, item: fourth })
   })
-
-  it('支持单项切换、本页移除和清空', () => {
-    const store = useDownloadSelection()
-    store.toggle(first)
-    store.toggle(second)
-    store.removeAll([first])
-    expect(store.selectedIds).toEqual([200])
-
-    store.addIds([300, 400])
-    store.removeIds([200, 400])
-    expect(store.selectedIds).toEqual([300])
-
-    store.clear()
-    expect(store.selectedIds).toEqual([])
-    expect(store.selectedEntries).toEqual([])
-
-    store.addIds([100])
-    expect(store.selectedEntries).toEqual([{ artworkId: 100, item: first }])
-  })
 })

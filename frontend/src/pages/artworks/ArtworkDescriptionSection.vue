@@ -2,7 +2,7 @@
 import { useRouter } from 'vue-router'
 
 import { artworkTypeLabel } from '@/features/artworks/artwork'
-import type { ArtworkDetail } from '@/features/gallery/gallery-api'
+import type { ArtworkDetail } from '@/features/artworks/artworks-api'
 import SafeHtml from '@/pages/artworks/SafeHtml.vue'
 import Card from '@ui/Card.vue'
 

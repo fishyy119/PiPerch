@@ -1,10 +1,11 @@
 <script setup lang="ts">
+import { settingsSections } from '@/features/settings/settings-sections'
+import { useSettingsLoadFeedback } from '@/features/settings/useSettingField'
+import { useSettingsNavigation } from '@/features/settings/useSettingsNavigation'
+
 import DownloadSettingsSection from './sections/DownloadSettingsSection.vue'
 import PixivSettingsSection from './sections/PixivSettingsSection.vue'
 import StorageSettingsSection from './sections/StorageSettingsSection.vue'
-import { settingsSections } from './settings-sections'
-import { useSettingsLoadFeedback } from './useSettingField'
-import { useSettingsNavigation } from './useSettingsNavigation'
 
 const { activeSection, scrollToSection } = useSettingsNavigation()
 useSettingsLoadFeedback()

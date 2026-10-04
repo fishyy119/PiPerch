@@ -4,7 +4,8 @@ import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
 
 import { usePreference } from '@/app/usePreference'
-import { listRelatedArtworks } from '@/features/gallery/gallery-api'
+import { listRelatedArtworks } from '@/features/artworks/artworks-api'
+import { artworkQueryKeys } from '@/features/library/library-query-cache'
 import Card from '@ui/Card.vue'
 import SettingsPopover from '@ui/SettingsPopover.vue'
 import Slider from '@ui/Slider.vue'
@@ -15,7 +16,7 @@ const props = defineProps<{ artworkId: number }>()
 const cardWidth = usePreference('artworkDetail.relatedCardWidth')
 const relatedCount = usePreference('artworkDetail.relatedCount')
 const relatedQuery = useQuery({
-  queryKey: computed(() => ['related-artworks', props.artworkId, relatedCount.value]),
+  queryKey: computed(() => artworkQueryKeys.related(props.artworkId, relatedCount.value)),
   queryFn: () => listRelatedArtworks(props.artworkId, relatedCount.value),
 })
 const gridStyle = computed(() => ({

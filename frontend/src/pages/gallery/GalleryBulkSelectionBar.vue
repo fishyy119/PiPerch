@@ -3,12 +3,10 @@ import { Tags, Trash2 } from '@lucide/vue'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query'
 import { computed, ref } from 'vue'
 
-import {
-  bulkDeleteArtworks,
-  bulkUpdateArtworkGroups,
-  listGroups,
-} from '@/features/gallery/gallery-api'
+import { bulkDeleteArtworks } from '@/features/artworks/artworks-api'
 import { useGallerySelectionStore } from '@/features/gallery/gallery-selection'
+import { bulkUpdateArtworkGroups, listGroups } from '@/features/groups/groups-api'
+import { groupQueryKeys, invalidateArtworkGroupData } from '@/features/library/library-query-cache'
 import BulkGroupsDialog from '@/pages/gallery/BulkGroupsDialog.vue'
 import { errorMessage } from '@/shared/errors'
 import Button from '@ui/Button.vue'
@@ -31,24 +29,17 @@ const visibleFullySelected = computed(
 )
 
 const groupsQuery = useQuery({
-  queryKey: ['groups'],
+  queryKey: groupQueryKeys.list(),
   queryFn: listGroups,
   enabled: computed(() => bulkGroupsOpen.value),
 })
-
-async function invalidateGroupData() {
-  await Promise.all([
-    queryClient.invalidateQueries({ queryKey: ['artworks'] }),
-    queryClient.invalidateQueries({ queryKey: ['groups'] }),
-  ])
-}
 
 const bulkGroupsMutation = useMutation({
   mutationFn: (change: { addGroupIds: number[]; removeGroupIds: number[] }) =>
     bulkUpdateArtworkGroups(selection.selectedIds, change.addGroupIds, change.removeGroupIds),
   onSuccess: async () => {
     bulkGroupsOpen.value = false
-    await invalidateGroupData()
+    await invalidateArtworkGroupData(queryClient)
     toast.success('本地分组已批量更新')
   },
   onError: (error) => {
@@ -61,10 +52,7 @@ const deleteMutation = useMutation({
   onSuccess: async () => {
     deleteOpen.value = false
     selection.reset()
-    await Promise.all([
-      queryClient.invalidateQueries({ queryKey: ['artworks'] }),
-      queryClient.invalidateQueries({ queryKey: ['tags'] }),
-    ])
+    await invalidateArtworkGroupData(queryClient)
   },
 })
 
@@ -147,7 +135,7 @@ function saveBulkGroups(addGroupIds: number[], removeGroupIds: number[]) {
     :selection-count="selection.selectedCount"
     :busy="bulkGroupsMutation.isPending.value"
     @close="bulkGroupsOpen = false"
-    @groups-changed="invalidateGroupData"
+    @groups-changed="invalidateArtworkGroupData(queryClient)"
     @save="saveBulkGroups"
   />
 </template>

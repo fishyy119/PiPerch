@@ -4,6 +4,7 @@ import { useMutation } from '@tanstack/vue-query'
 import { computed } from 'vue'
 
 import { validatePixivCookie } from '@/features/settings/settings-api'
+import { useSettingField } from '@/features/settings/useSettingField'
 import { errorMessage } from '@/shared/errors'
 import Button from '@ui/Button.vue'
 import Textarea from '@ui/Textarea.vue'
@@ -11,7 +12,6 @@ import { toast } from '@ui/toast'
 
 import SettingItem from '../SettingItem.vue'
 import SettingsSection from '../SettingsSection.vue'
-import { useSettingField } from '../useSettingField'
 
 const cookieField = useSettingField<'pixivCookie', string>('pixivCookie', {
   label: 'Cookie',

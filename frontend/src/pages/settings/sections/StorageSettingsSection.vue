@@ -4,6 +4,7 @@ import { useMutation } from '@tanstack/vue-query'
 import { computed, onBeforeUnmount, ref } from 'vue'
 
 import { getHealth, migrateLibraryRoot } from '@/features/settings/settings-api'
+import { useSettingField, useSettingsQuery } from '@/features/settings/useSettingField'
 import { errorMessage } from '@/shared/errors'
 import Button from '@ui/Button.vue'
 import Input from '@ui/Input.vue'
@@ -13,7 +14,6 @@ import { toast } from '@ui/toast'
 
 import SettingItem from '../SettingItem.vue'
 import SettingsSection from '../SettingsSection.vue'
-import { useSettingField, useSettingsQuery } from '../useSettingField'
 
 const settingsQuery = useSettingsQuery()
 const libraryRoot = computed(() => settingsQuery.data.value?.libraryRoot ?? '')

@@ -15,14 +15,15 @@ import { useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 
 import { artworkTypeLabel } from '@/features/artworks/artwork'
+import { type ArtworkDetail, deleteArtwork } from '@/features/artworks/artworks-api'
+import { replaceFavoriteState } from '@/features/favorites/favorites-api'
+import { createGroup, listGroups, replaceArtworkGroups } from '@/features/groups/groups-api'
 import {
-  type ArtworkDetail,
-  createGroup,
-  deleteArtwork,
-  listGroups,
-  replaceArtworkGroups,
-  replaceFavoriteState,
-} from '@/features/gallery/gallery-api'
+  groupQueryKeys,
+  invalidateArtworkData,
+  invalidateArtworkGroupData,
+  updateArtworkDetail,
+} from '@/features/library/library-query-cache'
 import CreateGroupDialog from '@/shared/components/groups/CreateGroupDialog.vue'
 import { errorMessage } from '@/shared/errors'
 import { usePageKeyboardShortcuts } from '@/shared/lib/usePageKeyboardShortcuts'
@@ -49,40 +50,27 @@ const groupsOpen = ref(false)
 const createGroupOpen = ref(false)
 
 const groupsQuery = useQuery({
-  queryKey: ['groups'],
+  queryKey: groupQueryKeys.list(),
   queryFn: listGroups,
 })
 
 const deleteMutation = useMutation({
   mutationFn: () => deleteArtwork(props.artwork.artworkId),
   onSuccess: async () => {
-    await queryClient.invalidateQueries({ queryKey: ['artworks'] })
+    await invalidateArtworkGroupData(queryClient)
     await router.replace('/gallery')
   },
 })
-
-function updateCachedArtwork(artworkId: number, update: (artwork: ArtworkDetail) => ArtworkDetail) {
-  queryClient.setQueryData<ArtworkDetail>(['artwork', artworkId], (artwork) =>
-    artwork ? update(artwork) : artwork,
-  )
-}
-
-async function invalidateArtworkData() {
-  await Promise.all([
-    queryClient.invalidateQueries({ queryKey: ['artworks'] }),
-    queryClient.invalidateQueries({ queryKey: ['groups'] }),
-  ])
-}
 
 const favoriteMutation = useMutation({
   mutationFn: (request: { artworkId: number; isFavorite: boolean }) =>
     replaceFavoriteState(request.artworkId, request.isFavorite),
   onSuccess: async (favoriteState) => {
-    updateCachedArtwork(favoriteState.artworkId, (artwork) => ({
+    updateArtworkDetail(queryClient, favoriteState.artworkId, (artwork) => ({
       ...artwork,
       isFavorite: favoriteState.isFavorite,
     }))
-    await invalidateArtworkData()
+    await invalidateArtworkData(queryClient)
     toast.success(favoriteState.isFavorite ? '已收藏' : '已取消收藏')
   },
   onError: (error) => {
@@ -94,11 +82,11 @@ const groupMutation = useMutation({
   mutationFn: (request: { artworkId: number; groupIds: number[]; selected: boolean }) =>
     replaceArtworkGroups(request.artworkId, request.groupIds),
   onSuccess: async (membership, request) => {
-    updateCachedArtwork(membership.artworkId, (artwork) => ({
+    updateArtworkDetail(queryClient, membership.artworkId, (artwork) => ({
       ...artwork,
       groupIds: membership.groupIds,
     }))
-    await invalidateArtworkData()
+    await invalidateArtworkGroupData(queryClient)
     toast.success(request.selected ? '已添加到本地分组' : '已从本地分组移除')
   },
   onError: (error) => {
@@ -115,15 +103,15 @@ const createAndAddGroupMutation = useMutation({
   },
   onSuccess: async ({ membership }) => {
     createGroupOpen.value = false
-    updateCachedArtwork(membership.artworkId, (artwork) => ({
+    updateArtworkDetail(queryClient, membership.artworkId, (artwork) => ({
       ...artwork,
       groupIds: membership.groupIds,
     }))
-    await invalidateArtworkData()
+    await invalidateArtworkGroupData(queryClient)
     toast.success('已创建本地分组并添加作品')
   },
   onError: async (error) => {
-    await invalidateArtworkData()
+    await invalidateArtworkGroupData(queryClient)
     toast.error('添加到新分组失败', { description: errorMessage(error) })
   },
 })

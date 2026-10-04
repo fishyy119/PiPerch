@@ -31,7 +31,7 @@ class FavoriteRepository:
         with self._database.begin() as connection:
             self._require_artwork(connection, artwork_id)
             if is_favorite:
-                self._ensure_favorite(connection, artwork_id, now)
+                self.ensure_favorite(connection, artwork_id, now)
             else:
                 connection.execute(delete(favorite_artworks).where(favorite_artworks.c.artwork_id == artwork_id))
             return self._state(connection, artwork_id)
@@ -79,7 +79,7 @@ class FavoriteRepository:
         return FavoriteSyncResult(added=len(additions), removed=len(removals))
 
     @staticmethod
-    def _ensure_favorite(connection: Connection, artwork_id: int, now: str) -> None:
+    def ensure_favorite(connection: Connection, artwork_id: int, now: str) -> None:
         exists = connection.scalar(
             select(favorite_artworks.c.artwork_id).where(favorite_artworks.c.artwork_id == artwork_id)
         )

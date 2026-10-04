@@ -1,7 +1,9 @@
 import { useQuery } from '@tanstack/vue-query'
 import { computed, ref } from 'vue'
 
-import { listAuthors, listGroups, listSeries, listTags } from '@/features/gallery/gallery-api'
+import { listAuthors, listSeries, listTags } from '@/features/artworks/artworks-api'
+import { listGroups } from '@/features/groups/groups-api'
+import { artworkQueryKeys, groupQueryKeys } from '@/features/library/library-query-cache'
 
 interface GalleryFilterOptionSources {
   open: () => boolean
@@ -15,13 +17,16 @@ export function useGalleryFilterOptions(sources: GalleryFilterOptionSources) {
   const seriesSearch = ref('')
 
   const tagsQuery = useQuery({
-    queryKey: computed(() => ['tags', tagSearch.value, sources.selectedTagIds()]),
+    queryKey: computed(() => artworkQueryKeys.tags(tagSearch.value, sources.selectedTagIds())),
     queryFn: () => listTags(tagSearch.value, sources.selectedTagIds()),
     enabled: computed(sources.open),
     placeholderData: (previousData) => previousData,
   })
   const authorsQuery = useQuery({
-    queryKey: computed(() => ['filter-authors', authorSearch.value, sources.authorId()]),
+    queryKey: computed(() => {
+      const authorId = sources.authorId()
+      return artworkQueryKeys.authors(authorSearch.value, authorId === undefined ? [] : [authorId])
+    }),
     queryFn: () => {
       const authorId = sources.authorId()
       return listAuthors(authorSearch.value, authorId === undefined ? [] : [authorId])
@@ -30,13 +35,13 @@ export function useGalleryFilterOptions(sources: GalleryFilterOptionSources) {
     placeholderData: (previousData) => previousData,
   })
   const seriesQuery = useQuery({
-    queryKey: computed(() => ['filter-series', seriesSearch.value]),
+    queryKey: computed(() => artworkQueryKeys.series(0, seriesSearch.value)),
     queryFn: () => listSeries(0, seriesSearch.value),
     enabled: computed(sources.open),
     placeholderData: (previousData) => previousData,
   })
   const groupsQuery = useQuery({
-    queryKey: ['groups'],
+    queryKey: groupQueryKeys.list(),
     queryFn: listGroups,
     enabled: computed(sources.open),
   })
