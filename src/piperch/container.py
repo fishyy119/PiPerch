@@ -12,6 +12,7 @@ if TYPE_CHECKING:
         DownloadEventBroker,
         DownloadSupervisor,
     )
+    from piperch.services.favorite_sync import FavoriteSyncService
     from piperch.services.library import LibraryService
     from piperch.services.storage import StorageMigrationService
     from piperch.services.thumbnails import ArtworkThumbnailCache
@@ -25,6 +26,7 @@ class AppContainer:
     settings: SettingsManager
     artworks: ArtworkRepository
     favorites: FavoriteRepository
+    favorite_sync: FavoriteSyncService
     groups: ArtworkGroupRepository
     downloads: DownloadRepository
     pixiv: PixivClient

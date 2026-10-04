@@ -390,6 +390,22 @@ class FavoriteStateResponse(ApiModel):
     is_favorite: bool
 
 
+class FavoriteSyncPlanResponse(ApiModel):
+    plan_id: str
+    pixiv_favorite_count: int
+    local_artwork_count: int
+    local_favorite_count: int
+    matched_favorite_count: int
+    unavailable_locally_count: int
+    add_count: int
+    remove_count: int
+
+
+class FavoriteSyncResultResponse(ApiModel):
+    added: int
+    removed: int
+
+
 class ArtworkGroupsResponse(ApiModel):
     artwork_id: int
     group_ids: list[int]

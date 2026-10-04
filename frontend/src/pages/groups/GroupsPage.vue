@@ -1,13 +1,16 @@
 <script setup lang="ts">
-import { Images, Pencil, Plus, Save, Trash2 } from '@lucide/vue'
+import { Images, Pencil, Plus, RefreshCw, Save, Trash2 } from '@lucide/vue'
 import { useQuery, useQueryClient } from '@tanstack/vue-query'
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 
 import {
+  applyFavoriteSyncPlan,
   type ArtworkGroup,
+  createFavoriteSyncPlan,
   createGroup as createArtworkGroup,
   deleteGroup,
+  type FavoriteSyncPlan,
   listGroups,
   renameGroup,
 } from '@/features/gallery/gallery-api'
@@ -15,6 +18,7 @@ import { errorMessage } from '@/shared/errors'
 import Button from '@ui/Button.vue'
 import Card from '@ui/Card.vue'
 import ConfirmDialog from '@ui/ConfirmDialog.vue'
+import Dialog from '@ui/Dialog.vue'
 import Input from '@ui/Input.vue'
 import { toast } from '@ui/toast'
 
@@ -26,6 +30,10 @@ const editingId = ref<number | null>(null)
 const editingName = ref('')
 const deleting = ref<ArtworkGroup | null>(null)
 const busy = ref(false)
+const favoriteSyncPlan = ref<FavoriteSyncPlan | null>(null)
+const favoriteSyncDialogOpen = ref(false)
+const checkingFavoriteSync = ref(false)
+const applyingFavoriteSync = ref(false)
 
 async function invalidateGroupData() {
   await Promise.all([
@@ -80,10 +88,87 @@ function viewGroup(groupId: number) {
     query: { groupId: String(groupId) },
   })
 }
+
+async function checkFavoriteSync() {
+  if (checkingFavoriteSync.value) return
+  checkingFavoriteSync.value = true
+  try {
+    favoriteSyncPlan.value = await createFavoriteSyncPlan()
+    toast.success('Pixiv 收藏检查完成', {
+      description: '可通过旁边的“查看同步摘要”确认差异。',
+    })
+  } catch (error) {
+    toast.error('检查 Pixiv 收藏失败', { description: errorMessage(error) })
+  } finally {
+    checkingFavoriteSync.value = false
+  }
+}
+
+function closeFavoriteSyncDialog() {
+  if (applyingFavoriteSync.value) return
+  favoriteSyncDialogOpen.value = false
+}
+
+function showFavoriteSyncDialog() {
+  if (favoriteSyncPlan.value !== null) favoriteSyncDialogOpen.value = true
+}
+
+async function applyFavoriteSync() {
+  if (applyingFavoriteSync.value) return
+  const plan = favoriteSyncPlan.value
+  if (plan === null) return
+  applyingFavoriteSync.value = true
+  try {
+    const result = await applyFavoriteSyncPlan(plan.planId)
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['artworks'] }),
+      queryClient.invalidateQueries({ queryKey: ['artwork'] }),
+    ])
+    favoriteSyncDialogOpen.value = false
+    favoriteSyncPlan.value = null
+    toast.success(
+      `本地收藏已同步：添加 ${String(result.added)} 件，移除 ${String(result.removed)} 件`,
+    )
+  } catch (error) {
+    toast.error('同步本地收藏失败', { description: errorMessage(error) })
+  } finally {
+    applyingFavoriteSync.value = false
+  }
+}
 </script>
 
 <template>
   <div class="mx-auto max-w-4xl space-y-6">
+    <Card class="p-5 md:p-6">
+      <div class="flex flex-wrap items-start justify-between gap-4">
+        <div class="max-w-2xl">
+          <h2 class="font-semibold">Pixiv 收藏同步</h2>
+          <p class="mt-1 text-sm leading-6 text-muted-foreground">
+            读取当前账号的公开与非公开收藏，与本地图库比较。确认差异后只更新本地收藏标记，不修改
+            Pixiv 收藏或本地分组。
+          </p>
+        </div>
+        <div class="flex flex-wrap gap-2">
+          <Button
+            v-if="favoriteSyncPlan"
+            variant="secondary"
+            :disabled="applyingFavoriteSync"
+            @click="showFavoriteSyncDialog"
+          >
+            查看同步摘要
+          </Button>
+          <Button
+            variant="secondary"
+            :disabled="checkingFavoriteSync || applyingFavoriteSync"
+            @click="checkFavoriteSync"
+          >
+            <RefreshCw :size="17" :class="checkingFavoriteSync ? 'animate-spin' : ''" />
+            {{ checkingFavoriteSync ? '正在检查…' : '检查同步差异' }}
+          </Button>
+        </div>
+      </div>
+    </Card>
+
     <Card class="p-5 md:p-6">
       <h2 class="font-semibold">新增本地分组</h2>
       <p class="mt-1 text-sm text-muted-foreground">分组独立于收藏状态，仅用于整理本地作品。</p>
@@ -166,4 +251,71 @@ function viewGroup(groupId: number) {
     @close="deleting = null"
     @confirm="confirmDelete"
   />
+
+  <Dialog
+    :open="favoriteSyncDialogOpen"
+    title="确认同步 Pixiv 收藏"
+    description="以下差异来自刚刚读取的 Pixiv 收藏快照。批准后将一次性更新本地数据库。"
+    @update:open="!$event && closeFavoriteSyncDialog()"
+  >
+    <template v-if="favoriteSyncPlan">
+      <dl class="mt-5 grid grid-cols-2 gap-3 text-sm sm:grid-cols-3">
+        <div class="rounded-xl bg-muted p-3">
+          <dt class="text-muted-foreground">Pixiv 收藏</dt>
+          <dd class="mt-1 text-xl font-semibold">{{ favoriteSyncPlan.pixivFavoriteCount }}</dd>
+        </div>
+        <div class="rounded-xl bg-muted p-3">
+          <dt class="text-muted-foreground">本地已收藏</dt>
+          <dd class="mt-1 text-xl font-semibold">{{ favoriteSyncPlan.localFavoriteCount }}</dd>
+        </div>
+        <div class="rounded-xl bg-muted p-3">
+          <dt class="text-muted-foreground">本地可匹配</dt>
+          <dd class="mt-1 text-xl font-semibold">{{ favoriteSyncPlan.matchedFavoriteCount }}</dd>
+        </div>
+        <div class="rounded-xl bg-muted p-3">
+          <dt class="text-muted-foreground">将添加收藏</dt>
+          <dd class="mt-1 text-xl font-semibold text-primary">{{ favoriteSyncPlan.addCount }}</dd>
+        </div>
+        <div class="rounded-xl bg-muted p-3">
+          <dt class="text-muted-foreground">将移除收藏</dt>
+          <dd class="mt-1 text-xl font-semibold text-destructive">
+            {{ favoriteSyncPlan.removeCount }}
+          </dd>
+        </div>
+        <div class="rounded-xl bg-muted p-3">
+          <dt class="text-muted-foreground">未下载，忽略</dt>
+          <dd class="mt-1 text-xl font-semibold">
+            {{ favoriteSyncPlan.unavailableLocallyCount }}
+          </dd>
+        </div>
+      </dl>
+      <p class="mt-4 text-sm text-muted-foreground">
+        本地图库共 {{ favoriteSyncPlan.localArtworkCount }} 件作品。同步摘要有效期为 10
+        分钟；过期后需重新检查。
+      </p>
+      <div class="mt-6 flex justify-end gap-2">
+        <Button
+          variant="secondary"
+          :disabled="applyingFavoriteSync"
+          @click="closeFavoriteSyncDialog"
+        >
+          {{ favoriteSyncPlan.addCount || favoriteSyncPlan.removeCount ? '取消' : '关闭' }}
+        </Button>
+        <Button
+          :disabled="
+            applyingFavoriteSync || (!favoriteSyncPlan.addCount && !favoriteSyncPlan.removeCount)
+          "
+          @click="applyFavoriteSync"
+        >
+          {{
+            applyingFavoriteSync
+              ? '同步中…'
+              : favoriteSyncPlan.addCount || favoriteSyncPlan.removeCount
+                ? '批准并同步'
+                : '无需同步'
+          }}
+        </Button>
+      </div>
+    </template>
+  </Dialog>
 </template>

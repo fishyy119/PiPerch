@@ -775,3 +775,84 @@ def test_local_groups_are_independent_from_automatic_pixiv_favorite_sync(
     }
     assert reads == ["/ajax/illust/701", "/ajax/illust/701"]
     assert writes == ["/ajax/illusts/bookmarks/add", "/ajax/illusts/bookmarks/delete"]
+
+
+def test_manual_favorite_sync_previews_before_updating_local_state(
+    app_client: tuple[ApiTestClient, AppContainer],
+    monkeypatch: MonkeyPatch,
+) -> None:
+    client, container = app_client
+    artwork = RemoteArtwork(
+        artwork_id=901,
+        artwork_type=ArtworkType.ILLUST,
+        title="本地收藏同步作品",
+        description="",
+        author_id=902,
+        author_name="同步作者",
+        author_account=None,
+        author_avatar_url=None,
+        series_id=None,
+        series_title=None,
+        page_count=1,
+        width=1000,
+        height=1200,
+        x_restrict=0,
+        is_ai=False,
+        published_at=None,
+        original_urls=("https://i.pximg.net/901.jpg",),
+        thumbnail_url=None,
+    )
+    for artwork_id in (901, 902, 903):
+        current = replace(
+            artwork,
+            artwork_id=artwork_id,
+            title=f"同步作品 {artwork_id}",
+            original_urls=(f"https://i.pximg.net/{artwork_id}.jpg",),
+        )
+        container.artworks.save_download(
+            current,
+            [MediaRecord("page", f"902/{artwork_id}/{artwork_id}_p0.jpg", "image/jpeg", 10, 0)],
+        )
+    container.favorites.replace_state(901, is_favorite=True)
+    container.favorites.replace_state(902, is_favorite=True)
+
+    async def list_bookmark_artwork_ids(
+        folders: Sequence[BookmarkFolderReference],
+        cookie: str | None,
+    ) -> list[int]:
+        assert folders == [
+            BookmarkFolderReference(BookmarkVisibility.PUBLIC, None),
+            BookmarkFolderReference(BookmarkVisibility.PRIVATE, None),
+        ]
+        assert cookie is None
+        return [902, 903, 999]
+
+    monkeypatch.setattr(container.pixiv, "list_bookmark_artwork_ids", list_bookmark_artwork_ids)
+
+    preview = client.post("/api/favorite-sync-plans")
+
+    assert preview.status_code == 200
+    preview_payload = preview.json()
+    plan_id = preview_payload.pop("planId")
+    assert isinstance(plan_id, str)
+    assert preview_payload == {
+        "pixivFavoriteCount": 3,
+        "localArtworkCount": 3,
+        "localFavoriteCount": 2,
+        "matchedFavoriteCount": 2,
+        "unavailableLocallyCount": 1,
+        "addCount": 1,
+        "removeCount": 1,
+    }
+    assert container.favorites.get_state(901).is_favorite is True
+    assert container.favorites.get_state(902).is_favorite is True
+    assert container.favorites.get_state(903).is_favorite is False
+
+    applied = client.post(f"/api/favorite-sync-plans/{plan_id}/apply")
+
+    assert applied.status_code == 200
+    assert applied.json() == {"added": 1, "removed": 1}
+    assert container.favorites.get_state(901).is_favorite is False
+    assert container.favorites.get_state(902).is_favorite is True
+    assert container.favorites.get_state(903).is_favorite is True
+    assert client.post(f"/api/favorite-sync-plans/{plan_id}/apply").status_code == 409

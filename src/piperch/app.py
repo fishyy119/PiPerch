@@ -34,6 +34,7 @@ from piperch.services.downloads import (
     DownloadEventBroker,
     DownloadSupervisor,
 )
+from piperch.services.favorite_sync import FavoriteSyncService
 from piperch.services.library import LibraryService
 from piperch.services.library_files import LibraryFileOperations
 from piperch.services.storage import StorageMigrationService
@@ -97,6 +98,7 @@ def create_app(paths: AppPaths | None = None, control: AppControl | None = None)
         )
         artwork_repository = ArtworkRepository(database)
         favorite_repository = FavoriteRepository(database)
+        favorite_sync_service = FavoriteSyncService(favorite_repository)
         group_repository = ArtworkGroupRepository(database)
         download_repository = DownloadRepository(database)
         events = DownloadEventBroker()
@@ -137,6 +139,7 @@ def create_app(paths: AppPaths | None = None, control: AppControl | None = None)
             settings=settings_manager,
             artworks=artwork_repository,
             favorites=favorite_repository,
+            favorite_sync=favorite_sync_service,
             groups=group_repository,
             downloads=download_repository,
             pixiv=pixiv,
