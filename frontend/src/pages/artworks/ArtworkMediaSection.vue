@@ -17,7 +17,8 @@ import { toast } from 'vue-sonner'
 import { artworkTypeLabel } from '@/features/artworks/artwork'
 import { type ArtworkDetail, deleteArtwork } from '@/features/artworks/artworks-api'
 import { replaceFavoriteState } from '@/features/favorites/favorites-api'
-import { createGroup, listGroups, replaceArtworkGroups } from '@/features/groups/groups-api'
+import { createGroupAndAddArtwork } from '@/features/groups/group-actions'
+import { listGroups, replaceArtworkGroups } from '@/features/groups/groups-api'
 import {
   groupQueryKeys,
   invalidateArtworkData,
@@ -95,13 +96,8 @@ const groupMutation = useMutation({
 })
 
 const createAndAddGroupMutation = useMutation({
-  mutationFn: async (request: { artworkId: number; name: string; groupIds: number[] }) => {
-    const group = await createGroup(request.name)
-    const groupIds = [...new Set([...request.groupIds, group.groupId])]
-    const membership = await replaceArtworkGroups(request.artworkId, groupIds)
-    return { membership, group }
-  },
-  onSuccess: async ({ membership }) => {
+  mutationFn: createGroupAndAddArtwork,
+  onSuccess: async (membership) => {
     createGroupOpen.value = false
     updateArtworkDetail(queryClient, membership.artworkId, (artwork) => ({
       ...artwork,

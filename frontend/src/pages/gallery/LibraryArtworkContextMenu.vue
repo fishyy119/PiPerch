@@ -4,12 +4,8 @@ import { computed, ref, watch } from 'vue'
 
 import type { ArtworkSummary } from '@/features/artworks/artworks-api'
 import { replaceFavoriteState } from '@/features/favorites/favorites-api'
-import {
-  type ArtworkGroup,
-  createGroup,
-  listGroups,
-  replaceArtworkGroups,
-} from '@/features/groups/groups-api'
+import { createGroupAndAddArtwork } from '@/features/groups/group-actions'
+import { type ArtworkGroup, listGroups, replaceArtworkGroups } from '@/features/groups/groups-api'
 import {
   groupQueryKeys,
   invalidateArtworkData,
@@ -122,9 +118,11 @@ async function createAndAddGroup(name: string) {
   if (actionPending.value) return
   actionPending.value = true
   try {
-    const group = await createGroup(name)
-    const groupIds = [...props.artwork.groupIds, group.groupId]
-    await replaceArtworkGroups(props.artwork.artworkId, groupIds)
+    await createGroupAndAddArtwork({
+      artworkId: props.artwork.artworkId,
+      name,
+      groupIds: props.artwork.groupIds,
+    })
     createGroupOpen.value = false
     await invalidateArtworkGroupData(queryClient)
     toast.success('已创建本地分组并添加作品')
