@@ -43,7 +43,6 @@ def artwork_detail_response(detail: ArtworkDetail) -> ArtworkDetailResponse:
             TagResponse(
                 tag_id=tag_id,
                 name=tag.name,
-                translated_name=tag.translated_name,
             )
             for tag_id, tag in detail.summary.tags
         ],

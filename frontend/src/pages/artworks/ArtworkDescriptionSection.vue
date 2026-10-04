@@ -60,13 +60,7 @@ function filterByTag(tagId: number) {
           ]"
           @click="filterByTag(tag.tagId)"
         >
-          <span>{{ tag.translatedName || tag.name }}</span>
-          <span
-            v-if="tag.translatedName && tag.translatedName !== tag.name"
-            class="text-muted-foreground"
-          >
-            {{ tag.name }}
-          </span>
+          <span>{{ tag.name }}</span>
         </button>
       </div>
     </div>

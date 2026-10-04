@@ -717,10 +717,7 @@ class PixivClient:
 
         tag_root = _mapping(body.get("tags"))
         parsed_tags = tuple(
-            TagRecord(
-                name=_text(tag.get("tag")),
-                translated_name=_text(tag.get("translation")) or None,
-            )
+            TagRecord(name=_text(tag.get("tag")))
             for raw in _sequence(tag_root.get("tags"))
             if (tag := _mapping(raw)) and _text(tag.get("tag"))
         )

@@ -35,3 +35,11 @@ pnpm dev
 pnpm --dir frontend build
 piperch serve
 ```
+
+## 致谢
+
+感谢以下项目所提供的界面设计灵感、接口实现参考与标签翻译数据：
+
+- [Pixiv_Tag-Chinese-English-Translation-Table](https://github.com/ffdkj/Pixiv_Tag-Chinese-English-Translation-Table)
+- [PixivDownloader](https://github.com/Sywyar/PixivDownloader)
+- [PixivBiu](https://github.com/txperl/PixivBiu)

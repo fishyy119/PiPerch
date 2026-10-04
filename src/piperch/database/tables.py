@@ -65,7 +65,23 @@ tags = Table(
     metadata,
     Column("id", Integer, primary_key=True, autoincrement=True),
     Column("name", Text, nullable=False, unique=True),
-    Column("translated_name", Text, nullable=True),
+)
+
+tag_search_cache = Table(
+    "tag_search_cache",
+    metadata,
+    Column("tag_id", Integer, ForeignKey("tags.id", ondelete="CASCADE"), primary_key=True),
+    Column("name_nfkc", Text, nullable=False),
+    Column("cn_name_nfkc", Text, nullable=True),
+)
+
+tag_search_cache_state = Table(
+    "tag_search_cache_state",
+    metadata,
+    Column("id", Integer, primary_key=True, autoincrement=False),
+    Column("catalog_version", Text, nullable=False),
+    Column("normalization_version", Integer, nullable=False),
+    CheckConstraint("id = 1", name="ck_tag_search_cache_state_singleton"),
 )
 
 artwork_tags = Table(

@@ -38,6 +38,7 @@ from piperch.services.favorite_sync import FavoriteSyncService
 from piperch.services.library import LibraryService
 from piperch.services.library_files import LibraryFileOperations
 from piperch.services.storage import StorageMigrationService
+from piperch.services.tag_search import TagSearchIndex
 from piperch.services.thumbnails import ArtworkThumbnailCache
 from piperch.settings import SettingsManager
 
@@ -89,6 +90,8 @@ def create_app(paths: AppPaths | None = None, control: AppControl | None = None)
         _cleanup_staging(resolved_paths)
         run_migrations(resolved_paths)
         database = Database(resolved_paths.database)
+        tag_search_index = TagSearchIndex(database)
+        tag_search_index.synchronize()
         settings_manager = SettingsManager(resolved_paths.settings, resolved_paths.default_library)
         settings_manager.initialize()
         current_settings = settings_manager.get()
@@ -96,7 +99,7 @@ def create_app(paths: AppPaths | None = None, control: AppControl | None = None)
             proxy_url=current_settings.proxy_url,
             request_interval_ms=current_settings.request_interval_ms,
         )
-        artwork_repository = ArtworkRepository(database)
+        artwork_repository = ArtworkRepository(database, tag_search_index)
         favorite_repository = FavoriteRepository(database)
         favorite_sync_service = FavoriteSyncService(favorite_repository)
         group_repository = ArtworkGroupRepository(database)

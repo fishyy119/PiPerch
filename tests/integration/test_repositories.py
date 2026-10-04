@@ -4,10 +4,12 @@ from dataclasses import replace
 from typing import TYPE_CHECKING
 
 from piperch.database import Database, run_migrations
+from piperch.database.tables import tag_search_cache
 from piperch.domain import ArtworkType, ItemState, MediaRecord, RemoteArtwork, TagRecord
 from piperch.paths import AppPaths
 from piperch.repositories import ArtworkRepository, DownloadRepository
 from piperch.services.library import LibraryService
+from piperch.services.tag_search import TagSearchIndex
 from piperch.settings import SettingsManager
 
 if TYPE_CHECKING:
@@ -82,6 +84,31 @@ def test_gallery_tag_filter_uses_and_semantics(tmp_path: Path) -> None:
 
     assert total == 1
     assert [item.artwork_id for item in items] == [1]
+
+
+def test_tag_search_cache_supports_incremental_and_startup_sync(tmp_path: Path) -> None:
+    _, database, _, artworks, _ = _repositories(tmp_path)
+    try:
+        artworks.save_download(
+            _artwork(1, (TagRecord("女戦闘員"),)),
+            [MediaRecord("page", "100/1/1_p0.jpg", "image/jpeg", 10, 0)],
+        )
+
+        by_original_name = artworks.list_tags("女戦闘員", 50)
+        after_incremental_sync = artworks.list_tags("女战斗员", 50)
+
+        with database.begin() as connection:
+            connection.execute(tag_search_cache.delete())
+        TagSearchIndex(database).synchronize()
+        after_startup_sync = artworks.list_tags("女战斗员", 50)
+    finally:
+        database.close()
+
+    assert len(by_original_name) == 1
+    assert len(after_incremental_sync) == 1
+    assert len(after_startup_sync) == 1
+    assert by_original_name[0][0] == after_incremental_sync[0][0] == after_startup_sync[0][0]
+    assert after_startup_sync[0][1].name == "女戦闘員"
 
 
 def test_related_artworks_combine_author_and_shared_tags(tmp_path: Path) -> None:

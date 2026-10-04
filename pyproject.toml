@@ -35,7 +35,7 @@ dev = [{ include-group = "test" }, { include-group = "lint" }]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/piperch"]
-artifacts = ["/src/piperch/frontend/**"]
+artifacts = ["/src/piperch/frontend/**", "/src/piperch/resources/**"]
 
 [tool.ruff]
 target-version = "py312"

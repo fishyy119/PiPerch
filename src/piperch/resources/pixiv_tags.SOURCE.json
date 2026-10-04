@@ -1,0 +1,8 @@
+{
+  "project": "Pixiv_Tag-Chinese-English-Translation-Table",
+  "repository": "https://github.com/ffdkj/Pixiv_Tag-Chinese-English-Translation-Table",
+  "release": "v2026-10-01",
+  "asset": "pixiv_tags.sqlite",
+  "sha256": "e6e35bc4523c72238504613bc41729b9eb62cd21d7ec410c0f01f6d59e9518d8",
+  "license": "MIT"
+}

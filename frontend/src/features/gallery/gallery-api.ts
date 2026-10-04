@@ -6,7 +6,6 @@ import { api } from '@/shared/api/http'
 export const tagSchema = z.object({
   tagId: z.number().int(),
   name: z.string(),
-  translatedName: z.string().nullable(),
   artworkCount: z.number().int().nullable().optional(),
 })
 export type Tag = z.infer<typeof tagSchema>

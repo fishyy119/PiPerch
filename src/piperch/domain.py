@@ -57,7 +57,6 @@ class AppSettings:
 @dataclass(frozen=True, slots=True)
 class TagRecord:
     name: str
-    translated_name: str | None = None
 
 
 @dataclass(frozen=True, slots=True)

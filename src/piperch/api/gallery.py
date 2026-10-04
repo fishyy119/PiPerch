@@ -188,7 +188,6 @@ def list_tags(
         TagResponse(
             tag_id=tag_id,
             name=tag.name,
-            translated_name=tag.translated_name,
             artwork_count=count,
         )
         for tag_id, tag, count in container.artworks.list_tags(search, limit, include_id)

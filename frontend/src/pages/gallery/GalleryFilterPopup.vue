@@ -221,7 +221,7 @@ function updateSort(sort: string, order: string) {
               :active="filters.selectedTagIds.includes(tag.tagId)"
               @click="toggleTag(tag.tagId)"
             >
-              {{ tag.translatedName || tag.name }}
+              {{ tag.name }}
               <span class="text-xs text-muted-foreground">{{ tag.artworkCount ?? 0 }}</span>
             </FilterOptionButton>
             <span v-if="visibleTags.length === 0" class="text-sm text-muted-foreground">

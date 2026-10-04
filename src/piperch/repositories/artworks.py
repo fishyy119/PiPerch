@@ -13,6 +13,7 @@ from piperch.database.tables import (
     favorite_artworks,
     media_files,
     series,
+    tag_search_cache,
     tags,
     ugoira_frames,
 )
@@ -40,6 +41,7 @@ from piperch.repositories._rows import (
     string as _string,
 )
 from piperch.repositories.groups import ArtworkGroupRepository
+from piperch.services.tag_search import TagSearchIndex
 from piperch.utils.datetime import utc_now_text
 
 if TYPE_CHECKING:
@@ -61,8 +63,9 @@ class ArtworkRepository:
         "id": artworks.c.id,
     }
 
-    def __init__(self, database: Database) -> None:
+    def __init__(self, database: Database, tag_search_index: TagSearchIndex | None = None) -> None:
         self._database = database
+        self._tag_search_index = tag_search_index or TagSearchIndex(database)
 
     def find_existing_ids(self, artwork_ids: Sequence[int]) -> set[int]:
         """返回已经保存到本地图库的作品 ID。"""
@@ -130,6 +133,7 @@ class ArtworkRepository:
         bookmark_tags: Sequence[str] | None = None,
     ) -> None:
         now = utc_now_text()
+        prepared_tag_search = self._tag_search_index.prepare([tag.name for tag in artwork.tags])
         with self._database.begin() as connection:
             self._upsert_author(connection, artwork, now)
             self._upsert_series(connection, artwork, now)
@@ -158,18 +162,17 @@ class ArtworkRepository:
                 connection.execute(update(artworks).where(artworks.c.id == artwork.artwork_id).values(**values))
 
             connection.execute(delete(artwork_tags).where(artwork_tags.c.artwork_id == artwork.artwork_id))
+            indexed_tags: list[tuple[int, str]] = []
             for tag in artwork.tags:
                 tag_id = connection.scalar(select(tags.c.id).where(tags.c.name == tag.name))
                 if tag_id is None:
-                    connection.execute(insert(tags).values(name=tag.name, translated_name=tag.translated_name))
+                    connection.execute(insert(tags).values(name=tag.name))
                     tag_id = connection.scalar(select(tags.c.id).where(tags.c.name == tag.name))
                     if tag_id is None:
                         raise RuntimeError("写入标签后未能读取主键。")
-                elif tag.translated_name:
-                    connection.execute(
-                        update(tags).where(tags.c.id == tag_id).values(translated_name=tag.translated_name)
-                    )
+                indexed_tags.append((tag_id, tag.name))
                 connection.execute(insert(artwork_tags).values(artwork_id=artwork.artwork_id, tag_id=tag_id))
+            self._tag_search_index.store(connection, indexed_tags, prepared_tag_search)
 
             connection.execute(delete(media_files).where(media_files.c.artwork_id == artwork.artwork_id))
             if media:
@@ -504,10 +507,14 @@ class ArtworkRepository:
             select(
                 tags.c.id,
                 tags.c.name,
-                tags.c.translated_name,
                 func.count(artwork_tags.c.artwork_id).label("artwork_count"),
             )
-            .select_from(tags.join(artwork_tags, tags.c.id == artwork_tags.c.tag_id))
+            .select_from(
+                tags.join(artwork_tags, tags.c.id == artwork_tags.c.tag_id).join(
+                    tag_search_cache,
+                    tags.c.id == tag_search_cache.c.tag_id,
+                )
+            )
             .group_by(tags.c.id)
         )
         if included_ids:
@@ -522,10 +529,11 @@ class ArtworkRepository:
                 tags.c.name.asc(),
             )
         statement = statement.limit(limit + len(included_ids))
-        if search:
+        normalized_search = self._tag_search_index.normalize(search)
+        if normalized_search:
             search_condition = or_(
-                tags.c.name.contains(search, autoescape=True),
-                tags.c.translated_name.contains(search, autoescape=True),
+                tag_search_cache.c.name_nfkc.contains(normalized_search, autoescape=True),
+                tag_search_cache.c.cn_name_nfkc.contains(normalized_search, autoescape=True),
             )
             statement = statement.where(
                 or_(search_condition, tags.c.id.in_(included_ids)) if included_ids else search_condition
@@ -535,7 +543,7 @@ class ArtworkRepository:
             return [
                 (
                     _integer(row["id"]),
-                    TagRecord(_string(row["name"]), _optional_string(row["translated_name"])),
+                    TagRecord(_string(row["name"])),
                     _integer(row["artwork_count"]),
                 )
                 for row in rows
@@ -663,7 +671,6 @@ class ArtworkRepository:
             select(
                 tags.c.id,
                 tags.c.name,
-                tags.c.translated_name,
             )
             .select_from(artwork_tags.join(tags, artwork_tags.c.tag_id == tags.c.id))
             .where(artwork_tags.c.artwork_id == summary.artwork_id)
@@ -674,7 +681,7 @@ class ArtworkRepository:
             tags=tuple(
                 (
                     _integer(row["id"]),
-                    TagRecord(_string(row["name"]), _optional_string(row["translated_name"])),
+                    TagRecord(_string(row["name"])),
                 )
                 for row in rows
             ),

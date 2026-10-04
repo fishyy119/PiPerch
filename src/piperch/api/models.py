@@ -275,7 +275,6 @@ class DownloadJobPage(ApiModel):
 class TagResponse(ApiModel):
     tag_id: int
     name: str
-    translated_name: str | None
     artwork_count: int | None = None
 
 
