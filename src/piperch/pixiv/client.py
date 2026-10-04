@@ -12,7 +12,6 @@ from piperch.domain import (
     BookmarkFolderReference,
     BookmarkVisibility,
     DiscoveryCandidate,
-    FavoriteSyncResult,
     FollowedUser,
     PublicBookmark,
     RecommendedUser,
@@ -22,7 +21,7 @@ from piperch.domain import (
     UgoiraFrame,
     UserProfile,
 )
-from piperch.errors import ConflictError, UpstreamError
+from piperch.errors import UpstreamError
 from piperch.pixiv.parsing import (
     artwork_type as _artwork_type,
 )
@@ -604,32 +603,28 @@ class PixivClient:
                 "未能在 Pixiv 公开收藏中找到该作品的收藏标签。",
             )
 
-    async def sync_public_bookmark(
+    async def sync_bookmark_state(
         self,
         artwork_id: int,
-        desired_tags: Sequence[str] | None,
+        is_favorite: bool,
         cookie: str | None,
-    ) -> FavoriteSyncResult:
-        """将一件作品的本地收藏状态收敛到 Pixiv 公开收藏。"""
+    ) -> None:
+        """将一件作品的本地收藏状态收敛到 Pixiv，不同步收藏标签。"""
         self._require_current_user_id(cookie)
-        await self._invalidate_public_bookmark_cache()
         body = _mapping(await self._transport.get_body(f"/ajax/illust/{artwork_id}", cookie=cookie))
         reference = self._bookmark_reference(body.get("bookmarkData"))
-        if reference is not None and reference.private:
-            raise ConflictError("private_bookmark_conflict", "Pixiv 上存在私密收藏，无法用本地公开收藏覆盖。")
 
-        if desired_tags is None:
+        if not is_favorite:
             if reference is None:
-                return FavoriteSyncResult(is_favorite=False, tags=())
+                return
             await self._transport.post_form(
                 "/ajax/illusts/bookmarks/delete",
                 cookie=cookie,
                 data={"bookmark_id": reference.bookmark_id},
             )
             await self._invalidate_public_bookmark_cache()
-            return FavoriteSyncResult(is_favorite=False, tags=())
+            return
 
-        normalized_tags = tuple(dict.fromkeys(desired_tags))
         if reference is None:
             await self._transport.post_json(
                 "/ajax/illusts/bookmarks/add",
@@ -638,38 +633,10 @@ class PixivClient:
                     "illust_id": str(artwork_id),
                     "restrict": 0,
                     "comment": "",
-                    "tags": list(normalized_tags),
+                    "tags": [],
                 },
             )
             await self._invalidate_public_bookmark_cache()
-            return FavoriteSyncResult(is_favorite=True, tags=normalized_tags)
-
-        bookmark = await self.get_public_bookmark(artwork_id, reference.bookmark_id, cookie)
-        current_tags = set(bookmark.tags)
-        desired_tag_set = set(normalized_tags)
-        removed = [tag for tag in bookmark.tags if tag not in desired_tag_set]
-        added = [tag for tag in normalized_tags if tag not in current_tags]
-        if removed:
-            await self._transport.post_json(
-                "/ajax/illusts/bookmarks/remove_tags",
-                cookie=cookie,
-                json_body={
-                    "removeTags": removed,
-                    "bookmarkIds": [str(reference.bookmark_id)],
-                },
-            )
-            await self._invalidate_public_bookmark_cache()
-        if added:
-            await self._transport.post_json(
-                "/ajax/illusts/bookmarks/add_tags",
-                cookie=cookie,
-                json_body={
-                    "tags": added,
-                    "bookmarkIds": [str(reference.bookmark_id)],
-                },
-            )
-            await self._invalidate_public_bookmark_cache()
-        return FavoriteSyncResult(is_favorite=True, tags=normalized_tags)
 
     @staticmethod
     def _bookmark_reference(value: object) -> RemoteBookmarkReference | None:

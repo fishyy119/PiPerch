@@ -29,7 +29,7 @@ def artwork_summary_response(summary: ArtworkSummary) -> ArtworkSummaryResponse:
         published_at=summary.published_at,
         downloaded_at=summary.downloaded_at,
         is_favorite=summary.is_favorite,
-        favorite_group_ids=list(summary.favorite_group_ids),
+        group_ids=list(summary.group_ids),
     )
 
 

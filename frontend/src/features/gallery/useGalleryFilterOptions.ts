@@ -1,12 +1,7 @@
 import { useQuery } from '@tanstack/vue-query'
 import { computed, ref } from 'vue'
 
-import {
-  listAuthors,
-  listFavoriteGroups,
-  listSeries,
-  listTags,
-} from '@/features/gallery/gallery-api'
+import { listAuthors, listGroups, listSeries, listTags } from '@/features/gallery/gallery-api'
 
 interface GalleryFilterOptionSources {
   open: () => boolean
@@ -40,9 +35,9 @@ export function useGalleryFilterOptions(sources: GalleryFilterOptionSources) {
     enabled: computed(sources.open),
     placeholderData: (previousData) => previousData,
   })
-  const favoriteGroupsQuery = useQuery({
-    queryKey: ['favorite-groups'],
-    queryFn: listFavoriteGroups,
+  const groupsQuery = useQuery({
+    queryKey: ['groups'],
+    queryFn: listGroups,
     enabled: computed(sources.open),
   })
 
@@ -53,7 +48,7 @@ export function useGalleryFilterOptions(sources: GalleryFilterOptionSources) {
     tags: computed(() => tagsQuery.data.value ?? []),
     authors: computed(() => authorsQuery.data.value ?? []),
     series: computed(() => seriesQuery.data.value?.items ?? []),
-    favoriteGroups: computed(() => favoriteGroupsQuery.data.value ?? []),
-    favoriteGroupsReady: favoriteGroupsQuery.isSuccess,
+    groups: computed(() => groupsQuery.data.value ?? []),
+    groupsReady: groupsQuery.isSuccess,
   }
 }

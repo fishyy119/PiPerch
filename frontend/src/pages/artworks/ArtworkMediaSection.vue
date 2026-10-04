@@ -17,13 +17,13 @@ import { toast } from 'vue-sonner'
 import { artworkTypeLabel } from '@/features/artworks/artwork'
 import {
   type ArtworkDetail,
-  bulkUpdateFavoriteGroups,
-  createFavoriteGroup,
+  createGroup,
   deleteArtwork,
-  listFavoriteGroups,
+  listGroups,
+  replaceArtworkGroups,
   replaceFavoriteState,
 } from '@/features/gallery/gallery-api'
-import CreateFavoriteGroupDialog from '@/shared/components/favorites/CreateFavoriteGroupDialog.vue'
+import CreateGroupDialog from '@/shared/components/groups/CreateGroupDialog.vue'
 import { errorMessage } from '@/shared/errors'
 import { usePageKeyboardShortcuts } from '@/shared/lib/usePageKeyboardShortcuts'
 import Button from '@ui/Button.vue'
@@ -45,12 +45,12 @@ const pageSelectorExpanded = ref(false)
 const pageSelectorGrid = ref<HTMLElement | null>(null)
 const pageSelectorColumns = ref(Number.POSITIVE_INFINITY)
 const deleteOpen = ref(false)
-const favoriteGroupsOpen = ref(false)
-const createFavoriteGroupOpen = ref(false)
+const groupsOpen = ref(false)
+const createGroupOpen = ref(false)
 
-const favoriteGroupsQuery = useQuery({
-  queryKey: ['favorite-groups'],
-  queryFn: listFavoriteGroups,
+const groupsQuery = useQuery({
+  queryKey: ['groups'],
+  queryFn: listGroups,
 })
 
 const deleteMutation = useMutation({
@@ -67,71 +67,63 @@ function updateCachedArtwork(artworkId: number, update: (artwork: ArtworkDetail)
   )
 }
 
-async function invalidateFavoriteData() {
+async function invalidateArtworkData() {
   await Promise.all([
     queryClient.invalidateQueries({ queryKey: ['artworks'] }),
-    queryClient.invalidateQueries({ queryKey: ['favorite-groups'] }),
+    queryClient.invalidateQueries({ queryKey: ['groups'] }),
   ])
 }
 
 const favoriteMutation = useMutation({
-  mutationFn: (request: { artworkId: number; isFavorite: boolean; groupIds: number[] }) =>
-    replaceFavoriteState(request.artworkId, request.isFavorite, request.groupIds),
+  mutationFn: (request: { artworkId: number; isFavorite: boolean }) =>
+    replaceFavoriteState(request.artworkId, request.isFavorite),
   onSuccess: async (favoriteState) => {
     updateCachedArtwork(favoriteState.artworkId, (artwork) => ({
       ...artwork,
       isFavorite: favoriteState.isFavorite,
-      favoriteGroupIds: favoriteState.groupIds,
     }))
-    await invalidateFavoriteData()
+    await invalidateArtworkData()
     toast.success(favoriteState.isFavorite ? '已收藏' : '已取消收藏')
   },
   onError: (error) => {
-    toast.error('更新本地收藏失败', { description: errorMessage(error) })
+    toast.error('更新收藏失败', { description: errorMessage(error) })
   },
 })
 
-const favoriteGroupMutation = useMutation({
-  mutationFn: (request: { artworkId: number; groupId: number; selected: boolean }) =>
-    bulkUpdateFavoriteGroups(
-      [request.artworkId],
-      request.selected ? [request.groupId] : [],
-      request.selected ? [] : [request.groupId],
-    ),
-  onSuccess: async (_result, request) => {
-    updateCachedArtwork(request.artworkId, (artwork) => ({
+const groupMutation = useMutation({
+  mutationFn: (request: { artworkId: number; groupIds: number[]; selected: boolean }) =>
+    replaceArtworkGroups(request.artworkId, request.groupIds),
+  onSuccess: async (membership, request) => {
+    updateCachedArtwork(membership.artworkId, (artwork) => ({
       ...artwork,
-      isFavorite: request.selected || artwork.isFavorite,
-      favoriteGroupIds: request.selected
-        ? [...new Set([...artwork.favoriteGroupIds, request.groupId])]
-        : artwork.favoriteGroupIds.filter((groupId) => groupId !== request.groupId),
+      groupIds: membership.groupIds,
     }))
-    await invalidateFavoriteData()
-    toast.success(request.selected ? '已添加到收藏分组' : '已从收藏分组移除')
+    await invalidateArtworkData()
+    toast.success(request.selected ? '已添加到本地分组' : '已从本地分组移除')
   },
   onError: (error) => {
-    toast.error('修改收藏分组失败', { description: errorMessage(error) })
+    toast.error('修改本地分组失败', { description: errorMessage(error) })
   },
 })
 
-const createAndAddFavoriteGroupMutation = useMutation({
-  mutationFn: async (request: { artworkId: number; name: string }) => {
-    const group = await createFavoriteGroup(request.name)
-    await bulkUpdateFavoriteGroups([request.artworkId], [group.groupId], [])
-    return group
+const createAndAddGroupMutation = useMutation({
+  mutationFn: async (request: { artworkId: number; name: string; groupIds: number[] }) => {
+    const group = await createGroup(request.name)
+    const groupIds = [...new Set([...request.groupIds, group.groupId])]
+    const membership = await replaceArtworkGroups(request.artworkId, groupIds)
+    return { membership, group }
   },
-  onSuccess: async (group, request) => {
-    createFavoriteGroupOpen.value = false
-    updateCachedArtwork(request.artworkId, (artwork) => ({
+  onSuccess: async ({ membership }) => {
+    createGroupOpen.value = false
+    updateCachedArtwork(membership.artworkId, (artwork) => ({
       ...artwork,
-      isFavorite: true,
-      favoriteGroupIds: [...new Set([...artwork.favoriteGroupIds, group.groupId])],
+      groupIds: membership.groupIds,
     }))
-    await invalidateFavoriteData()
-    toast.success('已创建收藏分组并添加作品')
+    await invalidateArtworkData()
+    toast.success('已创建本地分组并添加作品')
   },
   onError: async (error) => {
-    await invalidateFavoriteData()
+    await invalidateArtworkData()
     toast.error('添加到新分组失败', { description: errorMessage(error) })
   },
 })
@@ -181,8 +173,8 @@ watch(
   () => {
     selectedPage.value = null
     pageSelectorExpanded.value = false
-    favoriteGroupsOpen.value = false
-    createFavoriteGroupOpen.value = false
+    groupsOpen.value = false
+    createGroupOpen.value = false
   },
 )
 
@@ -238,23 +230,29 @@ function toggleFavorite() {
   favoriteMutation.mutate({
     artworkId: props.artwork.artworkId,
     isFavorite: !props.artwork.isFavorite,
-    groupIds: props.artwork.isFavorite ? [] : props.artwork.favoriteGroupIds,
   })
 }
 
-function changeFavoriteGroup(groupId: number, selected: boolean) {
-  favoriteGroupMutation.mutate({ artworkId: props.artwork.artworkId, groupId, selected })
+function changeGroup(groupId: number, selected: boolean) {
+  groupMutation.mutate({
+    artworkId: props.artwork.artworkId,
+    groupIds: selected
+      ? [...new Set([...props.artwork.groupIds, groupId])]
+      : props.artwork.groupIds.filter((currentGroupId) => currentGroupId !== groupId),
+    selected,
+  })
 }
 
-function openCreateFavoriteGroup() {
-  favoriteGroupsOpen.value = false
-  createFavoriteGroupOpen.value = true
+function openCreateGroup() {
+  groupsOpen.value = false
+  createGroupOpen.value = true
 }
 
-function createAndAddFavoriteGroup(name: string) {
-  createAndAddFavoriteGroupMutation.mutate({
+function createAndAddGroup(name: string) {
+  createAndAddGroupMutation.mutate({
     artworkId: props.artwork.artworkId,
     name,
+    groupIds: props.artwork.groupIds,
   })
 }
 
@@ -346,22 +344,22 @@ usePageKeyboardShortcuts(
           :variant="artwork.isFavorite ? 'secondary' : 'primary'"
           :disabled="
             favoriteMutation.isPending.value ||
-            favoriteGroupMutation.isPending.value ||
-            createAndAddFavoriteGroupMutation.isPending.value
+            groupMutation.isPending.value ||
+            createAndAddGroupMutation.isPending.value
           "
           @click="toggleFavorite"
         >
           <Heart :size="16" :fill="artwork.isFavorite ? 'currentColor' : 'none'" />
           {{ artwork.isFavorite ? '取消收藏' : '收藏' }}
         </Button>
-        <Popover v-model:open="favoriteGroupsOpen" align="end" content-class="p-2">
+        <Popover v-model:open="groupsOpen" align="end" content-class="p-2">
           <template #trigger>
             <Button
               variant="secondary"
               :disabled="
                 favoriteMutation.isPending.value ||
-                favoriteGroupMutation.isPending.value ||
-                createAndAddFavoriteGroupMutation.isPending.value
+                groupMutation.isPending.value ||
+                createAndAddGroupMutation.isPending.value
               "
             >
               <FolderHeart :size="16" />分组管理
@@ -372,48 +370,37 @@ usePageKeyboardShortcuts(
             <button
               type="button"
               class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2 py-2 text-left hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
-              :disabled="createAndAddFavoriteGroupMutation.isPending.value"
-              @click="openCreateFavoriteGroup"
+              :disabled="createAndAddGroupMutation.isPending.value"
+              @click="openCreateGroup"
             >
               <Plus :size="17" class="text-primary" />
               <span class="truncate text-sm">新增分组</span>
             </button>
             <div class="my-1 h-px bg-border" />
-            <p
-              v-if="favoriteGroupsQuery.isPending.value"
-              class="px-2 py-3 text-sm text-muted-foreground"
-            >
-              正在读取收藏分组…
+            <p v-if="groupsQuery.isPending.value" class="px-2 py-3 text-sm text-muted-foreground">
+              正在读取本地分组…
             </p>
-            <p
-              v-else-if="favoriteGroupsQuery.error.value"
-              class="px-2 py-3 text-sm text-destructive"
-            >
-              {{ favoriteGroupsQuery.error.value.message }}
+            <p v-else-if="groupsQuery.error.value" class="px-2 py-3 text-sm text-destructive">
+              {{ groupsQuery.error.value.message }}
             </p>
-            <template v-else-if="favoriteGroupsQuery.data.value?.length">
+            <template v-else-if="groupsQuery.data.value?.length">
               <button
-                v-for="group in favoriteGroupsQuery.data.value"
+                v-for="group in groupsQuery.data.value"
                 :key="group.groupId"
                 type="button"
                 class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2 py-2 text-left hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
-                :disabled="favoriteGroupMutation.isPending.value"
-                @click="
-                  changeFavoriteGroup(
-                    group.groupId,
-                    !artwork.favoriteGroupIds.includes(group.groupId),
-                  )
-                "
+                :disabled="groupMutation.isPending.value"
+                @click="changeGroup(group.groupId, !artwork.groupIds.includes(group.groupId))"
               >
                 <Checkbox
                   class="pointer-events-none"
-                  :model-value="artwork.favoriteGroupIds.includes(group.groupId)"
-                  :disabled="favoriteGroupMutation.isPending.value"
+                  :model-value="artwork.groupIds.includes(group.groupId)"
+                  :disabled="groupMutation.isPending.value"
                 />
                 <span class="truncate text-sm">{{ group.name }}</span>
               </button>
             </template>
-            <p v-else class="px-2 py-3 text-sm text-muted-foreground">还没有收藏分组。</p>
+            <p v-else class="px-2 py-3 text-sm text-muted-foreground">还没有本地分组。</p>
           </div>
         </Popover>
         <Button
@@ -430,12 +417,12 @@ usePageKeyboardShortcuts(
     </div>
   </Card>
 
-  <CreateFavoriteGroupDialog
-    :open="createFavoriteGroupOpen"
-    description="创建分组后会自动收藏当前作品并加入该分组。"
-    :busy="createAndAddFavoriteGroupMutation.isPending.value"
-    @close="createFavoriteGroupOpen = false"
-    @save="createAndAddFavoriteGroup"
+  <CreateGroupDialog
+    :open="createGroupOpen"
+    description="创建分组后会将当前作品加入该本地分组，不影响收藏状态。"
+    :busy="createAndAddGroupMutation.isPending.value"
+    @close="createGroupOpen = false"
+    @save="createAndAddGroup"
   />
 
   <ConfirmDialog

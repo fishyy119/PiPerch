@@ -17,6 +17,7 @@ def test_initial_migration_and_sqlite_pragmas(tmp_path: Path) -> None:
         inspector = inspect(database.engine)
         table_names = set(inspector.get_table_names())
         download_item_columns = {column["name"] for column in inspector.get_columns("download_items")}
+        artwork_group_foreign_keys = inspector.get_foreign_keys("artwork_group_items")
         with database.connect() as connection:
             foreign_keys = connection.scalar(text("PRAGMA foreign_keys"))
             journal_mode = connection.scalar(text("PRAGMA journal_mode"))
@@ -33,14 +34,18 @@ def test_initial_migration_and_sqlite_pragmas(tmp_path: Path) -> None:
         "download_items",
         "download_jobs",
         "favorite_artworks",
-        "favorite_group_items",
-        "favorite_groups",
+        "artwork_group_items",
+        "artwork_groups",
         "media_files",
         "series",
         "tags",
         "ugoira_frames",
     } <= table_names
     assert not {"progress_phase", "progress_completed", "progress_total"} & download_item_columns
+    assert any(
+        foreign_key["referred_table"] == "artworks" and foreign_key["constrained_columns"] == ["artwork_id"]
+        for foreign_key in artwork_group_foreign_keys
+    )
     assert foreign_keys == 1
     assert str(journal_mode).lower() == "wal"
     assert synchronous == 1

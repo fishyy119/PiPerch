@@ -8,7 +8,7 @@ export interface GalleryFilterValues {
   rating: string
   ai: string
   favorite: string
-  selectedFavoriteGroupIds: number[]
+  selectedGroupIds: number[]
   sort: string
   order: string
   randomSeed: number
@@ -49,7 +49,7 @@ export function defaultGalleryFilterValues(): GalleryFilterValues {
     rating: 'all',
     ai: 'all',
     favorite: 'all',
-    selectedFavoriteGroupIds: [],
+    selectedGroupIds: [],
     sort: 'downloadedAt',
     order: 'desc',
     randomSeed: 0,

@@ -59,8 +59,8 @@ function selectedTagIds() {
     .filter((value): value is number => value !== undefined)
 }
 
-function selectedFavoriteGroupIds() {
-  const raw = route.query.favoriteGroupId
+function selectedGroupIds() {
+  const raw = route.query.groupId
   const values = Array.isArray(raw) ? raw : raw === undefined ? [] : [raw]
   return values
     .map((value) => positiveInt(value))
@@ -77,7 +77,7 @@ const galleryFilterValues = computed<GalleryFilterValues>({
       rating: firstQueryValue(route.query.rating) || 'all',
       ai: firstQueryValue(route.query.ai) || 'all',
       favorite: firstQueryValue(route.query.favorite) || 'all',
-      selectedFavoriteGroupIds: selectedFavoriteGroupIds(),
+      selectedGroupIds: selectedGroupIds(),
       sort: firstQueryValue(route.query.sort) || 'downloadedAt',
       order: firstQueryValue(route.query.order) || 'desc',
       randomSeed: randomSeed(),
@@ -102,7 +102,7 @@ function artworkFilters(): GalleryFilters {
     rating: filters.rating,
     ai: filters.ai,
     favorite: filters.favorite,
-    favoriteGroupIds: filters.selectedFavoriteGroupIds,
+    groupIds: filters.selectedGroupIds,
     sort: filters.sort,
     order: filters.order,
     ...(filters.sort === 'random' ? { randomSeed: filters.randomSeed } : {}),
@@ -126,7 +126,7 @@ const activeFilterCount = computed(() => {
   ]
   return (
     filters.selectedTagIds.length +
-    filters.selectedFavoriteGroupIds.length +
+    filters.selectedGroupIds.length +
     scalarFilters.filter(Boolean).length
   )
 })
@@ -182,7 +182,7 @@ function updateGalleryFilters(filters: GalleryFilterValues) {
     rating: filters.rating === 'all' ? undefined : filters.rating,
     ai: filters.ai === 'all' ? undefined : filters.ai,
     favorite: filters.favorite === 'all' ? undefined : filters.favorite,
-    favoriteGroupId: filters.selectedFavoriteGroupIds.map(String),
+    groupId: filters.selectedGroupIds.map(String),
     sort: filters.sort === 'downloadedAt' ? undefined : filters.sort,
     order: filters.order === 'desc' ? undefined : filters.order,
     randomSeed: filters.sort === 'random' ? String(filters.randomSeed) : undefined,

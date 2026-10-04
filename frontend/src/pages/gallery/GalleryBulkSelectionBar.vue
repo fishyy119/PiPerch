@@ -1,16 +1,15 @@
 <script setup lang="ts">
-import { Heart, HeartOff, Tags, Trash2 } from '@lucide/vue'
+import { Tags, Trash2 } from '@lucide/vue'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query'
 import { computed, ref } from 'vue'
 
 import {
   bulkDeleteArtworks,
-  bulkSetFavorite,
-  bulkUpdateFavoriteGroups,
-  listFavoriteGroups,
+  bulkUpdateArtworkGroups,
+  listGroups,
 } from '@/features/gallery/gallery-api'
 import { useGallerySelectionStore } from '@/features/gallery/gallery-selection'
-import BulkFavoriteGroupsDialog from '@/pages/gallery/BulkFavoriteGroupsDialog.vue'
+import BulkGroupsDialog from '@/pages/gallery/BulkGroupsDialog.vue'
 import { errorMessage } from '@/shared/errors'
 import Button from '@ui/Button.vue'
 import Card from '@ui/Card.vue'
@@ -24,47 +23,36 @@ const props = defineProps<{
 const selection = useGallerySelectionStore()
 const queryClient = useQueryClient()
 const deleteOpen = ref(false)
-const bulkFavoriteGroupsOpen = ref(false)
+const bulkGroupsOpen = ref(false)
 const visibleFullySelected = computed(
   () =>
     props.visibleArtworkIds.length > 0 &&
     props.visibleArtworkIds.every((artworkId) => selection.isSelected(artworkId)),
 )
 
-const favoriteGroupsQuery = useQuery({
-  queryKey: ['favorite-groups'],
-  queryFn: listFavoriteGroups,
-  enabled: computed(() => bulkFavoriteGroupsOpen.value),
+const groupsQuery = useQuery({
+  queryKey: ['groups'],
+  queryFn: listGroups,
+  enabled: computed(() => bulkGroupsOpen.value),
 })
 
-async function invalidateFavoriteData() {
+async function invalidateGroupData() {
   await Promise.all([
     queryClient.invalidateQueries({ queryKey: ['artworks'] }),
-    queryClient.invalidateQueries({ queryKey: ['favorite-groups'] }),
+    queryClient.invalidateQueries({ queryKey: ['groups'] }),
   ])
 }
 
-const bulkFavoriteMutation = useMutation({
-  mutationFn: (isFavorite: boolean) => bulkSetFavorite(selection.selectedIds, isFavorite),
-  onSuccess: async (_result, isFavorite) => {
-    await invalidateFavoriteData()
-    toast.success(isFavorite ? '已批量收藏' : '已批量取消收藏')
-  },
-  onError: (error) => {
-    toast.error('批量修改收藏失败', { description: errorMessage(error) })
-  },
-})
-
 const bulkGroupsMutation = useMutation({
   mutationFn: (change: { addGroupIds: number[]; removeGroupIds: number[] }) =>
-    bulkUpdateFavoriteGroups(selection.selectedIds, change.addGroupIds, change.removeGroupIds),
+    bulkUpdateArtworkGroups(selection.selectedIds, change.addGroupIds, change.removeGroupIds),
   onSuccess: async () => {
-    bulkFavoriteGroupsOpen.value = false
-    await invalidateFavoriteData()
-    toast.success('收藏分组已批量更新')
+    bulkGroupsOpen.value = false
+    await invalidateGroupData()
+    toast.success('本地分组已批量更新')
   },
   onError: (error) => {
-    toast.error('批量修改收藏分组失败', { description: errorMessage(error) })
+    toast.error('批量修改本地分组失败', { description: errorMessage(error) })
   },
 })
 
@@ -124,22 +112,8 @@ function saveBulkGroups(addGroupIds: number[], removeGroupIds: number[]) {
           </Button>
           <Button
             variant="secondary"
-            :disabled="selection.selectedCount === 0 || bulkFavoriteMutation.isPending.value"
-            @click="bulkFavoriteMutation.mutate(true)"
-          >
-            <Heart :size="17" />收藏
-          </Button>
-          <Button
-            variant="secondary"
-            :disabled="selection.selectedCount === 0 || bulkFavoriteMutation.isPending.value"
-            @click="bulkFavoriteMutation.mutate(false)"
-          >
-            <HeartOff :size="17" />取消收藏
-          </Button>
-          <Button
-            variant="secondary"
             :disabled="selection.selectedCount === 0"
-            @click="bulkFavoriteGroupsOpen = true"
+            @click="bulkGroupsOpen = true"
           >
             <Tags :size="17" />修改分组
           </Button>
@@ -166,14 +140,14 @@ function saveBulkGroups(addGroupIds: number[], removeGroupIds: number[]) {
     @confirm="deleteMutation.mutate()"
   />
 
-  <BulkFavoriteGroupsDialog
-    v-if="bulkFavoriteGroupsOpen"
+  <BulkGroupsDialog
+    v-if="bulkGroupsOpen"
     :open="true"
-    :groups="favoriteGroupsQuery.data.value ?? []"
+    :groups="groupsQuery.data.value ?? []"
     :selection-count="selection.selectedCount"
     :busy="bulkGroupsMutation.isPending.value"
-    @close="bulkFavoriteGroupsOpen = false"
-    @groups-changed="invalidateFavoriteData"
+    @close="bulkGroupsOpen = false"
+    @groups-changed="invalidateGroupData"
     @save="saveBulkGroups"
   />
 </template>

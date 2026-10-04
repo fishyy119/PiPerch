@@ -6,11 +6,11 @@ from typing import TYPE_CHECKING, ClassVar, cast
 from sqlalchemy import Select, and_, case, delete, func, insert, literal, or_, select, update
 
 from piperch.database.tables import (
+    artwork_group_items,
     artwork_tags,
     artworks,
     authors,
     favorite_artworks,
-    favorite_group_items,
     media_files,
     series,
     tags,
@@ -39,7 +39,7 @@ from piperch.repositories._rows import (
 from piperch.repositories._rows import (
     string as _string,
 )
-from piperch.repositories.favorites import FavoriteRepository
+from piperch.repositories.groups import ArtworkGroupRepository
 from piperch.utils.datetime import utc_now_text
 
 if TYPE_CHECKING:
@@ -204,8 +204,16 @@ class ArtworkRepository:
                     ],
                 )
 
+            if existing_downloaded_at is None and artwork.bookmark_data is not None:
+                connection.execute(
+                    insert(favorite_artworks).values(
+                        artwork_id=artwork.artwork_id,
+                        created_at=now,
+                        updated_at=now,
+                    )
+                )
             if existing_downloaded_at is None and bookmark_tags is not None:
-                FavoriteRepository.import_public_bookmark(
+                ArtworkGroupRepository.import_bookmark_groups(
                     connection,
                     artwork.artwork_id,
                     bookmark_tags,
@@ -259,7 +267,7 @@ class ArtworkRepository:
         order: str,
         random_seed: int = 0,
         favorite: str = "all",
-        favorite_group_ids: Sequence[int] = (),
+        group_ids: Sequence[int] = (),
     ) -> tuple[list[ArtworkSummary], int]:
         conditions: list[ColumnElement[bool]] = []
         if search:
@@ -290,13 +298,11 @@ class ArtworkRepository:
             conditions.append(favorite_exists.exists())
         elif favorite == "no":
             conditions.append(~favorite_exists.exists())
-        if favorite_group_ids:
-            matching_favorite_groups = (
-                select(favorite_group_items.c.artwork_id)
-                .where(favorite_group_items.c.group_id.in_(favorite_group_ids))
-                .distinct()
+        if group_ids:
+            matching_groups = (
+                select(artwork_group_items.c.artwork_id).where(artwork_group_items.c.group_id.in_(group_ids)).distinct()
             )
-            conditions.append(artworks.c.id.in_(matching_favorite_groups))
+            conditions.append(artworks.c.id.in_(matching_groups))
         if tag_ids:
             matching_tags = (
                 select(artwork_tags.c.artwork_id)
@@ -682,30 +688,24 @@ class ArtworkRepository:
         if not summaries:
             return []
         artwork_ids = [summary.artwork_id for summary in summaries]
-        rows = connection.execute(
-            select(
-                favorite_artworks.c.artwork_id,
-                favorite_group_items.c.group_id,
+        favorite_ids = set(
+            connection.scalars(
+                select(favorite_artworks.c.artwork_id).where(favorite_artworks.c.artwork_id.in_(artwork_ids))
             )
-            .select_from(
-                favorite_artworks.outerjoin(
-                    favorite_group_items,
-                    favorite_artworks.c.artwork_id == favorite_group_items.c.artwork_id,
-                )
-            )
-            .where(favorite_artworks.c.artwork_id.in_(artwork_ids))
-            .order_by(favorite_group_items.c.group_id.asc())
         )
-        favorites: dict[int, list[int]] = {}
-        for artwork_id, group_id in rows:
-            groups = favorites.setdefault(int(artwork_id), [])
-            if group_id is not None:
-                groups.append(int(group_id))
+        group_rows = connection.execute(
+            select(artwork_group_items.c.artwork_id, artwork_group_items.c.group_id)
+            .where(artwork_group_items.c.artwork_id.in_(artwork_ids))
+            .order_by(artwork_group_items.c.group_id.asc())
+        )
+        groups: dict[int, list[int]] = {}
+        for artwork_id, group_id in group_rows:
+            groups.setdefault(int(artwork_id), []).append(int(group_id))
         return [
             replace(
                 summary,
-                is_favorite=summary.artwork_id in favorites,
-                favorite_group_ids=tuple(favorites.get(summary.artwork_id, ())),
+                is_favorite=summary.artwork_id in favorite_ids,
+                group_ids=tuple(groups.get(summary.artwork_id, ())),
             )
             for summary in summaries
         ]

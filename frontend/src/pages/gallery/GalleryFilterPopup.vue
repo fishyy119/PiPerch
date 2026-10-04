@@ -13,20 +13,12 @@ import SearchInput from '@ui/SearchInput.vue'
 const open = defineModel<boolean>('open', { required: true })
 const { filters, update: updateFilters } = useGalleryFilters()
 
-const {
-  tagSearch,
-  authorSearch,
-  seriesSearch,
-  tags,
-  authors,
-  series,
-  favoriteGroups,
-  favoriteGroupsReady,
-} = useGalleryFilterOptions({
-  open: () => open.value,
-  selectedTagIds: () => filters.value.selectedTagIds,
-  authorId: () => filters.value.authorId,
-})
+const { tagSearch, authorSearch, seriesSearch, tags, authors, series, groups, groupsReady } =
+  useGalleryFilterOptions({
+    open: () => open.value,
+    selectedTagIds: () => filters.value.selectedTagIds,
+    authorId: () => filters.value.authorId,
+  })
 
 const visibleTags = computed(() => {
   const selectedIds = new Set(filters.value.selectedTagIds)
@@ -38,22 +30,22 @@ const visibleAuthors = computed(() =>
 const visibleSeries = computed(() =>
   activeFirst(series.value, (item) => item.itemId === filters.value.seriesId),
 )
-const visibleFavoriteGroups = computed(() => {
-  const selectedIds = new Set(filters.value.selectedFavoriteGroupIds)
-  return activeFirst(favoriteGroups.value, (group) => selectedIds.has(group.groupId))
+const visibleGroups = computed(() => {
+  const selectedIds = new Set(filters.value.selectedGroupIds)
+  return activeFirst(groups.value, (group) => selectedIds.has(group.groupId))
 })
 
 function activeFirst<T>(items: T[], isActive: (item: T) => boolean) {
   return [...items].sort((left, right) => Number(isActive(right)) - Number(isActive(left)))
 }
 
-watch([favoriteGroups, favoriteGroupsReady], ([groups, ready]) => {
+watch([groups, groupsReady], ([availableGroups, ready]) => {
   if (!ready) return
-  const validIds = new Set(groups.map((group) => group.groupId))
-  const selectedIds = filters.value.selectedFavoriteGroupIds
+  const validIds = new Set(availableGroups.map((group) => group.groupId))
+  const selectedIds = filters.value.selectedGroupIds
   const retainedIds = selectedIds.filter((groupId) => validIds.has(groupId))
   if (retainedIds.length !== selectedIds.length) {
-    updateFilters({ selectedFavoriteGroupIds: retainedIds })
+    updateFilters({ selectedGroupIds: retainedIds })
   }
 })
 
@@ -64,11 +56,11 @@ function toggleTag(tagId: number) {
   updateFilters({ selectedTagIds })
 }
 
-function toggleFavoriteGroup(groupId: number) {
-  const selectedFavoriteGroupIds = filters.value.selectedFavoriteGroupIds.includes(groupId)
-    ? filters.value.selectedFavoriteGroupIds.filter((id) => id !== groupId)
-    : [...filters.value.selectedFavoriteGroupIds, groupId]
-  updateFilters({ favorite: 'all', selectedFavoriteGroupIds })
+function toggleGroup(groupId: number) {
+  const selectedGroupIds = filters.value.selectedGroupIds.includes(groupId)
+    ? filters.value.selectedGroupIds.filter((id) => id !== groupId)
+    : [...filters.value.selectedGroupIds, groupId]
+  updateFilters({ selectedGroupIds })
 }
 
 function updateSort(sort: string, order: string) {
@@ -182,40 +174,39 @@ function updateSort(sort: string, order: string) {
         </div>
       </section>
 
-      <section class="filter-row border-t pt-5">
+      <section class="filter-row">
         <h3 class="filter-row-title">收藏</h3>
-        <div class="space-y-3">
-          <div class="flex flex-wrap gap-2">
-            <FilterOptionButton
-              v-for="option in [
-                { value: 'all', label: '全部' },
-                { value: 'yes', label: '已收藏' },
-                { value: 'no', label: '未收藏' },
-              ]"
-              :key="option.value"
-              :active="
-                filters.selectedFavoriteGroupIds.length === 0 && filters.favorite === option.value
-              "
-              @click="updateFilters({ favorite: option.value, selectedFavoriteGroupIds: [] })"
-            >
-              {{ option.label }}
-            </FilterOptionButton>
-          </div>
-          <p class="text-xs text-muted-foreground">选择多个分组时，属于任一分组即可</p>
-          <div class="flex flex-wrap gap-2">
-            <FilterOptionButton
-              v-for="group in visibleFavoriteGroups"
-              :key="group.groupId"
-              :active="filters.selectedFavoriteGroupIds.includes(group.groupId)"
-              @click="toggleFavoriteGroup(group.groupId)"
-            >
-              {{ group.name }}
-              <span class="text-xs text-muted-foreground">{{ group.artworkCount }}</span>
-            </FilterOptionButton>
-            <span v-if="visibleFavoriteGroups.length === 0" class="text-sm text-muted-foreground">
-              还没有收藏分组。
-            </span>
-          </div>
+        <div class="flex flex-wrap gap-2">
+          <FilterOptionButton
+            v-for="option in [
+              { value: 'all', label: '全部' },
+              { value: 'yes', label: '已收藏' },
+              { value: 'no', label: '未收藏' },
+            ]"
+            :key="option.value"
+            :active="filters.favorite === option.value"
+            @click="updateFilters({ favorite: option.value })"
+          >
+            {{ option.label }}
+          </FilterOptionButton>
+        </div>
+      </section>
+
+      <section class="filter-row border-t pt-5">
+        <h3 class="filter-row-title">本地分组</h3>
+        <div class="flex flex-wrap gap-2">
+          <FilterOptionButton
+            v-for="group in visibleGroups"
+            :key="group.groupId"
+            :active="filters.selectedGroupIds.includes(group.groupId)"
+            @click="toggleGroup(group.groupId)"
+          >
+            {{ group.name }}
+            <span class="text-xs text-muted-foreground">{{ group.artworkCount }}</span>
+          </FilterOptionButton>
+          <span v-if="visibleGroups.length === 0" class="text-sm text-muted-foreground">
+            还没有本地分组。
+          </span>
         </div>
       </section>
 

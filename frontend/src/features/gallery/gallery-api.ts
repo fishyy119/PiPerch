@@ -25,7 +25,7 @@ export const artworkSummarySchema = z.object({
   publishedAt: z.string().nullable(),
   downloadedAt: z.string(),
   isFavorite: z.boolean(),
-  favoriteGroupIds: z.array(z.number().int().positive()),
+  groupIds: z.array(z.number().int().positive()),
 })
 export type ArtworkSummary = z.infer<typeof artworkSummarySchema>
 
@@ -80,7 +80,7 @@ export interface GalleryFilters {
   rating: string
   ai: string
   favorite: string
-  favoriteGroupIds: number[]
+  groupIds: number[]
   sort: string
   order: string
   randomSeed?: number
@@ -98,7 +98,7 @@ function galleryQuery(filters: GalleryFilters) {
     order: filters.order,
   })
   filters.tagIds.forEach((id) => params.append('tagId', String(id)))
-  filters.favoriteGroupIds.forEach((id) => params.append('favoriteGroupId', String(id)))
+  filters.groupIds.forEach((id) => params.append('groupId', String(id)))
   if (filters.authorId !== undefined) params.set('authorId', String(filters.authorId))
   if (filters.seriesId !== undefined) params.set('seriesId', String(filters.seriesId))
   if (filters.artworkType) params.set('artworkType', filters.artworkType)
@@ -155,74 +155,61 @@ export async function bulkDeleteArtworks(artworkIds: number[]) {
     .parse(await api.post<unknown>('/api/artworks/bulk-delete', { artworkIds }))
 }
 
-export const favoriteGroupSchema = z.object({
+export const artworkGroupSchema = z.object({
   groupId: z.number().int().positive(),
   name: z.string(),
   artworkCount: z.number().int().nonnegative(),
 })
-export type FavoriteGroup = z.infer<typeof favoriteGroupSchema>
+export type ArtworkGroup = z.infer<typeof artworkGroupSchema>
 
 const favoriteStateSchema = z.object({
   artworkId: z.number().int().positive(),
   isFavorite: z.boolean(),
+})
+
+const artworkGroupsSchema = z.object({
+  artworkId: z.number().int().positive(),
   groupIds: z.array(z.number().int().positive()),
 })
 
-export async function listFavoriteGroups() {
-  return z.array(favoriteGroupSchema).parse(await api.get<unknown>('/api/favorite-groups'))
+export async function listGroups() {
+  return z.array(artworkGroupSchema).parse(await api.get<unknown>('/api/groups'))
 }
 
-export async function createFavoriteGroup(name: string) {
-  return favoriteGroupSchema.parse(await api.post<unknown>('/api/favorite-groups', { name }))
+export async function createGroup(name: string) {
+  return artworkGroupSchema.parse(await api.post<unknown>('/api/groups', { name }))
 }
 
-export async function renameFavoriteGroup(groupId: number, name: string) {
-  return favoriteGroupSchema.parse(
-    await api.patch<unknown>(`/api/favorite-groups/${String(groupId)}`, { name }),
+export async function renameGroup(groupId: number, name: string) {
+  return artworkGroupSchema.parse(
+    await api.patch<unknown>(`/api/groups/${String(groupId)}`, { name }),
   )
 }
 
-export async function deleteFavoriteGroup(groupId: number) {
+export async function deleteGroup(groupId: number) {
   return z
     .object({ deleted: z.number().int() })
-    .parse(await api.delete<unknown>(`/api/favorite-groups/${String(groupId)}`))
+    .parse(await api.delete<unknown>(`/api/groups/${String(groupId)}`))
 }
 
-export async function replaceFavoriteState(
-  artworkId: number,
-  isFavorite: boolean,
-  groupIds: number[],
-) {
+export async function replaceFavoriteState(artworkId: number, isFavorite: boolean) {
   return favoriteStateSchema.parse(
     await api.put<unknown>(`/api/artworks/${String(artworkId)}/favorite`, {
       isFavorite,
-      groupIds,
     }),
   )
 }
 
-export async function bulkSetFavorite(artworkIds: number[], isFavorite: boolean) {
-  return z
-    .object({ updated: z.number().int() })
-    .parse(await api.post<unknown>('/api/artworks/bulk-favorite', { artworkIds, isFavorite }))
+export async function replaceArtworkGroups(artworkId: number, groupIds: number[]) {
+  return artworkGroupsSchema.parse(
+    await api.put<unknown>(`/api/artworks/${String(artworkId)}/groups`, { groupIds }),
+  )
 }
 
-export async function bulkUpdateFavoriteGroups(
+export async function bulkUpdateArtworkGroups(
   artworkIds: number[],
   addGroupIds: number[],
   removeGroupIds: number[],
 ) {
-  return z.object({ updated: z.number().int() }).parse(
-    await api.post<unknown>('/api/artworks/bulk-favorite-groups', {
-      artworkIds,
-      addGroupIds,
-      removeGroupIds,
-    }),
-  )
-}
-
-export async function syncFavorite(artworkId: number) {
-  return z
-    .object({ isFavorite: z.boolean(), tags: z.array(z.string()) })
-    .parse(await api.post<unknown>(`/api/artworks/${String(artworkId)}/favorite/sync`))
+  await api.patch<undefined>('/api/artworks/groups', { artworkIds, addGroupIds, removeGroupIds })
 }

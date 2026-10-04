@@ -26,9 +26,9 @@ export const router = createRouter({
           meta: { title: '本地图库', hideTitle: true },
         },
         {
-          path: 'favorites',
-          component: () => import('@/pages/favorites/FavoritesPage.vue'),
-          meta: { title: '收藏' },
+          path: 'groups',
+          component: () => import('@/pages/groups/GroupsPage.vue'),
+          meta: { title: '本地分组' },
         },
         {
           path: 'artworks/:artworkId(\\d+)',

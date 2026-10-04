@@ -3,33 +3,30 @@ import { useQueryClient } from '@tanstack/vue-query'
 import { computed, ref, watch } from 'vue'
 
 import {
+  type ArtworkGroup,
   type ArtworkSummary,
-  bulkUpdateFavoriteGroups,
-  createFavoriteGroup,
-  type FavoriteGroup,
-  listFavoriteGroups,
+  createGroup,
+  listGroups,
+  replaceArtworkGroups,
   replaceFavoriteState,
-  syncFavorite,
 } from '@/features/gallery/gallery-api'
-import CreateFavoriteGroupDialog from '@/shared/components/favorites/CreateFavoriteGroupDialog.vue'
+import CreateGroupDialog from '@/shared/components/groups/CreateGroupDialog.vue'
 import { errorMessage } from '@/shared/errors'
-import ConfirmDialog from '@ui/ConfirmDialog.vue'
 import ContextMenu, { type ContextMenuOption } from '@ui/ContextMenu.vue'
 import { toast } from '@ui/toast'
 
 const props = defineProps<{ artwork: ArtworkSummary }>()
 const open = defineModel<boolean>('open', { default: false })
 const queryClient = useQueryClient()
-const favoriteGroups = ref<FavoriteGroup[]>([])
+const groups = ref<ArtworkGroup[]>([])
 const createGroupOpen = ref(false)
-const syncConfirmationOpen = ref(false)
 const actionPending = ref(false)
 
 const availableGroups = computed(() =>
-  favoriteGroups.value.filter((group) => !props.artwork.favoriteGroupIds.includes(group.groupId)),
+  groups.value.filter((group) => !props.artwork.groupIds.includes(group.groupId)),
 )
 const currentGroups = computed(() =>
-  favoriteGroups.value.filter((group) => props.artwork.favoriteGroupIds.includes(group.groupId)),
+  groups.value.filter((group) => props.artwork.groupIds.includes(group.groupId)),
 )
 const contextItems = computed<ContextMenuOption[]>(() => [
   {
@@ -66,34 +63,28 @@ const contextItems = computed<ContextMenuOption[]>(() => [
           })),
         },
       ]),
-  {
-    value: 'sync',
-    label: '同步到 Pixiv',
-    separatorBefore: true,
-    disabled: actionPending.value,
-  },
 ])
 
 watch(open, (isOpen) => {
   if (!isOpen) return
-  void loadFavoriteGroups()
+  void loadGroups()
 })
 
-async function loadFavoriteGroups() {
+async function loadGroups() {
   try {
-    favoriteGroups.value = await queryClient.query({
-      queryKey: ['favorite-groups'],
-      queryFn: listFavoriteGroups,
+    groups.value = await queryClient.query({
+      queryKey: ['groups'],
+      queryFn: listGroups,
     })
   } catch (error) {
-    toast.error('读取收藏分组失败', { description: errorMessage(error) })
+    toast.error('读取本地分组失败', { description: errorMessage(error) })
   }
 }
 
-async function invalidateFavoriteData() {
+async function invalidateArtworkData() {
   await Promise.all([
     queryClient.invalidateQueries({ queryKey: ['artworks'] }),
-    queryClient.invalidateQueries({ queryKey: ['favorite-groups'] }),
+    queryClient.invalidateQueries({ queryKey: ['groups'] }),
   ])
 }
 
@@ -101,75 +92,47 @@ async function toggleFavorite() {
   if (actionPending.value) return
   actionPending.value = true
   try {
-    await replaceFavoriteState(
-      props.artwork.artworkId,
-      !props.artwork.isFavorite,
-      props.artwork.isFavorite ? [] : props.artwork.favoriteGroupIds,
-    )
-    await invalidateFavoriteData()
-    toast.success('本地收藏已更新')
+    await replaceFavoriteState(props.artwork.artworkId, !props.artwork.isFavorite)
+    await invalidateArtworkData()
+    toast.success('收藏已更新并同步到 Pixiv')
   } catch (error) {
-    toast.error('更新本地收藏失败', { description: errorMessage(error) })
+    toast.error('更新收藏失败', { description: errorMessage(error) })
   } finally {
     actionPending.value = false
   }
 }
 
-async function changeFavoriteGroup(groupId: number, mode: 'add' | 'remove') {
+async function changeGroup(groupId: number, mode: 'add' | 'remove') {
   if (actionPending.value) return
   actionPending.value = true
   try {
-    await bulkUpdateFavoriteGroups(
-      [props.artwork.artworkId],
-      mode === 'add' ? [groupId] : [],
-      mode === 'remove' ? [groupId] : [],
-    )
-    await invalidateFavoriteData()
-    toast.success(mode === 'add' ? '已添加到收藏分组' : '已从收藏分组移除')
+    const groupIds =
+      mode === 'add'
+        ? [...new Set([...props.artwork.groupIds, groupId])]
+        : props.artwork.groupIds.filter((currentGroupId) => currentGroupId !== groupId)
+    await replaceArtworkGroups(props.artwork.artworkId, groupIds)
+    await invalidateArtworkData()
+    toast.success(mode === 'add' ? '已添加到本地分组' : '已从本地分组移除')
   } catch (error) {
-    toast.error('修改收藏分组失败', { description: errorMessage(error) })
+    toast.error('修改本地分组失败', { description: errorMessage(error) })
   } finally {
     actionPending.value = false
   }
 }
 
-async function createAndAddFavoriteGroup(name: string) {
+async function createAndAddGroup(name: string) {
   if (actionPending.value) return
   actionPending.value = true
   try {
-    const group = await createFavoriteGroup(name)
-    await bulkUpdateFavoriteGroups([props.artwork.artworkId], [group.groupId], [])
+    const group = await createGroup(name)
+    const groupIds = [...props.artwork.groupIds, group.groupId]
+    await replaceArtworkGroups(props.artwork.artworkId, groupIds)
     createGroupOpen.value = false
-    await invalidateFavoriteData()
-    toast.success('已创建收藏分组并添加作品')
+    await invalidateArtworkData()
+    toast.success('已创建本地分组并添加作品')
   } catch (error) {
-    await invalidateFavoriteData()
+    await invalidateArtworkData()
     toast.error('添加到新分组失败', { description: errorMessage(error) })
-  } finally {
-    actionPending.value = false
-  }
-}
-
-function requestSync() {
-  if (props.artwork.isFavorite) void runSync()
-  else syncConfirmationOpen.value = true
-}
-
-async function runSync() {
-  if (actionPending.value) return
-  actionPending.value = true
-  try {
-    const result = await syncFavorite(props.artwork.artworkId)
-    syncConfirmationOpen.value = false
-    if (result.isFavorite) {
-      toast.success('已同步到 Pixiv 公开收藏', {
-        description: `远端标签：${result.tags.join('、') || '无'}`,
-      })
-    } else {
-      toast.success('已解除 Pixiv 收藏')
-    }
-  } catch (error) {
-    toast.error('同步到 Pixiv 失败', { description: errorMessage(error) })
   } finally {
     actionPending.value = false
   }
@@ -177,12 +140,11 @@ async function runSync() {
 
 function handleAction(action: string) {
   if (action === 'favorite') void toggleFavorite()
-  else if (action === 'sync') requestSync()
   else if (action === 'add-group:new') createGroupOpen.value = true
   else if (action.startsWith('add-group:')) {
-    void changeFavoriteGroup(Number(action.slice('add-group:'.length)), 'add')
+    void changeGroup(Number(action.slice('add-group:'.length)), 'add')
   } else if (action.startsWith('remove-group:')) {
-    void changeFavoriteGroup(Number(action.slice('remove-group:'.length)), 'remove')
+    void changeGroup(Number(action.slice('remove-group:'.length)), 'remove')
   }
 }
 </script>
@@ -192,23 +154,12 @@ function handleAction(action: string) {
     <slot />
   </ContextMenu>
 
-  <CreateFavoriteGroupDialog
+  <CreateGroupDialog
     v-if="createGroupOpen"
     :open="true"
-    :description="`创建收藏分组，并将“${artwork.title}”添加到该分组。`"
+    :description="`创建本地分组，并将“${artwork.title}”添加到该分组，不影响收藏状态。`"
     :busy="actionPending"
     @close="createGroupOpen = false"
-    @save="createAndAddFavoriteGroup"
-  />
-
-  <ConfirmDialog
-    v-if="syncConfirmationOpen"
-    :open="true"
-    title="解除 Pixiv 收藏"
-    description="本地未收藏该作品。继续同步会解除 Pixiv 上的公开收藏；若远端本就未收藏则不会产生写入。"
-    confirm-text="继续同步"
-    :busy="actionPending"
-    @close="syncConfirmationOpen = false"
-    @confirm="runSync"
+    @save="createAndAddGroup"
   />
 </template>

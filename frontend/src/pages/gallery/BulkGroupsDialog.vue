@@ -2,8 +2,11 @@
 import { Plus } from '@lucide/vue'
 import { ref, watch } from 'vue'
 
-import { createFavoriteGroup, type FavoriteGroup } from '@/features/gallery/gallery-api'
-import CreateFavoriteGroupDialog from '@/shared/components/favorites/CreateFavoriteGroupDialog.vue'
+import {
+  type ArtworkGroup,
+  createGroup as createArtworkGroup,
+} from '@/features/gallery/gallery-api'
+import CreateGroupDialog from '@/shared/components/groups/CreateGroupDialog.vue'
 import { errorMessage } from '@/shared/errors'
 import Button from '@ui/Button.vue'
 import Checkbox from '@ui/Checkbox.vue'
@@ -12,7 +15,7 @@ import { toast } from '@ui/toast'
 
 const props = defineProps<{
   open: boolean
-  groups: FavoriteGroup[]
+  groups: ArtworkGroup[]
   selectionCount: number
   busy?: boolean
 }>()
@@ -51,14 +54,14 @@ function toggle(groupId: number, mode: 'add' | 'remove') {
 async function createGroup(name: string) {
   creatingGroup.value = true
   try {
-    const group = await createFavoriteGroup(name)
+    const group = await createArtworkGroup(name)
     addGroupIds.value = [...addGroupIds.value, group.groupId]
     removeGroupIds.value = removeGroupIds.value.filter((id) => id !== group.groupId)
     createGroupOpen.value = false
     emit('groupsChanged')
-    toast.success('收藏分组已创建，并加入待添加分组')
+    toast.success('本地分组已创建，并加入待添加分组')
   } catch (error) {
-    toast.error('创建收藏分组失败', { description: errorMessage(error) })
+    toast.error('创建本地分组失败', { description: errorMessage(error) })
   } finally {
     creatingGroup.value = false
   }
@@ -68,8 +71,8 @@ async function createGroup(name: string) {
 <template>
   <Dialog
     :open="open"
-    title="批量修改收藏分组"
-    :description="`将修改 ${String(selectionCount)} 件作品；添加分组会自动收藏，移除最后一个分组不会取消收藏。`"
+    title="批量修改本地分组"
+    :description="`将修改 ${String(selectionCount)} 件作品的本地分组，不影响收藏状态，也不会请求 Pixiv。`"
     @update:open="!$event && emit('close')"
   >
     <div class="mt-5 grid gap-4 sm:grid-cols-2">
@@ -121,7 +124,7 @@ async function createGroup(name: string) {
       </section>
     </div>
     <p v-if="groups.length === 0" class="mt-4 text-sm text-muted-foreground">
-      还没有收藏分组，可通过上方“添加到新分组”创建。
+      还没有本地分组，可通过上方“添加到新分组”创建。
     </p>
     <div class="mt-6 flex justify-end gap-2">
       <Button variant="secondary" :disabled="busy" @click="emit('close')">取消</Button>
@@ -134,7 +137,7 @@ async function createGroup(name: string) {
     </div>
   </Dialog>
 
-  <CreateFavoriteGroupDialog
+  <CreateGroupDialog
     :open="createGroupOpen"
     description="创建分组后会自动加入本次批量操作的待添加分组。"
     :busy="creatingGroup"

@@ -178,12 +178,12 @@ class ArtworkSummary:
     published_at: str | None
     downloaded_at: str
     is_favorite: bool = False
-    favorite_group_ids: tuple[int, ...] = ()
+    group_ids: tuple[int, ...] = ()
     tags: tuple[tuple[int, TagRecord], ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
-class FavoriteGroup:
+class ArtworkGroup:
     group_id: int
     name: str
     artwork_count: int
@@ -193,14 +193,12 @@ class FavoriteGroup:
 class FavoriteState:
     artwork_id: int
     is_favorite: bool
-    group_ids: tuple[int, ...]
-    group_names: tuple[str, ...]
 
 
 @dataclass(frozen=True, slots=True)
-class FavoriteSyncResult:
-    is_favorite: bool
-    tags: tuple[str, ...]
+class ArtworkGroupMembership:
+    artwork_id: int
+    group_ids: tuple[int, ...]
 
 
 @dataclass(frozen=True, slots=True)

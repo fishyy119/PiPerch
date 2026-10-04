@@ -13,7 +13,7 @@ from PIL import Image, ImageOps
 
 from piperch.domain import ArtworkType, ItemState, MediaRecord, RemoteArtwork
 from piperch.errors import AppError, UpstreamError
-from piperch.repositories.favorites import validate_imported_favorite_groups
+from piperch.repositories.groups import validate_imported_group_names
 from piperch.services.library_files import LibraryFileOperations
 from piperch.services.thumbnails import ArtworkThumbnailCache
 
@@ -74,10 +74,10 @@ class ArtworkDownloadService:
                     artwork.bookmark_data.bookmark_id,
                     settings.pixiv_cookie,
                 )
-                bookmark_tags = validate_imported_favorite_groups(bookmark.tags)
+                bookmark_tags = validate_imported_group_names(bookmark.tags)
             except AppError as error:
                 logger.warning(
-                    "作品 %d 的 Pixiv 收藏信息导入失败，媒体将继续入库: %s",
+                    "作品 %d 的 Pixiv 收藏标签导入失败，媒体将继续入库: %s",
                     artwork_id,
                     error.message,
                 )

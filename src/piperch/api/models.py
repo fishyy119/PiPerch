@@ -293,7 +293,7 @@ class ArtworkSummaryResponse(ApiModel):
     published_at: str | None
     downloaded_at: str
     is_favorite: bool
-    favorite_group_ids: list[int]
+    group_ids: list[int]
 
 
 class ArtworkPage(ApiModel):
@@ -355,7 +355,7 @@ class DeleteResponse(ApiModel):
     deleted: int
 
 
-class FavoriteGroupNameRequest(ApiModel):
+class GroupNameRequest(ApiModel):
     name: str = Field(min_length=1, max_length=20)
 
     @field_validator("name", mode="before")
@@ -364,49 +364,38 @@ class FavoriteGroupNameRequest(ApiModel):
         return value.strip() if isinstance(value, str) else value
 
 
-class FavoriteGroupResponse(ApiModel):
+class ArtworkGroupResponse(ApiModel):
     group_id: int
     name: str
     artwork_count: int
 
 
-class FavoriteStateRequest(ApiModel):
-    is_favorite: bool
+class ArtworkGroupsRequest(ApiModel):
     group_ids: list[int] = Field(default_factory=lambda: list[int](), max_length=10)
 
     @field_validator("group_ids")
     @classmethod
     def validate_group_ids(cls, values: list[int]) -> list[int]:
         if any(value <= 0 for value in values):
-            raise ValueError("收藏分组 ID 必须是正整数。")
+            raise ValueError("本地分组 ID 必须是正整数。")
         return list(dict.fromkeys(values))
 
-    @model_validator(mode="after")
-    def validate_state(self) -> FavoriteStateRequest:
-        if not self.is_favorite and self.group_ids:
-            raise ValueError("取消收藏时不能保留收藏分组。")
-        return self
+
+class FavoriteStateRequest(ApiModel):
+    is_favorite: bool
 
 
 class FavoriteStateResponse(ApiModel):
     artwork_id: int
     is_favorite: bool
+
+
+class ArtworkGroupsResponse(ApiModel):
+    artwork_id: int
     group_ids: list[int]
 
 
-class BulkFavoriteRequest(ApiModel):
-    artwork_ids: list[int] = Field(min_length=1, max_length=1000)
-    is_favorite: bool
-
-    @field_validator("artwork_ids")
-    @classmethod
-    def validate_artwork_ids(cls, values: list[int]) -> list[int]:
-        if any(value <= 0 for value in values):
-            raise ValueError("作品 ID 必须是正整数。")
-        return list(dict.fromkeys(values))
-
-
-class BulkFavoriteGroupsRequest(ApiModel):
+class BulkArtworkGroupsRequest(ApiModel):
     artwork_ids: list[int] = Field(min_length=1, max_length=1000)
     add_group_ids: list[int] = Field(default_factory=lambda: list[int](), max_length=10)
     remove_group_ids: list[int] = Field(default_factory=lambda: list[int](), max_length=10)
@@ -419,18 +408,9 @@ class BulkFavoriteGroupsRequest(ApiModel):
         return list(dict.fromkeys(values))
 
     @model_validator(mode="after")
-    def validate_changes(self) -> BulkFavoriteGroupsRequest:
+    def validate_changes(self) -> BulkArtworkGroupsRequest:
         if not self.add_group_ids and not self.remove_group_ids:
-            raise ValueError("至少需要添加或移除一个收藏分组。")
+            raise ValueError("至少需要添加或移除一个本地分组。")
         if set(self.add_group_ids) & set(self.remove_group_ids):
             raise ValueError("同一分组不能同时添加和移除。")
         return self
-
-
-class MutationResponse(ApiModel):
-    updated: int
-
-
-class FavoriteSyncResponse(ApiModel):
-    is_favorite: bool
-    tags: list[str]

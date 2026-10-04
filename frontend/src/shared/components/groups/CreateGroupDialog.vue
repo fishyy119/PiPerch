@@ -11,7 +11,7 @@ const props = withDefaults(
     description?: string
     busy?: boolean
   }>(),
-  { description: '创建一个新的收藏分组。', busy: false },
+  { description: '创建一个新的本地分组。', busy: false },
 )
 const emit = defineEmits<{
   close: []
