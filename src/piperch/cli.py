@@ -1,11 +1,15 @@
 from __future__ import annotations
 
 import argparse
+import logging
 import os
+import socket
 import sys
 import threading
 import webbrowser
+from contextlib import ExitStack
 from copy import deepcopy
+from ipaddress import AddressValueError, IPv4Address
 from pathlib import Path
 from typing import TYPE_CHECKING, NoReturn, Protocol
 from uuid import uuid4
@@ -19,6 +23,7 @@ from piperch.paths import AppPaths
 from piperch.runtime import AppControl
 
 _GRACEFUL_SHUTDOWN_TIMEOUT_SECONDS = 5
+_LOOPBACK_HOST = "127.0.0.1"
 _PIPERCH_LOGGING_CONFIG = deepcopy(LOGGING_CONFIG)
 _PIPERCH_LOGGING_CONFIG["loggers"]["piperch"] = {
     "handlers": ["default"],
@@ -27,7 +32,7 @@ _PIPERCH_LOGGING_CONFIG["loggers"]["piperch"] = {
 }
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from collections.abc import Callable, Sequence
 
 
 class _ServerControl(Protocol):
@@ -116,32 +121,79 @@ def _start_terminal_interrupt_watcher(server: _ServerLifecycle) -> None:
     ).start()
 
 
-def run_server(paths: AppPaths, port: int, *, open_browser: bool = False) -> None:
+# TODO: 整理参数解析
+def _parse_host(value: str) -> str:
+    try:
+        address = IPv4Address(value)
+    except AddressValueError as error:
+        raise argparse.ArgumentTypeError("监听地址必须是有效的 IPv4 地址。") from error
+    if address.is_unspecified:
+        raise argparse.ArgumentTypeError("请指定具体的 IPv4 地址，不能使用 0.0.0.0。")
+    return str(address)
+
+
+def _bind_sockets(hosts: Sequence[str], port: int) -> list[socket.socket]:
+    sockets: list[socket.socket] = []
+    with ExitStack() as cleanup:
+        for host in hosts:
+            listener = socket.socket(family=socket.AF_INET, type=socket.SOCK_STREAM)
+            cleanup.callback(listener.close)
+            listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            listener.bind((host, port))
+            sockets.append(listener)
+        cleanup.pop_all()
+    return sockets
+
+
+def run_server(
+    paths: AppPaths,
+    port: int,
+    *,
+    additional_hosts: Sequence[str] = (),
+    open_browser: bool = False,
+) -> None:
     lifecycle = _ServerLifecycle()
+    hosts = tuple(dict.fromkeys((_LOOPBACK_HOST, *additional_hosts)))
     watcher_started = False
     while True:
         control = AppControl(instance_id=str(uuid4()), request_restart=lifecycle.request_restart)
         config = uvicorn.Config(
             create_app(paths, control),
-            host="127.0.0.1",
+            host=_LOOPBACK_HOST,
             port=port,
             workers=1,
             timeout_graceful_shutdown=_GRACEFUL_SHUTDOWN_TIMEOUT_SECONDS,
             log_config=_PIPERCH_LOGGING_CONFIG,
         )
         server = uvicorn.Server(config)
+        try:
+            sockets = _bind_sockets(hosts, port) if len(hosts) > 1 else []
+        except OSError as error:
+            logging.getLogger("uvicorn.error").error(error)
+            raise SystemExit(3) from None
+        if sockets:
+            logger = logging.getLogger("uvicorn.error")
+            for host in hosts:
+                logger.info("Uvicorn running on http://%s:%d (Press CTRL+C to quit)", host, port)
         if open_browser:
             threading.Timer(
                 1,
                 webbrowser.open,
-                args=(f"http://{config.host}:{config.port}",),
+                args=(f"http://{_LOOPBACK_HOST}:{config.port}",),
             ).start()
         open_browser = False
         lifecycle.bind(server)
         if not watcher_started:
             _start_terminal_interrupt_watcher(lifecycle)
             watcher_started = True
-        server.run()
+        try:
+            if sockets:
+                server.run(sockets=sockets)
+            else:
+                server.run()
+        finally:
+            for listener in sockets:
+                listener.close()
         if not server.started:
             raise SystemExit(3)
         if not lifecycle.take_restart_request():
@@ -154,6 +206,14 @@ def _parser() -> argparse.ArgumentParser:
 
     serve = commands.add_parser("serve", help="迁移数据库并启动本地服务")
     serve.add_argument("--port", type=int, default=9303)
+    serve.add_argument(
+        "--host",
+        action="append",
+        default=[],
+        type=_parse_host,
+        metavar="IP",
+        help="追加监听的本机 IPv4 地址，可重复传入，始终监听 127.0.0.1",
+    )
     serve.add_argument("--data-dir", type=Path)
 
     database = commands.add_parser("db", help="数据库管理")
@@ -171,5 +231,5 @@ def main() -> NoReturn:
         raise SystemExit(0)
     if not 1 <= arguments.port <= 65535:
         _parser().error("端口必须位于 1 到 65535 之间。")
-    run_server(paths, arguments.port, open_browser=True)
+    run_server(paths, arguments.port, additional_hosts=arguments.host, open_browser=True)
     raise SystemExit(0)
