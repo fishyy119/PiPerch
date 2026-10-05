@@ -317,6 +317,7 @@ class UgoiraFrameResponse(ApiModel):
 
 class ArtworkDetailResponse(ArtworkSummaryResponse):
     description: str
+    local_linked_artwork_ids: list[int]
     width: int | None
     height: int | None
     tags: list[TagResponse]

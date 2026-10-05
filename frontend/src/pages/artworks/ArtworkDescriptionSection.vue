@@ -3,7 +3,7 @@ import { useRouter } from 'vue-router'
 
 import { artworkTypeLabel } from '@/features/artworks/artwork'
 import type { ArtworkDetail } from '@/features/artworks/artworks-api'
-import SafeHtml from '@/pages/artworks/SafeHtml.vue'
+import SafeDescription from '@/pages/artworks/SafeDescription.vue'
 import Card from '@ui/Card.vue'
 
 defineProps<{ artwork: ArtworkDetail }>()
@@ -39,10 +39,11 @@ function filterByTag(tagId: number) {
       </div>
     </div>
 
-    <SafeHtml
+    <SafeDescription
       v-if="artwork.description"
       class="mt-5 text-sm leading-7"
       :html="artwork.description"
+      :local-artwork-ids="artwork.localLinkedArtworkIds"
     />
     <p v-else class="mt-5 text-sm text-muted-foreground">作者没有为这件作品添加说明。</p>
 

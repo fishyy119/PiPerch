@@ -20,11 +20,15 @@ def test_parse_artwork_ids_supports_urls_and_deduplicates() -> None:
             "123 456",
             "https://www.pixiv.net/artworks/123",
             "https://www.pixiv.net/member_illust.php?illust_id=789",
+            (
+                '<a href="https://www.pixiv.net/artworks/321">作品一</a>'
+                '<a href="https://www.pixiv.net/artworks/654">作品二</a>'
+            ),
             "invalid",
         ]
     )
 
-    assert result == [123, 456, 789]
+    assert result == [123, 456, 789, 321, 654]
 
 
 def test_parse_artwork_ids_rejects_non_positive_values() -> None:

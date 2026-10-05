@@ -53,6 +53,7 @@ export type NamedCount = z.infer<typeof namedCountSchema>
 
 export const artworkDetailSchema = artworkSummarySchema.extend({
   description: z.string(),
+  localLinkedArtworkIds: z.array(z.number().int().positive()),
   width: z.number().int().nullable(),
   height: z.number().int().nullable(),
   tags: z.array(tagSchema),

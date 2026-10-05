@@ -15,11 +15,13 @@ def parse_artwork_ids(values: Sequence[str]) -> list[int]:
     output: dict[int, None] = {}
     for raw in values:
         for token in re.split(r"[\s,;]+", raw.strip()):
-            match = _ARTWORK_URL_PATTERN.search(token)
-            value = token if token.isdecimal() else match.group(1) if match else ""
-            artwork_id = int(value) if value else 0
-            if artwork_id > 0:
-                output[artwork_id] = None
+            parsed_values = (
+                [token] if token.isdecimal() else [match.group(1) for match in _ARTWORK_URL_PATTERN.finditer(token)]
+            )
+            for value in parsed_values:
+                artwork_id = int(value)
+                if artwork_id > 0:
+                    output[artwork_id] = None
     return list(output)
 
 

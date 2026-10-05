@@ -33,10 +33,14 @@ def artwork_summary_response(summary: ArtworkSummary) -> ArtworkSummaryResponse:
     )
 
 
-def artwork_detail_response(detail: ArtworkDetail) -> ArtworkDetailResponse:
+def artwork_detail_response(
+    detail: ArtworkDetail,
+    local_linked_artwork_ids: list[int],
+) -> ArtworkDetailResponse:
     return ArtworkDetailResponse(
         **artwork_summary_response(detail.summary).model_dump(),
         description=detail.description,
+        local_linked_artwork_ids=local_linked_artwork_ids,
         width=detail.width,
         height=detail.height,
         tags=[

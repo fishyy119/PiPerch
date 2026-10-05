@@ -24,6 +24,7 @@ from piperch.api.models import (
 from piperch.container import AppContainer
 from piperch.domain import ArtworkType
 from piperch.errors import NotFoundError
+from piperch.pixiv.parsing import parse_artwork_ids
 
 router = APIRouter(tags=["gallery"])
 PositiveId = Annotated[int, Field(gt=0)]
@@ -81,7 +82,13 @@ def get_artwork(
     artwork_id: int = PathParameter(gt=0),
     container: AppContainer = Depends(get_container),
 ) -> ArtworkDetailResponse:
-    return artwork_detail_response(container.artworks.get_detail(artwork_id))
+    detail = container.artworks.get_detail(artwork_id)
+    linked_artwork_ids = parse_artwork_ids([detail.description])
+    existing_ids = container.artworks.find_existing_ids(linked_artwork_ids)
+    return artwork_detail_response(
+        detail,
+        sorted(existing_ids),
+    )
 
 
 @router.get("/artworks/{artwork_id}/related", response_model=list[ArtworkSummaryResponse])
