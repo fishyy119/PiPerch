@@ -10,7 +10,7 @@ import {
   Trash2,
 } from '@lucide/vue'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query'
-import { computed, ref, watch } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 
@@ -23,6 +23,7 @@ import {
   groupQueryKeys,
   invalidateArtworkData,
   invalidateArtworkGroupData,
+  removeArtworkData,
   updateArtworkDetail,
 } from '@/features/library/library-query-cache'
 import CreateGroupDialog from '@/shared/components/groups/CreateGroupDialog.vue'
@@ -58,8 +59,12 @@ const groupsQuery = useQuery({
 const deleteMutation = useMutation({
   mutationFn: () => deleteArtwork(props.artwork.artworkId),
   onSuccess: async () => {
-    await invalidateArtworkGroupData(queryClient)
+    const artworkId = props.artwork.artworkId
+    deleteOpen.value = false
     await router.replace('/gallery')
+    await nextTick()
+    removeArtworkData(queryClient, artworkId)
+    await invalidateArtworkGroupData(queryClient)
   },
 })
 

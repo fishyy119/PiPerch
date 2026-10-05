@@ -6,6 +6,7 @@ export const artworkQueryKeys = {
   all: ['artworks'] as const,
   list: (filters: ArtworkListFilters) => ['artworks', 'list', filters] as const,
   detail: (artworkId: number) => ['artworks', 'detail', artworkId] as const,
+  relatedByArtwork: (artworkId: number) => ['artworks', 'related', artworkId] as const,
   related: (artworkId: number, limit: number) => ['artworks', 'related', artworkId, limit] as const,
   tags: (search: string, includeIds: number[]) => ['artworks', 'tags', search, includeIds] as const,
   authors: (search: string, includeIds: number[]) =>
@@ -26,6 +27,11 @@ export function updateArtworkDetail(
   queryClient.setQueryData<ArtworkDetail>(artworkQueryKeys.detail(artworkId), (artwork) =>
     artwork ? update(artwork) : artwork,
   )
+}
+
+export function removeArtworkData(queryClient: QueryClient, artworkId: number) {
+  queryClient.removeQueries({ queryKey: artworkQueryKeys.detail(artworkId), exact: true })
+  queryClient.removeQueries({ queryKey: artworkQueryKeys.relatedByArtwork(artworkId) })
 }
 
 export async function invalidateArtworkData(queryClient: QueryClient) {
