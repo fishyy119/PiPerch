@@ -68,11 +68,14 @@ export const artworkDetailSchema = artworkSummarySchema.extend({
 })
 export type ArtworkDetail = z.infer<typeof artworkDetailSchema>
 
+export type MultiValueMatch = 'any' | 'all'
+
 export interface ArtworkListFilters {
   page: number
   size: number
   search: string
   tagIds: number[]
+  tagMatch: MultiValueMatch
   authorId?: number
   seriesId?: number
   artworkType?: string
@@ -80,6 +83,7 @@ export interface ArtworkListFilters {
   ai: string
   favorite: string
   groupIds: number[]
+  groupMatch: MultiValueMatch
   sort: string
   order: string
   randomSeed?: number
@@ -90,9 +94,11 @@ function artworkListQuery(filters: ArtworkListFilters) {
     page: String(filters.page),
     size: String(filters.size),
     search: filters.search,
+    tagMatch: filters.tagMatch,
     rating: filters.rating,
     ai: filters.ai,
     favorite: filters.favorite,
+    groupMatch: filters.groupMatch,
     sort: filters.sort,
     order: filters.order,
   })

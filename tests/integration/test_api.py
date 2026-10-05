@@ -533,7 +533,7 @@ def test_gallery_accepts_camel_case_filter_parameters(
         published_at=None,
         original_urls=("https://i.pximg.net/target.jpg",),
         thumbnail_url=None,
-        tags=(TagRecord("目标标签"),),
+        tags=(TagRecord("目标标签"), TagRecord("共同标签")),
     )
     second = RemoteArtwork(
         artwork_id=102,
@@ -556,6 +556,27 @@ def test_gallery_accepts_camel_case_filter_parameters(
         thumbnail_url=None,
         tags=(TagRecord("其他标签"),),
     )
+    partial_match = RemoteArtwork(
+        artwork_id=103,
+        artwork_type=ArtworkType.MANGA,
+        title="部分匹配作品",
+        description="",
+        author_id=201,
+        author_name="目标作者",
+        author_account=None,
+        author_avatar_url=None,
+        series_id=301,
+        series_title="目标系列",
+        page_count=1,
+        width=1000,
+        height=1200,
+        x_restrict=1,
+        is_ai=True,
+        published_at=None,
+        original_urls=("https://i.pximg.net/partial.jpg",),
+        thumbnail_url=None,
+        tags=(TagRecord("目标标签"),),
+    )
     container.download_commits.commit(
         first,
         [MediaRecord("page", "201/101/101_p0.jpg", "image/jpeg", 10, 0)],
@@ -564,10 +585,26 @@ def test_gallery_accepts_camel_case_filter_parameters(
         second,
         [MediaRecord("page", "202/102/102_p0.jpg", "image/jpeg", 10, 0)],
     )
-    target_tag_id = next(tag_id for tag_id, tag, _ in container.artworks.list_tags("", 50) if tag.name == "目标标签")
+    container.download_commits.commit(
+        partial_match,
+        [MediaRecord("page", "201/103/103_p0.jpg", "image/jpeg", 10, 0)],
+    )
+    tag_ids = {tag.name: tag_id for tag_id, tag, _ in container.artworks.list_tags("", 50)}
+    target_tag_id = tag_ids["目标标签"]
+    shared_tag_id = tag_ids["共同标签"]
+
+    first_group = container.groups.create_group("第一组")
+    second_group = container.groups.create_group("第二组")
+    container.groups.replace_groups(101, group_ids=(first_group.group_id, second_group.group_id))
+    container.groups.replace_groups(103, group_ids=(first_group.group_id,))
 
     response = client.get(
-        f"/api/artworks?tagId={target_tag_id}&authorId=201&seriesId=301&artworkType=manga&rating=r18&ai=yes"
+        f"/api/artworks?tagId={target_tag_id}&tagId={shared_tag_id}&tagMatch=all"
+        "&authorId=201&seriesId=301&artworkType=manga&rating=r18&ai=yes"
+    )
+    group_response = client.get(
+        f"/api/artworks?groupId={first_group.group_id}&groupId={second_group.group_id}&groupMatch=all"
+        "&authorId=201&seriesId=301&artworkType=manga&rating=r18&ai=yes"
     )
     tags_response = client.get(f"/api/tags?search=其他&limit=1&includeId={target_tag_id}")
     authors_response = client.get("/api/authors?search=其他&limit=1&includeId=201")
@@ -576,6 +613,8 @@ def test_gallery_accepts_camel_case_filter_parameters(
     payload = response.json()
     assert payload["totalElements"] == 1
     assert [item["artworkId"] for item in payload["items"]] == [101]
+    assert group_response.status_code == 200
+    assert [item["artworkId"] for item in group_response.json()["items"]] == [101]
     assert tags_response.status_code == 200
     assert [item["name"] for item in tags_response.json()] == ["目标标签", "其他标签"]
     assert authors_response.status_code == 200

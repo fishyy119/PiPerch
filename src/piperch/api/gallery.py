@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import math
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, Query
 from fastapi import Path as PathParameter
@@ -35,6 +35,7 @@ def list_artworks(
     size: int = Query(default=24, ge=1, le=100),
     search: str = Query(default="", max_length=200),
     tag_id: list[PositiveId] = Query(default=[], alias="tagId"),
+    tag_match: Literal["any", "all"] = Query(default="any", alias="tagMatch"),
     author_id: int | None = Query(default=None, gt=0, alias="authorId"),
     series_id: int | None = Query(default=None, gt=0, alias="seriesId"),
     artwork_type: ArtworkType | None = Query(default=None, alias="artworkType"),
@@ -42,6 +43,7 @@ def list_artworks(
     ai: str = Query(default="all", pattern="^(all|yes|no)$"),
     favorite: str = Query(default="all", pattern="^(all|yes|no)$"),
     group_id: list[PositiveId] = Query(default=[], alias="groupId"),
+    group_match: Literal["any", "all"] = Query(default="any", alias="groupMatch"),
     sort: str = Query(default="downloadedAt", pattern="^(downloadedAt|publishedAt|title|id|random)$"),
     order: str = Query(default="desc", pattern="^(asc|desc)$"),
     random_seed: int = Query(default=0, ge=0, lt=2_147_483_647, alias="randomSeed"),
@@ -52,6 +54,7 @@ def list_artworks(
         size=size,
         search=search,
         tag_ids=tag_id,
+        tag_match=tag_match,
         author_id=author_id,
         series_id=series_id,
         artwork_type=artwork_type,
@@ -59,6 +62,7 @@ def list_artworks(
         ai=ai,
         favorite=favorite,
         group_ids=group_id,
+        group_match=group_match,
         sort=sort,
         order=order,
         random_seed=random_seed,

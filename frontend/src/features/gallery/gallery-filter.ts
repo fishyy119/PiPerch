@@ -1,7 +1,10 @@
 import { inject, type InjectionKey, provide, type Ref } from 'vue'
 
+import type { MultiValueMatch } from '@/features/artworks/artworks-api'
+
 export interface GalleryFilterValues {
   selectedTagIds: number[]
+  tagMatch: MultiValueMatch
   authorId: number | undefined
   seriesId: number | undefined
   artworkType: string
@@ -9,6 +12,7 @@ export interface GalleryFilterValues {
   ai: string
   favorite: string
   selectedGroupIds: number[]
+  groupMatch: MultiValueMatch
   sort: string
   order: string
   randomSeed: number
@@ -43,6 +47,7 @@ export function useGalleryFilters() {
 export function defaultGalleryFilterValues(): GalleryFilterValues {
   return {
     selectedTagIds: [],
+    tagMatch: 'any',
     authorId: undefined,
     seriesId: undefined,
     artworkType: '',
@@ -50,6 +55,7 @@ export function defaultGalleryFilterValues(): GalleryFilterValues {
     ai: 'all',
     favorite: 'all',
     selectedGroupIds: [],
+    groupMatch: 'any',
     sort: 'downloadedAt',
     order: 'desc',
     randomSeed: 0,

@@ -5,6 +5,7 @@ import { computed, watch } from 'vue'
 import { GALLERY_RANDOM_SEED_MODULUS, useGalleryFilters } from '@/features/gallery/gallery-filter'
 import { useGalleryFilterOptions } from '@/features/gallery/useGalleryFilterOptions'
 import CollapsibleFilterOptions from '@/pages/gallery/CollapsibleFilterOptions.vue'
+import FilterMatchToggle from '@/pages/gallery/FilterMatchToggle.vue'
 import FilterOptionButton from '@/pages/gallery/FilterOptionButton.vue'
 import Button from '@ui/Button.vue'
 import Dialog from '@ui/Dialog.vue'
@@ -193,7 +194,13 @@ function updateSort(sort: string, order: string) {
       </section>
 
       <section class="filter-row border-t pt-5">
-        <h3 class="filter-row-title">本地分组</h3>
+        <div class="filter-row-title flex flex-col items-start gap-1.5">
+          <h3>本地分组</h3>
+          <FilterMatchToggle
+            :model-value="filters.groupMatch"
+            @update:model-value="updateFilters({ groupMatch: $event })"
+          />
+        </div>
         <div class="flex flex-wrap gap-2">
           <FilterOptionButton
             v-for="group in visibleGroups"
@@ -211,7 +218,13 @@ function updateSort(sort: string, order: string) {
       </section>
 
       <section class="filter-row border-t pt-5">
-        <h3 class="filter-row-title">标签</h3>
+        <div class="filter-row-title flex flex-col items-start gap-1.5">
+          <h3>标签</h3>
+          <FilterMatchToggle
+            :model-value="filters.tagMatch"
+            @update:model-value="updateFilters({ tagMatch: $event })"
+          />
+        </div>
         <div>
           <SearchInput v-model="tagSearch" class="mb-3 w-full max-w-sm" placeholder="搜索标签…" />
           <CollapsibleFilterOptions>

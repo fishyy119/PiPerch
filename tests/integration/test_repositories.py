@@ -27,6 +27,7 @@ from piperch.settings import SettingsManager
 
 if TYPE_CHECKING:
     from pathlib import Path
+    from typing import Literal
 
 
 def _artwork(artwork_id: int, tags: tuple[TagRecord, ...]) -> RemoteArtwork:
@@ -80,7 +81,7 @@ def _repositories(
     return paths, database, settings, artworks, commits, DownloadRepository(database)
 
 
-def test_gallery_tag_filter_uses_and_semantics(tmp_path: Path) -> None:
+def test_gallery_multi_value_filters_apply_selected_match_modes(tmp_path: Path) -> None:
     _, database, _, artworks, commits, _ = _repositories(tmp_path)
     try:
         commits.commit(
@@ -91,27 +92,67 @@ def test_gallery_tag_filter_uses_and_semantics(tmp_path: Path) -> None:
             _artwork(2, (TagRecord("风景"),)),
             [MediaRecord("page", "100/2/2_p0.jpg", "image/jpeg", 10, 0)],
         )
-        available_tags = artworks.list_tags("", 50)
-        tag_ids = [tag_id for tag_id, _, _ in available_tags]
+        commits.commit(
+            _artwork(3, (TagRecord("蓝天"),)),
+            [MediaRecord("page", "100/3/3_p0.jpg", "image/jpeg", 10, 0)],
+        )
+        available_tags = {tag.name: tag_id for tag_id, tag, _ in artworks.list_tags("", 50)}
+        tag_ids = (available_tags["风景"], available_tags["蓝天"])
 
-        items, total = artworks.list_artworks(
-            page=0,
-            size=24,
-            search="",
-            tag_ids=tag_ids,
-            author_id=None,
-            series_id=None,
-            artwork_type=None,
-            rating="all",
-            ai="all",
-            sort="id",
-            order="asc",
+        groups = ArtworkGroupRepository(database)
+        first_group = groups.create_group("第一组")
+        second_group = groups.create_group("第二组")
+        groups.replace_groups(1, group_ids=(first_group.group_id,))
+        groups.replace_groups(2, group_ids=(first_group.group_id, second_group.group_id))
+        groups.replace_groups(3, group_ids=(second_group.group_id,))
+        group_ids = (first_group.group_id, second_group.group_id)
+
+        def filtered_ids(
+            *,
+            selected_tag_ids: tuple[int, ...] = (),
+            tag_match: Literal["any", "all"] = "any",
+            selected_group_ids: tuple[int, ...] = (),
+            group_match: Literal["any", "all"] = "any",
+        ) -> list[int]:
+            items, _ = artworks.list_artworks(
+                page=0,
+                size=24,
+                search="",
+                tag_ids=selected_tag_ids,
+                tag_match=tag_match,
+                author_id=None,
+                series_id=None,
+                artwork_type=None,
+                rating="all",
+                ai="all",
+                group_ids=selected_group_ids,
+                group_match=group_match,
+                sort="id",
+                order="asc",
+            )
+            return [item.artwork_id for item in items]
+
+        tag_any_ids = filtered_ids(selected_tag_ids=tag_ids)
+        tag_all_ids = filtered_ids(selected_tag_ids=(*tag_ids, tag_ids[0]), tag_match="all")
+        group_any_ids = filtered_ids(selected_group_ids=group_ids)
+        group_all_ids = filtered_ids(
+            selected_group_ids=(*group_ids, group_ids[0]),
+            group_match="all",
+        )
+        intersection_ids = filtered_ids(
+            selected_tag_ids=tag_ids,
+            tag_match="all",
+            selected_group_ids=group_ids,
+            group_match="all",
         )
     finally:
         database.close()
 
-    assert total == 1
-    assert [item.artwork_id for item in items] == [1]
+    assert tag_any_ids == [1, 2, 3]
+    assert tag_all_ids == [1]
+    assert group_any_ids == [1, 2, 3]
+    assert group_all_ids == [2]
+    assert intersection_ids == []
 
 
 def test_tag_search_cache_supports_incremental_and_startup_sync(tmp_path: Path) -> None:

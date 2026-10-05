@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
-from typing import TYPE_CHECKING, ClassVar, cast
+from typing import TYPE_CHECKING, ClassVar, Literal, cast
 
 from sqlalchemy import Select, and_, case, delete, func, insert, literal, or_, select, update
 
@@ -263,6 +263,8 @@ class ArtworkRepository:
         random_seed: int = 0,
         favorite: str = "all",
         group_ids: Sequence[int] = (),
+        tag_match: Literal["any", "all"] = "any",
+        group_match: Literal["any", "all"] = "any",
     ) -> tuple[list[ArtworkSummary], int]:
         conditions: list[ColumnElement[bool]] = []
         if search:
@@ -294,17 +296,26 @@ class ArtworkRepository:
         elif favorite == "no":
             conditions.append(~favorite_exists.exists())
         if group_ids:
-            matching_groups = (
-                select(artwork_group_items.c.artwork_id).where(artwork_group_items.c.group_id.in_(group_ids)).distinct()
+            unique_group_ids = tuple(dict.fromkeys(group_ids))
+            matching_groups = select(artwork_group_items.c.artwork_id).where(
+                artwork_group_items.c.group_id.in_(unique_group_ids)
             )
+            if group_match == "all":
+                matching_groups = matching_groups.group_by(artwork_group_items.c.artwork_id).having(
+                    func.count(func.distinct(artwork_group_items.c.group_id)) == len(unique_group_ids)
+                )
+            else:
+                matching_groups = matching_groups.distinct()
             conditions.append(artworks.c.id.in_(matching_groups))
         if tag_ids:
-            matching_tags = (
-                select(artwork_tags.c.artwork_id)
-                .where(artwork_tags.c.tag_id.in_(tag_ids))
-                .group_by(artwork_tags.c.artwork_id)
-                .having(func.count(func.distinct(artwork_tags.c.tag_id)) == len(set(tag_ids)))
-            )
+            unique_tag_ids = tuple(dict.fromkeys(tag_ids))
+            matching_tags = select(artwork_tags.c.artwork_id).where(artwork_tags.c.tag_id.in_(unique_tag_ids))
+            if tag_match == "all":
+                matching_tags = matching_tags.group_by(artwork_tags.c.artwork_id).having(
+                    func.count(func.distinct(artwork_tags.c.tag_id)) == len(unique_tag_ids)
+                )
+            else:
+                matching_tags = matching_tags.distinct()
             conditions.append(artworks.c.id.in_(matching_tags))
 
         base = artworks.join(authors, artworks.c.author_id == authors.c.id).outerjoin(

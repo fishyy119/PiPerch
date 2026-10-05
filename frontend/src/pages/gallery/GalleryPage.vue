@@ -5,7 +5,11 @@ import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import { usePreference } from '@/app/usePreference'
-import { type ArtworkListFilters, listArtworks } from '@/features/artworks/artworks-api'
+import {
+  type ArtworkListFilters,
+  listArtworks,
+  type MultiValueMatch,
+} from '@/features/artworks/artworks-api'
 import type { GalleryFilterValues } from '@/features/gallery/gallery-filter'
 import {
   defaultGalleryFilterValues,
@@ -52,6 +56,10 @@ function randomSeed() {
     : 0
 }
 
+function multiValueMatch(value: string | null | undefined): MultiValueMatch {
+  return value === 'all' ? 'all' : 'any'
+}
+
 function selectedTagIds() {
   const raw = route.query.tagId
   const values = Array.isArray(raw) ? raw : raw === undefined ? [] : [raw]
@@ -72,6 +80,7 @@ const galleryFilterValues = computed<GalleryFilterValues>({
   get() {
     return {
       selectedTagIds: selectedTagIds(),
+      tagMatch: multiValueMatch(firstQueryValue(route.query.tagMatch)),
       authorId: positiveInt(firstQueryValue(route.query.authorId)),
       seriesId: positiveInt(firstQueryValue(route.query.seriesId)),
       artworkType: firstQueryValue(route.query.artworkType),
@@ -79,6 +88,7 @@ const galleryFilterValues = computed<GalleryFilterValues>({
       ai: firstQueryValue(route.query.ai) || 'all',
       favorite: firstQueryValue(route.query.favorite) || 'all',
       selectedGroupIds: selectedGroupIds(),
+      groupMatch: multiValueMatch(firstQueryValue(route.query.groupMatch)),
       sort: firstQueryValue(route.query.sort) || 'downloadedAt',
       order: firstQueryValue(route.query.order) || 'desc',
       randomSeed: randomSeed(),
@@ -97,6 +107,7 @@ function artworkFilters(): ArtworkListFilters {
     size: preferredPageSize.value,
     search: routeSearch.value,
     tagIds: filters.selectedTagIds,
+    tagMatch: filters.tagMatch,
     ...(filters.authorId === undefined ? {} : { authorId: filters.authorId }),
     ...(filters.seriesId === undefined ? {} : { seriesId: filters.seriesId }),
     ...(filters.artworkType ? { artworkType: filters.artworkType } : {}),
@@ -104,6 +115,7 @@ function artworkFilters(): ArtworkListFilters {
     ai: filters.ai,
     favorite: filters.favorite,
     groupIds: filters.selectedGroupIds,
+    groupMatch: filters.groupMatch,
     sort: filters.sort,
     order: filters.order,
     ...(filters.sort === 'random' ? { randomSeed: filters.randomSeed } : {}),
@@ -173,6 +185,7 @@ function clearSearch() {
 function updateGalleryFilters(filters: GalleryFilterValues) {
   pushQuery({
     tagId: filters.selectedTagIds.map(String),
+    tagMatch: filters.tagMatch === 'any' ? undefined : filters.tagMatch,
     authorId: filters.authorId === undefined ? undefined : String(filters.authorId),
     seriesId: filters.seriesId === undefined ? undefined : String(filters.seriesId),
     artworkType: filters.artworkType || undefined,
@@ -180,6 +193,7 @@ function updateGalleryFilters(filters: GalleryFilterValues) {
     ai: filters.ai === 'all' ? undefined : filters.ai,
     favorite: filters.favorite === 'all' ? undefined : filters.favorite,
     groupId: filters.selectedGroupIds.map(String),
+    groupMatch: filters.groupMatch === 'any' ? undefined : filters.groupMatch,
     sort: filters.sort === 'downloadedAt' ? undefined : filters.sort,
     order: filters.order === 'desc' ? undefined : filters.order,
     randomSeed: filters.sort === 'random' ? String(filters.randomSeed) : undefined,
