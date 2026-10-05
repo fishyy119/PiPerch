@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vue-tsc -b && vite build",
+    "build": "vue-tsc -b && pnpm build:bundle",
+    "build:bundle": "vite build",
     "preview": "vite preview",
     "typecheck": "vue-tsc -b --force",
     "lint": "eslint . --max-warnings=0",
@@ -13,7 +14,7 @@
     "format:check": "prettier --check .",
     "test:unit": "vitest run",
     "test:unit:watch": "vitest",
-    "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test:unit && pnpm build"
+    "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test:unit && pnpm build:bundle"
   },
   "dependencies": {
     "@lucide/vue": "^1.48.0",
