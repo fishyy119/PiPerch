@@ -1,13 +1,12 @@
 import { QueryClient, VueQueryPlugin } from '@tanstack/vue-query'
-import userEvent from '@testing-library/user-event'
-import { render, screen, waitFor } from '@testing-library/vue'
 import { http, HttpResponse } from 'msw'
 import { setupServer } from 'msw/node'
 import { createPinia, setActivePinia } from 'pinia'
-import { vi } from 'vitest'
 
 import { useDownloadSelection } from '@/features/downloads/download-selection'
-import DownloadJobsSidebar from '@/pages/downloads/DownloadJobsSidebar.vue'
+import { useDownloadSubmissionStore } from '@/features/downloads/download-submission'
+
+import { renderComposable } from './composable'
 
 interface DownloadRequestBody {
   artworkIds: number[]
@@ -17,9 +16,6 @@ interface DownloadRequestBody {
 const submittedRequests: DownloadRequestBody[] = []
 
 const server = setupServer(
-  http.get('/api/download-jobs', () =>
-    HttpResponse.json({ items: [], page: 0, size: 100, totalElements: 0, totalPages: 0 }),
-  ),
   http.post('/api/download-jobs', async ({ request }) => {
     submittedRequests.push((await request.json()) as DownloadRequestBody)
     if (submittedRequests.length === 1) return HttpResponse.json({ jobId: 'job-1' })
@@ -30,26 +26,10 @@ const server = setupServer(
   }),
 )
 
-class EventSourceMock {
-  addEventListener() {
-    return undefined
-  }
-
-  close() {
-    return undefined
-  }
-}
-
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }))
-beforeEach(() => {
-  submittedRequests.splice(0)
-  vi.stubGlobal('EventSource', EventSourceMock)
-})
+beforeEach(() => submittedRequests.splice(0))
 afterEach(() => server.resetHandlers())
-afterAll(() => {
-  server.close()
-  vi.unstubAllGlobals()
-})
+afterAll(() => server.close())
 
 describe('下载任务提交', () => {
   it('分批提交失败时只移除已经提交的作品', async () => {
@@ -57,32 +37,28 @@ describe('下载任务提交', () => {
     setActivePinia(pinia)
     const selection = useDownloadSelection()
     selection.addIds(Array.from({ length: 1001 }, (_, index) => index + 1))
-    const user = userEvent.setup()
-
-    render(DownloadJobsSidebar, {
-      props: { sourceLabel: '作品' },
-      global: {
-        plugins: [
-          pinia,
-          [
-            VueQueryPlugin,
-            {
-              queryClient: new QueryClient({
-                defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
-              }),
-            },
-          ],
-        ],
-      },
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
     })
+    const { result: submission, unmount } = renderComposable(useDownloadSubmissionStore, [
+      pinia,
+      [VueQueryPlugin, { queryClient }],
+    ])
+    try {
+      const result = await submission.submit('作品')
 
-    await user.click(screen.getByRole('button', { name: '创建下载任务' }))
-
-    await waitFor(() => expect(submittedRequests).toHaveLength(2))
-    expect(submittedRequests[0]?.artworkIds).toHaveLength(1000)
-    expect(submittedRequests[0]?.artworkIds[0]).toBe(1)
-    expect(submittedRequests[0]?.artworkIds.at(-1)).toBe(1000)
-    expect(submittedRequests[1]?.artworkIds).toEqual([1001])
-    await waitFor(() => expect(selection.selectedIds).toEqual([1001]))
+      const submittedIds = Array.from({ length: 1000 }, (_, index) => index + 1)
+      expect(submittedRequests.map((request) => request.artworkIds)).toEqual([submittedIds, [1001]])
+      expect(result).toMatchObject({
+        createdJobCount: 1,
+        submittedArtworkIds: submittedIds,
+        remainingCount: 1,
+        failedError: { code: 'submission_failed', status: 503 },
+      })
+      expect(selection.selectedIds).toEqual([1001])
+    } finally {
+      unmount()
+      queryClient.clear()
+    }
   })
 })

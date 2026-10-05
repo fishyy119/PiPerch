@@ -13,7 +13,7 @@ __pycache__/
 dist/
 build/
 
-frontend/node_modules/
+node_modules/
 frontend/dist/
 frontend/coverage/
 src/piperch/frontend/

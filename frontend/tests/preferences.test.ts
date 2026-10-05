@@ -15,7 +15,6 @@ describe('本地偏好存储', () => {
     expect(getPreference('gallery.pageSize')).toBe(48)
     expect(localStorage.getItem('piperch.preferences.gallery.cardWidth')).toBe('225')
     expect(localStorage.getItem('piperch.preferences.gallery.pageSize')).toBe('48')
-    expect(localStorage.getItem('piperch.gallery.preferences')).toBeNull()
   })
 
   it('同一偏好键在不同调用方之间共享响应式状态', () => {

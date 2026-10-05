@@ -11,7 +11,6 @@
 ```shell
 pip install --group dev -e .
 
-cd frontend
 corepack enable pnpm
 pnpm install --frozen-lockfile
 ```
@@ -23,7 +22,6 @@ pnpm install --frozen-lockfile
 piperch serve
 
 # 终端二：启动开发服务器后，在 http://127.0.0.1:5173 访问
-cd frontend
 pnpm dev
 ```
 
@@ -32,7 +30,7 @@ pnpm dev
 提前构建页面后，后端直接在 <http://127.0.0.1:9303> 托管页面
 
 ```shell
-pnpm --dir frontend build
+pnpm build
 piperch serve
 ```
 

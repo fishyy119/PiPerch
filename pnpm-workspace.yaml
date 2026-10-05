@@ -1,4 +1,8 @@
+packages:
+  - frontend
+
 allowBuilds:
   esbuild: true
+  lefthook: true
   msw: false
   vue-demi: true

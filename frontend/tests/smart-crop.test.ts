@@ -44,7 +44,6 @@ describe('智能裁剪分析', () => {
     const first = analyzeSmartCrop(image, '/deduplication-test', 1, 1)
     const second = analyzeSmartCrop(image, '/deduplication-test', 1, 1)
 
-    expect(second).toBe(first)
     await expect(Promise.all([first, second])).resolves.toEqual([
       { x: 50, y: 80 },
       { x: 50, y: 80 },

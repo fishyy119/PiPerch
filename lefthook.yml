@@ -1,0 +1,36 @@
+min_version: 2.1.16
+assert_lefthook_installed: true
+lefthook: pnpm exec lefthook
+glob_matcher: doublestar
+
+pre-commit:
+  parallel: true
+  jobs:
+    - name: backend checks
+      glob:
+        - src/**/*.py
+        - tests/**/*.py
+        - pyproject.toml
+        - alembic.ini
+      group:
+        parallel: true
+        jobs:
+          - name: backend lint
+            run: ruff check src tests
+
+          - name: backend format
+            run: ruff format --check src tests
+
+          - name: backend typecheck
+            run: pyright
+
+          - name: backend tests
+            run: pytest
+
+    - name: frontend checks
+      glob:
+        - frontend/**
+        - package.json
+        - pnpm-lock.yaml
+        - pnpm-workspace.yaml
+      run: pnpm check

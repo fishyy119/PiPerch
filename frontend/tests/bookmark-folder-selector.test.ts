@@ -2,7 +2,7 @@ import userEvent from '@testing-library/user-event'
 import { render, screen } from '@testing-library/vue'
 import { vi } from 'vitest'
 
-import type { BookmarkFolder } from '@/features/discovery/discovery-api'
+import type { BookmarkFolder, BookmarkFolderReference } from '@/features/discovery/discovery-api'
 import BookmarkFolderSelector from '@/pages/downloads/BookmarkFolderSelector.vue'
 
 const folders: BookmarkFolder[] = [
@@ -22,7 +22,7 @@ const folders: BookmarkFolder[] = [
 describe('收藏夹选择', () => {
   it('同一范围内让全部收藏与普通标签互斥', async () => {
     const user = userEvent.setup()
-    const onUpdate = vi.fn()
+    const onUpdate = vi.fn<(folders: BookmarkFolderReference[]) => void>()
     const view = render(BookmarkFolderSelector, {
       props: {
         folders,
@@ -34,13 +34,13 @@ describe('收藏夹选择', () => {
       },
     })
 
-    const [publicAll] = screen.getAllByRole('button', { name: /全部收藏/u })
-    if (!publicAll) throw new Error('缺少公开全部收藏选项。')
-    await user.click(publicAll)
-    expect(onUpdate).toHaveBeenLastCalledWith([
-      { visibility: 'public', tag: null },
-      { visibility: 'private', tag: '风景' },
-    ])
+    await user.click(screen.getByTitle('公开收藏 / 全部收藏'))
+    expect(new Set(onUpdate.mock.lastCall?.[0])).toEqual(
+      new Set([
+        { visibility: 'public', tag: null },
+        { visibility: 'private', tag: '风景' },
+      ]),
+    )
 
     await view.rerender({
       folders,
@@ -50,12 +50,12 @@ describe('收藏夹选择', () => {
       ],
       'onUpdate:selectedFolders': onUpdate,
     })
-    const [publicLandscape] = screen.getAllByRole('button', { name: /风景/u })
-    if (!publicLandscape) throw new Error('缺少公开风景收藏夹。')
-    await user.click(publicLandscape)
-    expect(onUpdate).toHaveBeenLastCalledWith([
-      { visibility: 'public', tag: '风景' },
-      { visibility: 'private', tag: '风景' },
-    ])
+    await user.click(screen.getByTitle('公开收藏 / 风景'))
+    expect(new Set(onUpdate.mock.lastCall?.[0])).toEqual(
+      new Set([
+        { visibility: 'public', tag: '风景' },
+        { visibility: 'private', tag: '风景' },
+      ]),
+    )
   })
 })

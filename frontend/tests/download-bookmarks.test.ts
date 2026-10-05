@@ -1,11 +1,9 @@
-import { QueryClient, VueQueryPlugin } from '@tanstack/vue-query'
-import userEvent from '@testing-library/user-event'
-import { render, screen, waitFor } from '@testing-library/vue'
 import { http, HttpResponse } from 'msw'
 import { setupServer } from 'msw/node'
-import { createPinia } from 'pinia'
+import { createPinia, setActivePinia } from 'pinia'
+import { effectScope } from 'vue'
 
-import BookmarkSourceTab from '@/pages/downloads/sources/BookmarkSourceTab.vue'
+import { useBookmarkPreview } from '@/features/downloads/useBookmarkPreview'
 
 import { discoveryItem } from './fixtures'
 
@@ -27,14 +25,6 @@ const privateFirstPage = [
 ]
 
 const server = setupServer(
-  http.get('/api/discovery/bookmark-folders', () =>
-    HttpResponse.json({
-      items: [
-        { visibility: 'public', tag: '风景', kind: 'tag', name: '风景', itemCount: 49 },
-        { visibility: 'private', tag: '私藏', kind: 'tag', name: '私藏', itemCount: 48 },
-      ],
-    }),
-  ),
   http.post('/api/discovery', async ({ request }) => {
     const body = (await request.json()) as BookmarkRequestBody
     discoveryRequests.push(body)
@@ -59,27 +49,36 @@ afterAll(() => server.close())
 
 describe('收藏下载来源', () => {
   it('跨收藏夹分页时轮询来源并去除重复作品', async () => {
-    const user = userEvent.setup()
-    render(BookmarkSourceTab, {
-      global: {
-        plugins: [createPinia(), [VueQueryPlugin, { queryClient: new QueryClient() }]],
-      },
-    })
+    setActivePinia(createPinia())
+    const scope = effectScope()
+    try {
+      await scope.run(async () => {
+        const preview = useBookmarkPreview()
+        preview.reset([
+          { visibility: 'public', tag: '风景' },
+          { visibility: 'private', tag: '私藏' },
+        ])
+        await preview.loadPage(0)
+        expect(preview.candidates.value.map((item) => item.artworkId)).toEqual(
+          publicFirstPage.map((item) => item.artworkId),
+        )
+        expect(preview.nextPage.value).toBe(1)
 
-    await user.click(await screen.findByRole('button', { name: /风景/u }))
-    await user.click(screen.getByRole('button', { name: /私藏/u }))
-    await user.click(screen.getByRole('button', { name: '确认并预览' }))
-    expect(await screen.findByText('公开作品 1')).toBeInTheDocument()
-
-    await user.click(screen.getByRole('button', { name: '下一页' }))
-    expect(await screen.findByText('公开补位作品')).toBeInTheDocument()
-    expect(screen.queryByText('跨标签重复作品')).not.toBeInTheDocument()
-    await waitFor(() =>
-      expect(discoveryRequests).toEqual([
-        { sourceType: 'bookmark', folder: { visibility: 'public', tag: '风景' }, page: 0 },
-        { sourceType: 'bookmark', folder: { visibility: 'private', tag: '私藏' }, page: 0 },
-        { sourceType: 'bookmark', folder: { visibility: 'public', tag: '风景' }, page: 1 },
-      ]),
-    )
+        await preview.loadPage(1)
+        expect(preview.candidates.value.map((item) => item.artworkId)).toEqual([
+          ...privateFirstPage.slice(1).map((item) => item.artworkId),
+          3001,
+        ])
+        expect(preview.page.value).toBe(1)
+        expect(preview.nextPage.value).toBeNull()
+        expect(discoveryRequests).toEqual([
+          { sourceType: 'bookmark', folder: { visibility: 'public', tag: '风景' }, page: 0 },
+          { sourceType: 'bookmark', folder: { visibility: 'private', tag: '私藏' }, page: 0 },
+          { sourceType: 'bookmark', folder: { visibility: 'public', tag: '风景' }, page: 1 },
+        ])
+      })
+    } finally {
+      scope.stop()
+    }
   })
 })
