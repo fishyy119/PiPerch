@@ -9,17 +9,26 @@ const props = defineProps<{ html: string; localArtworkIds: readonly number[] }>(
 const router = useRouter()
 const clean = computed(() => {
   const sanitized = DOMPurify.sanitize(props.html)
-  if (props.localArtworkIds.length === 0) return sanitized
-
   const localArtworkIds = new Set(props.localArtworkIds)
   const document = new DOMParser().parseFromString(sanitized, 'text/html')
-  document.querySelectorAll<HTMLAnchorElement>('a[href]').forEach((anchor) => {
-    const artworkId = pixivArtworkIdFromUrl(anchor.getAttribute('href') ?? '')
-    if (artworkId === null || !localArtworkIds.has(artworkId)) return
+  document.querySelectorAll<HTMLAnchorElement>('a').forEach((anchor) => {
+    // 站内跳转标记，保护性清除同名属性。
+    anchor.removeAttribute('data-local-artwork-id')
 
-    anchor.href = `/artworks/${String(artworkId)}`
-    anchor.dataset.localArtworkId = String(artworkId)
-    anchor.removeAttribute('target')
+    const href = anchor.getAttribute('href')
+    if (href === null) return
+
+    const artworkId = pixivArtworkIdFromUrl(href)
+    if (artworkId !== null && localArtworkIds.has(artworkId)) {
+      anchor.href = `/artworks/${String(artworkId)}`
+      anchor.dataset.localArtworkId = String(artworkId)
+      anchor.removeAttribute('target')
+      return
+    }
+
+    // 严格限制外链行为
+    anchor.target = '_blank'
+    anchor.relList.add('noreferrer')
   })
   return document.body.innerHTML
 })
