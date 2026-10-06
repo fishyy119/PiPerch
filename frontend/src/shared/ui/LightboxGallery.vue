@@ -6,6 +6,14 @@ export interface LightboxItem {
 </script>
 
 <script setup lang="ts">
+import {
+  DialogContent,
+  DialogDescription,
+  DialogOverlay,
+  DialogPortal,
+  DialogRoot,
+  DialogTitle,
+} from 'reka-ui'
 import { computed, ref, watch } from 'vue'
 
 const WHEEL_NAVIGATION_THRESHOLD_PX = 40
@@ -26,7 +34,6 @@ const emit = defineEmits<{
   change: [index: number]
 }>()
 
-const dialogElement = ref<HTMLDialogElement>()
 const lightboxOpen = ref(false)
 const currentIndex = ref(0)
 const currentItem = computed(() => props.items[currentIndex.value])
@@ -47,11 +54,10 @@ function openLightbox(index = 0) {
   lightboxOpen.value = true
 
   if (nextIndex !== normalizedIndex(props.activeIndex)) emit('change', nextIndex)
-  if (!dialogElement.value?.open) dialogElement.value?.showModal()
 }
 
 function closeLightbox() {
-  dialogElement.value?.close()
+  lightboxOpen.value = false
 }
 
 function resetWheelNavigation() {
@@ -88,11 +94,6 @@ function handleWheel(event: WheelEvent) {
   emit('change', nextIndex)
 }
 
-function handleClose() {
-  lightboxOpen.value = false
-  resetWheelNavigation()
-}
-
 watch(
   () => props.activeIndex,
   (index) => {
@@ -111,37 +112,43 @@ watch(
     currentIndex.value = normalizedIndex(props.activeIndex)
   },
 )
+
+watch(lightboxOpen, (open) => {
+  if (!open) resetWheelNavigation()
+})
 </script>
 
 <template>
-  <slot :open="openLightbox" />
+  <DialogRoot v-model:open="lightboxOpen">
+    <slot :open="openLightbox" />
 
-  <Teleport to="body">
-    <dialog
-      ref="dialogElement"
-      role="dialog"
-      class="artwork-lightbox fixed inset-0 m-0 size-full max-h-none max-w-none overflow-hidden border-0 bg-overlay/80 p-0 text-overlay-foreground"
-      @close="handleClose"
-    >
-      <div
-        v-if="lightboxOpen && currentItem"
-        class="relative flex size-full items-center justify-center p-4 sm:p-8"
-        @click.self="closeLightbox"
-        @wheel="handleWheel"
+    <DialogPortal>
+      <DialogOverlay class="fixed inset-0 z-40 bg-overlay/80" />
+      <DialogContent
+        class="artwork-lightbox fixed inset-0 z-50 overflow-hidden text-overlay-foreground outline-none"
       >
-        <img
-          class="block h-auto max-h-full w-auto max-w-full object-contain"
-          :src="currentItem.src"
-          :alt="currentItem.alt"
-          decoding="async"
-          draggable="false"
-        />
-        <output
-          class="absolute top-4 left-4 rounded-full bg-overlay/65 px-3 py-1 text-sm text-overlay-foreground tabular-nums sm:top-6 sm:left-6"
+        <DialogTitle class="sr-only">作品预览</DialogTitle>
+        <DialogDescription class="sr-only">全屏查看当前作品</DialogDescription>
+        <div
+          class="relative flex size-full items-center justify-center p-4 sm:p-8"
+          @click.self="closeLightbox"
+          @wheel="handleWheel"
         >
-          {{ currentIndex + 1 }} / {{ items.length }}
-        </output>
-      </div>
-    </dialog>
-  </Teleport>
+          <img
+            v-if="currentItem"
+            class="block h-auto max-h-full w-auto max-w-full object-contain"
+            :src="currentItem.src"
+            :alt="currentItem.alt"
+            decoding="async"
+            draggable="false"
+          />
+          <output
+            class="absolute top-4 left-4 rounded-full bg-overlay/65 px-3 py-1 text-sm text-overlay-foreground tabular-nums sm:top-6 sm:left-6"
+          >
+            {{ currentIndex + 1 }} / {{ items.length }}
+          </output>
+        </div>
+      </DialogContent>
+    </DialogPortal>
+  </DialogRoot>
 </template>
