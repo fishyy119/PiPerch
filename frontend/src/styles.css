@@ -135,6 +135,11 @@
     border-color: var(--border);
   }
 
+  /* 保留滚动条占位，避免部分页面加载时出现宽度跳跃 */
+  html {
+    scrollbar-gutter: stable;
+  }
+
   body {
     min-width: 320px;
     min-height: 100vh;

@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { useQuery } from '@tanstack/vue-query'
-import { computed, ref, watch } from 'vue'
+import { computed, ref, shallowRef, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
-import { getArtwork } from '@/features/artworks/artworks-api'
+import { type ArtworkDetail, getArtwork } from '@/features/artworks/artworks-api'
 import {
   galleryNavigationRouteState,
   type GalleryNavigationState,
@@ -27,6 +27,22 @@ const artworkQuery = useQuery({
   queryKey: computed(() => artworkQueryKeys.detail(artworkId.value)),
   queryFn: () => getArtwork(artworkId.value),
 })
+const retainedMediaArtwork = shallowRef<ArtworkDetail | null>(null)
+
+watch(
+  () => artworkQuery.data.value,
+  (artwork) => {
+    if (artwork !== undefined) retainedMediaArtwork.value = artwork
+  },
+  { immediate: true },
+)
+
+watch(
+  () => artworkQuery.error.value,
+  (error) => {
+    if (error !== null) retainedMediaArtwork.value = null
+  },
+)
 
 watch(artworkId, (currentArtworkId) => {
   const navigation = parseGalleryNavigationState(router.options.history.state)
@@ -71,15 +87,20 @@ usePageKeyboardShortcuts(
   <div v-else-if="artworkQuery.error.value" class="py-24 text-center text-destructive">
     {{ artworkQuery.error.value.message }}
   </div>
-  <article v-else-if="artworkQuery.data.value">
+  <article v-if="retainedMediaArtwork">
     <div class="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_20rem]">
       <div class="min-w-0 space-y-5">
-        <ArtworkMediaSection :artwork="artworkQuery.data.value" />
-        <ArtworkDescriptionSection :artwork="artworkQuery.data.value" />
-        <RelatedArtworksSection :artwork-id="artworkId" />
+        <!-- 查询下一件作品时保留组件实例，使 Teleport 中已打开的 Lightbox 不被销毁。 -->
+        <div v-show="artworkQuery.data.value !== undefined">
+          <ArtworkMediaSection :artwork="retainedMediaArtwork" />
+        </div>
+        <template v-if="artworkQuery.data.value">
+          <ArtworkDescriptionSection :artwork="artworkQuery.data.value" />
+          <RelatedArtworksSection :artwork-id="artworkId" />
+        </template>
       </div>
 
-      <ArtworkInfoSidebar :artwork="artworkQuery.data.value" />
+      <ArtworkInfoSidebar v-if="artworkQuery.data.value" :artwork="artworkQuery.data.value" />
     </div>
   </article>
 </template>

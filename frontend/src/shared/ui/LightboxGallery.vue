@@ -137,7 +137,7 @@ watch(
           draggable="false"
         />
         <output
-          class="absolute top-4 left-1/2 -translate-x-1/2 rounded-full bg-overlay/65 px-3 py-1 text-sm text-overlay-foreground tabular-nums sm:top-6"
+          class="absolute top-4 left-4 rounded-full bg-overlay/65 px-3 py-1 text-sm text-overlay-foreground tabular-nums sm:top-6 sm:left-6"
         >
           {{ currentIndex + 1 }} / {{ items.length }}
         </output>
