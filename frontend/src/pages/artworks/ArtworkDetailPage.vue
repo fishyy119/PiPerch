@@ -26,6 +26,8 @@ const galleryNavigation = ref<GalleryNavigationState | null>(
 const artworkQuery = useQuery({
   queryKey: computed(() => artworkQueryKeys.detail(artworkId.value)),
   queryFn: () => getArtwork(artworkId.value),
+  // 保留上一份数据以避免中间加载态高度坍缩；遮罩层负责阻止旧内容被操作。
+  placeholderData: (previousData) => previousData,
 })
 const retainedMediaArtwork = shallowRef<ArtworkDetail | null>(null)
 
@@ -87,7 +89,11 @@ usePageKeyboardShortcuts(
   <div v-else-if="artworkQuery.error.value" class="py-24 text-center text-destructive">
     {{ artworkQuery.error.value.message }}
   </div>
-  <article v-if="retainedMediaArtwork">
+  <article v-if="retainedMediaArtwork" class="relative">
+    <div
+      v-if="artworkQuery.isPlaceholderData.value"
+      class="absolute inset-0 z-10 cursor-progress"
+    />
     <div class="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_20rem]">
       <div class="min-w-0 space-y-5">
         <!-- 查询下一件作品时保留组件实例，使 Teleport 中已打开的 Lightbox 不被销毁。 -->

@@ -18,6 +18,8 @@ const relatedCount = usePreference('artworkDetail.relatedCount')
 const relatedQuery = useQuery({
   queryKey: computed(() => artworkQueryKeys.related(props.artworkId, relatedCount.value)),
   queryFn: () => listRelatedArtworks(props.artworkId, relatedCount.value),
+  // 保留上一份数据以避免中间加载态高度坍缩；遮罩层负责阻止旧内容被操作。
+  placeholderData: (previousData) => previousData,
 })
 const gridStyle = computed(() => ({
   gridTemplateColumns: `repeat(auto-fill, minmax(min(100%, ${String(cardWidth.value)}px), ${String(cardWidth.value)}px))`,
@@ -25,7 +27,11 @@ const gridStyle = computed(() => ({
 </script>
 
 <template>
-  <Card as="section" class="p-5 sm:p-6">
+  <Card as="section" class="relative p-5 sm:p-6">
+    <div
+      v-if="relatedQuery.isPlaceholderData.value"
+      class="absolute inset-0 z-10 cursor-progress"
+    />
     <div class="mb-4 flex items-start justify-between gap-3">
       <div>
         <h2 class="font-semibold">相关作品</h2>
