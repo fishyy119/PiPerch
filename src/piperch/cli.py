@@ -33,6 +33,24 @@ _PIPERCH_LOGGING_CONFIG["loggers"]["piperch"] = {
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Sequence
+    from typing import Any
+
+
+class _NonSuccessAccessFilter(logging.Filter):
+    def filter(self, record: logging.LogRecord) -> bool:
+        if not isinstance(record.args, tuple) or len(record.args) < 5:
+            return True
+        status_code = record.args[4]
+        return not isinstance(status_code, int) or not 200 <= status_code < 300
+
+
+def _logging_config(*, verbose: bool) -> dict[str, Any]:
+    config = deepcopy(_PIPERCH_LOGGING_CONFIG)
+    if verbose:
+        return config
+    config.setdefault("filters", {})["non_success_access"] = {"()": _NonSuccessAccessFilter}
+    config["handlers"]["access"]["filters"] = ["non_success_access"]
+    return config
 
 
 class _ServerControl(Protocol):
@@ -151,6 +169,7 @@ def run_server(
     *,
     additional_hosts: Sequence[str] = (),
     open_browser: bool = False,
+    verbose: bool = False,
 ) -> None:
     lifecycle = _ServerLifecycle()
     hosts = tuple(dict.fromkeys((_LOOPBACK_HOST, *additional_hosts)))
@@ -163,7 +182,8 @@ def run_server(
             port=port,
             workers=1,
             timeout_graceful_shutdown=_GRACEFUL_SHUTDOWN_TIMEOUT_SECONDS,
-            log_config=_PIPERCH_LOGGING_CONFIG,
+            log_config=_logging_config(verbose=verbose),
+            access_log=True,
         )
         server = uvicorn.Server(config)
         try:
@@ -215,6 +235,7 @@ def _parser() -> argparse.ArgumentParser:
         help="追加监听的本机 IPv4 地址，可重复传入，始终监听 127.0.0.1",
     )
     serve.add_argument("--data-dir", type=Path)
+    serve.add_argument("--verbose", action="store_true", help="输出每个 HTTP 请求的访问日志")
 
     database = commands.add_parser("db", help="数据库管理")
     database.add_argument("action", choices=["upgrade"])
@@ -231,5 +252,11 @@ def main() -> NoReturn:
         raise SystemExit(0)
     if not 1 <= arguments.port <= 65535:
         _parser().error("端口必须位于 1 到 65535 之间。")
-    run_server(paths, arguments.port, additional_hosts=arguments.host, open_browser=True)
+    run_server(
+        paths,
+        arguments.port,
+        additional_hosts=arguments.host,
+        open_browser=True,
+        verbose=arguments.verbose,
+    )
     raise SystemExit(0)
