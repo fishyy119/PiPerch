@@ -157,6 +157,22 @@
   }
 }
 
+/* Viselect 框选区域的项目默认样式。 */
+.selection-area-container {
+  z-index: 30 !important;
+}
+
+.selection-area {
+  border: 1px solid var(--primary);
+  background: color-mix(in oklab, var(--primary) 15%, transparent);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 8%);
+}
+
+.selection-area--removing {
+  border-color: var(--destructive);
+  background: color-mix(in oklab, var(--destructive) 15%, transparent);
+}
+
 /* Reka 锚点浮层共用短促的淡入缩放动效。 */
 [data-app-floating-content][data-state='open'],
 [data-app-floating-content][data-state='delayed-open'],

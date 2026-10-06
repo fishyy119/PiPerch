@@ -67,12 +67,18 @@ function handleCardClick(event: MouseEvent) {
   event.stopPropagation()
   selection.toggleArtwork(props.artwork.artworkId)
 }
+
+function handleCardDragStart(event: DragEvent) {
+  // 避免原生图片或链接拖拽吞掉批量选择的点击事件。
+  if (selection.enabled) event.preventDefault()
+}
 </script>
 
 <template>
   <LibraryArtworkContextMenu v-model:open="contextMenuOpen" :artwork="artwork">
     <ArtworkCard
-      :class="{ 'cursor-pointer': selection.enabled }"
+      :class="{ 'cursor-crosshair': selection.enabled }"
+      :data-gallery-artwork-id="artwork.artworkId"
       :title="artwork.title"
       :author-name="artwork.authorName"
       :page-count="artwork.pageCount"
@@ -84,6 +90,7 @@ function handleCardClick(event: MouseEvent) {
       :show-author="showAuthor"
       :show-page-preview="!selection.enabled && !contextMenuOpen"
       @click.capture="handleCardClick"
+      @dragstart.capture="handleCardDragStart"
     >
       <template v-if="selection.enabled || showFavoriteIndicator" #leading-action>
         <Checkbox

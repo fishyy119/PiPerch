@@ -22,6 +22,10 @@ export const useGallerySelectionStore = defineStore('gallery-selection', () => {
     ids.value = new Set()
   }
 
+  function setSelected(artworkIds: readonly number[]) {
+    ids.value = new Set(artworkIds)
+  }
+
   function toggleMode() {
     enabled.value = !enabled.value
     if (!enabled.value) clear()
@@ -50,6 +54,7 @@ export const useGallerySelectionStore = defineStore('gallery-selection', () => {
     isSelected,
     toggleArtwork,
     clear,
+    setSelected,
     toggleMode,
     toggleVisible,
     reset,

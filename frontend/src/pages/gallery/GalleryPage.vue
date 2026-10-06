@@ -17,6 +17,7 @@ import {
   provideGalleryFilters,
 } from '@/features/gallery/gallery-filter'
 import { useGallerySelectionStore } from '@/features/gallery/gallery-selection'
+import { useGalleryMarqueeSelection } from '@/features/gallery/useGalleryMarqueeSelection'
 import { artworkQueryKeys } from '@/features/library/library-query-cache'
 import GalleryBulkSelectionBar from '@/pages/gallery/GalleryBulkSelectionBar.vue'
 import GalleryFilterPopup from '@/pages/gallery/GalleryFilterPopup.vue'
@@ -38,6 +39,8 @@ const searchInput = ref(routeSearch.value)
 const filterOpen = ref(false)
 const preferredCardWidth = usePreference('gallery.cardWidth')
 const preferredPageSize = usePreference('gallery.pageSize')
+const galleryGrid = ref<HTMLElement | null>(null)
+const marquee = useGalleryMarqueeSelection(galleryGrid)
 
 function positiveInt(value: string | null | undefined) {
   const parsed = Number(value)
@@ -159,6 +162,7 @@ watch(routeSearch, (search) => {
 watch(
   () => route.fullPath,
   () => {
+    marquee.reset()
     selection.clear()
   },
 )
@@ -304,8 +308,10 @@ usePageKeyboardShortcuts((event) => {
     </div>
     <div
       v-else-if="artworksQuery.data.value?.items.length"
-      class="gallery-grid"
+      ref="galleryGrid"
+      :class="['gallery-grid', selection.enabled ? 'cursor-crosshair select-none' : '']"
       :style="{ '--gallery-card-width': `${String(preferredCardWidth)}px` }"
+      @click.capture="marquee.handleClick"
     >
       <LibraryArtworkCard
         v-for="artwork in artworksQuery.data.value.items"
