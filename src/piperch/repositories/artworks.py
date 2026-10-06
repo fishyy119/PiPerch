@@ -635,11 +635,21 @@ class ArtworkRepository:
                 total,
             )
 
-    def delete_metadata(self, artwork_ids: Sequence[int]) -> int:
+    def delete_metadata(self, artwork_ids: Sequence[int]) -> set[int]:
         if not artwork_ids:
-            return 0
+            return set()
         with self._database.begin() as connection:
-            result = connection.execute(delete(artworks).where(artworks.c.id.in_(artwork_ids)))
+            favorite_exists = select(favorite_artworks.c.artwork_id).where(
+                favorite_artworks.c.artwork_id == artworks.c.id
+            )
+            deleted_ids = {
+                int(artwork_id)
+                for artwork_id in connection.scalars(
+                    delete(artworks)
+                    .where(artworks.c.id.in_(artwork_ids), ~favorite_exists.exists())
+                    .returning(artworks.c.id)
+                )
+            }
             connection.execute(
                 delete(tags).where(~select(artwork_tags.c.tag_id).where(artwork_tags.c.tag_id == tags.c.id).exists())
             )
@@ -649,7 +659,7 @@ class ArtworkRepository:
             connection.execute(
                 delete(authors).where(~select(artworks.c.id).where(artworks.c.author_id == authors.c.id).exists())
             )
-            return max(0, result.rowcount or 0)
+            return deleted_ids
 
     @staticmethod
     def _summary_from_row(row: RowMapping) -> ArtworkSummary:

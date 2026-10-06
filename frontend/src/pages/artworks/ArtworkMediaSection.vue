@@ -15,7 +15,7 @@ import { useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 
 import { artworkTypeLabel } from '@/features/artworks/artwork'
-import { type ArtworkDetail, deleteArtwork } from '@/features/artworks/artworks-api'
+import { type ArtworkDetail, deleteArtworks } from '@/features/artworks/artworks-api'
 import { replaceFavoriteState } from '@/features/favorites/favorites-api'
 import { createGroupAndAddArtwork } from '@/features/groups/group-actions'
 import { listGroups, replaceArtworkGroups } from '@/features/groups/groups-api'
@@ -57,7 +57,7 @@ const groupsQuery = useQuery({
 })
 
 const deleteMutation = useMutation({
-  mutationFn: () => deleteArtwork(props.artwork.artworkId),
+  mutationFn: () => deleteArtworks({ mode: 'single', artworkId: props.artwork.artworkId }),
   onSuccess: async () => {
     const artworkId = props.artwork.artworkId
     deleteOpen.value = false
@@ -65,6 +65,9 @@ const deleteMutation = useMutation({
     await nextTick()
     removeArtworkData(queryClient, artworkId)
     await invalidateArtworkGroupData(queryClient)
+  },
+  onError: (error) => {
+    toast.error('永久删除作品失败', { description: errorMessage(error) })
   },
 })
 
@@ -401,7 +404,14 @@ usePageKeyboardShortcuts(
         >
           <ExternalLink :size="16" />打开 Pixiv
         </Button>
-        <Button variant="danger" @click="deleteOpen = true"> <Trash2 :size="16" />永久删除 </Button>
+        <Button
+          variant="danger"
+          :disabled="artwork.isFavorite"
+          :title="artwork.isFavorite ? '收藏作品不可删除，请先取消收藏' : undefined"
+          @click="deleteOpen = true"
+        >
+          <Trash2 :size="16" />永久删除
+        </Button>
       </div>
     </div>
   </Card>

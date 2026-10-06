@@ -2,25 +2,30 @@
 import { useQueryClient } from '@tanstack/vue-query'
 import { computed, ref, watch } from 'vue'
 
-import type { ArtworkSummary } from '@/features/artworks/artworks-api'
+import { type ArtworkSummary, deleteArtworks } from '@/features/artworks/artworks-api'
 import { replaceFavoriteState } from '@/features/favorites/favorites-api'
+import { useGallerySelectionStore } from '@/features/gallery/gallery-selection'
 import { createGroupAndAddArtwork } from '@/features/groups/group-actions'
 import { type ArtworkGroup, listGroups, replaceArtworkGroups } from '@/features/groups/groups-api'
 import {
   groupQueryKeys,
   invalidateArtworkData,
   invalidateArtworkGroupData,
+  removeArtworkData,
 } from '@/features/library/library-query-cache'
 import CreateGroupDialog from '@/shared/components/groups/CreateGroupDialog.vue'
 import { errorMessage } from '@/shared/errors'
+import ConfirmDialog from '@ui/ConfirmDialog.vue'
 import ContextMenu, { type ContextMenuOption } from '@ui/ContextMenu.vue'
 import { toast } from '@ui/toast'
 
 const props = defineProps<{ artwork: ArtworkSummary }>()
 const open = defineModel<boolean>('open', { default: false })
 const queryClient = useQueryClient()
+const selection = useGallerySelectionStore()
 const groups = ref<ArtworkGroup[]>([])
 const createGroupOpen = ref(false)
+const deleteOpen = ref(false)
 const actionPending = ref(false)
 
 const availableGroups = computed(() =>
@@ -64,6 +69,13 @@ const contextItems = computed<ContextMenuOption[]>(() => [
           })),
         },
       ]),
+  {
+    value: 'delete',
+    label: props.artwork.isFavorite ? '永久删除（请先取消收藏）' : '永久删除',
+    disabled: actionPending.value || props.artwork.isFavorite,
+    danger: true,
+    separatorBefore: true,
+  },
 ])
 
 watch(open, (isOpen) => {
@@ -134,8 +146,29 @@ async function createAndAddGroup(name: string) {
   }
 }
 
+async function deleteCurrentArtwork() {
+  if (actionPending.value) return
+  const artworkId = props.artwork.artworkId
+  actionPending.value = true
+  try {
+    await deleteArtworks({ mode: 'single', artworkId })
+    deleteOpen.value = false
+    selection.setSelected(
+      selection.selectedIds.filter((selectedArtworkId) => selectedArtworkId !== artworkId),
+    )
+    removeArtworkData(queryClient, artworkId)
+    await invalidateArtworkGroupData(queryClient)
+    toast.success('作品已永久删除')
+  } catch (error) {
+    toast.error('永久删除作品失败', { description: errorMessage(error) })
+  } finally {
+    actionPending.value = false
+  }
+}
+
 function handleAction(action: string) {
   if (action === 'favorite') void toggleFavorite()
+  else if (action === 'delete') deleteOpen.value = true
   else if (action === 'add-group:new') createGroupOpen.value = true
   else if (action.startsWith('add-group:')) {
     void changeGroup(Number(action.slice('add-group:'.length)), 'add')
@@ -157,5 +190,16 @@ function handleAction(action: string) {
     :busy="actionPending"
     @close="createGroupOpen = false"
     @save="createAndAddGroup"
+  />
+
+  <ConfirmDialog
+    v-if="deleteOpen"
+    :open="true"
+    title="永久删除作品"
+    :description="`将永久删除“${artwork.title}”的作品记录和本地文件。此操作无法撤销。`"
+    confirm-text="永久删除"
+    :busy="actionPending"
+    @close="deleteOpen = false"
+    @confirm="deleteCurrentArtwork"
   />
 </template>

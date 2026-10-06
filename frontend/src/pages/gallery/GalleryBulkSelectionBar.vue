@@ -3,10 +3,14 @@ import { Tags, Trash2 } from '@lucide/vue'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query'
 import { computed, ref } from 'vue'
 
-import { bulkDeleteArtworks } from '@/features/artworks/artworks-api'
+import { deleteArtworks } from '@/features/artworks/artworks-api'
 import { useGallerySelectionStore } from '@/features/gallery/gallery-selection'
 import { bulkUpdateArtworkGroups, listGroups } from '@/features/groups/groups-api'
-import { groupQueryKeys, invalidateArtworkGroupData } from '@/features/library/library-query-cache'
+import {
+  groupQueryKeys,
+  invalidateArtworkGroupData,
+  removeArtworkData,
+} from '@/features/library/library-query-cache'
 import BulkGroupsDialog from '@/pages/gallery/BulkGroupsDialog.vue'
 import { errorMessage } from '@/shared/errors'
 import Button from '@ui/Button.vue'
@@ -48,11 +52,30 @@ const bulkGroupsMutation = useMutation({
 })
 
 const deleteMutation = useMutation({
-  mutationFn: () => bulkDeleteArtworks(selection.selectedIds),
-  onSuccess: async () => {
+  mutationFn: async () => {
+    const artworkIds = selection.selectedIds
+    const result = await deleteArtworks({ mode: 'bulk', artworkIds })
+    return { artworkIds, result }
+  },
+  onSuccess: async ({ artworkIds, result }) => {
     deleteOpen.value = false
-    selection.reset()
+    const skippedIds = new Set(result.skippedFavoriteArtworkIds)
+    artworkIds
+      .filter((artworkId) => !skippedIds.has(artworkId))
+      .forEach((artworkId) => removeArtworkData(queryClient, artworkId))
+    if (result.skippedFavoriteArtworkIds.length > 0) {
+      selection.setSelected(result.skippedFavoriteArtworkIds)
+      toast.warning(`已删除 ${String(result.deleted)} 个作品`, {
+        description: `已跳过 ${String(result.skippedFavoriteArtworkIds.length)} 个收藏作品。`,
+      })
+    } else {
+      selection.reset()
+      toast.success(`已删除 ${String(result.deleted)} 个作品`)
+    }
     await invalidateArtworkGroupData(queryClient)
+  },
+  onError: (error) => {
+    toast.error('批量删除作品失败', { description: errorMessage(error) })
   },
 })
 
@@ -121,7 +144,7 @@ function saveBulkGroups(addGroupIds: number[], removeGroupIds: number[]) {
     v-if="deleteOpen"
     :open="true"
     title="永久删除作品"
-    :description="`将永久删除 ${String(selection.selectedCount)} 个作品及其本地文件。此操作无法撤销。`"
+    :description="`将永久删除所选作品及其本地文件，收藏作品会被保留。当前选择 ${String(selection.selectedCount)} 项。此操作无法撤销。`"
     confirm-text="永久删除"
     :busy="deleteMutation.isPending.value"
     @close="deleteOpen = false"

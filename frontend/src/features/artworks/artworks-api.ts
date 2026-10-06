@@ -149,14 +149,21 @@ export async function listRelatedArtworks(artworkId: number, limit = 12) {
     )
 }
 
-export async function deleteArtwork(artworkId: number) {
-  return z
-    .object({ deleted: z.number().int() })
-    .parse(await api.delete<unknown>(`/api/artworks/${String(artworkId)}`))
-}
+const artworkDeleteResultSchema = z.object({
+  deleted: z.number().int().nonnegative(),
+  skippedFavoriteArtworkIds: z.array(z.number().int().positive()),
+})
+export type ArtworkDeleteResult = z.infer<typeof artworkDeleteResultSchema>
 
-export async function bulkDeleteArtworks(artworkIds: number[]) {
-  return z
-    .object({ deleted: z.number().int() })
-    .parse(await api.post<unknown>('/api/artworks/bulk-delete', { artworkIds }))
+export type DeleteArtworksRequest =
+  { mode: 'single'; artworkId: number } | { mode: 'bulk'; artworkIds: number[] }
+
+export async function deleteArtworks(request: DeleteArtworksRequest) {
+  const response =
+    request.mode === 'single'
+      ? await api.delete<unknown>(`/api/artworks/${String(request.artworkId)}`)
+      : await api.post<unknown>('/api/artworks/bulk-delete', {
+          artworkIds: request.artworkIds,
+        })
+  return artworkDeleteResultSchema.parse(response)
 }

@@ -305,7 +305,7 @@ def test_delete_metadata_removes_unused_gallery_facets(tmp_path: Path) -> None:
     finally:
         database.close()
 
-    assert deleted == 1
+    assert deleted == {101}
     assert available_tags == []
     assert available_authors == []
     assert available_series == []

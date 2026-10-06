@@ -355,6 +355,10 @@ class DeleteResponse(ApiModel):
     deleted: int
 
 
+class ArtworkDeleteResponse(DeleteResponse):
+    skipped_favorite_artwork_ids: list[int]
+
+
 class GroupNameRequest(ApiModel):
     name: str = Field(min_length=1, max_length=20)
 

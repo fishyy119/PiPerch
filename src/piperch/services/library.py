@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import shutil
+from dataclasses import dataclass
 from threading import Lock
 from typing import TYPE_CHECKING
 
@@ -15,6 +16,12 @@ if TYPE_CHECKING:
     from piperch.paths import AppPaths
     from piperch.repositories import ArtworkRepository
     from piperch.settings import SettingsManager
+
+
+@dataclass(frozen=True, slots=True)
+class ArtworkDeleteResult:
+    deleted: int
+    skipped_favorite_artwork_ids: tuple[int, ...]
 
 
 class LibraryService:
@@ -34,19 +41,26 @@ class LibraryService:
         self._mutation_lock = mutation_lock or Lock()
         self._files = files or LibraryFileOperations()
 
-    def delete_artworks(self, artwork_ids: Sequence[int]) -> int:
+    def delete_artworks(self, artwork_ids: Sequence[int]) -> ArtworkDeleteResult:
         with self._mutation_lock:
             return self._delete_artworks(artwork_ids)
 
-    def _delete_artworks(self, artwork_ids: Sequence[int]) -> int:
+    def _delete_artworks(self, artwork_ids: Sequence[int]) -> ArtworkDeleteResult:
         root = self._settings.get().library_root.resolve()
-        staged: list[tuple[Path, Path]] = []
+        requested_ids = tuple(dict.fromkeys(artwork_ids))
+        existing_ids: list[int] = []
+        deletable_ids: list[int] = []
+        staged: list[tuple[int, Path, Path]] = []
         try:
-            for artwork_id in dict.fromkeys(artwork_ids):
+            for artwork_id in requested_ids:
                 try:
                     detail = self._artworks.get_detail(artwork_id)
                 except NotFoundError:
                     continue
+                existing_ids.append(artwork_id)
+                if detail.summary.is_favorite:
+                    continue
+                deletable_ids.append(artwork_id)
                 source = (root / str(detail.summary.author_id) / str(artwork_id)).resolve()
                 self._require_safe_artwork_path(root, source)
                 if source.exists():
@@ -59,21 +73,31 @@ class LibraryService:
                     target = self._files.delete_target(root, detail.summary.author_id, artwork_id)
                     target.parent.mkdir(parents=True, exist_ok=True)
                     source.replace(target)
-                    staged.append((source, target))
-            deleted = self._artworks.delete_metadata(artwork_ids)
+                    staged.append((artwork_id, source, target))
+            deleted_ids = self._artworks.delete_metadata(deletable_ids)
         except Exception:
-            for source, target in reversed(staged):
+            for _, source, target in reversed(staged):
                 if target.exists():
                     source.parent.mkdir(parents=True, exist_ok=True)
                     target.replace(source)
             self._files.cleanup_delete_root(root)
             raise
-        for _, target in staged:
-            shutil.rmtree(target, ignore_errors=True)
-        for artwork_id in artwork_ids:
+
+        for artwork_id, source, target in staged:
+            if artwork_id in deleted_ids:
+                shutil.rmtree(target, ignore_errors=True)
+            elif target.exists():
+                source.parent.mkdir(parents=True, exist_ok=True)
+                target.replace(source)
+        for artwork_id in deleted_ids:
             self._thumbnails.delete_artwork(artwork_id)
         self._files.cleanup_delete_root(root)
-        return deleted
+        return ArtworkDeleteResult(
+            deleted=len(deleted_ids),
+            skipped_favorite_artwork_ids=tuple(
+                artwork_id for artwork_id in existing_ids if artwork_id not in deleted_ids
+            ),
+        )
 
     def recover_pending_deletes(self) -> None:
         """根据数据库是否仍有作品记录，完成或回滚进程中断的删除操作。"""

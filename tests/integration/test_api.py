@@ -667,6 +667,63 @@ def test_local_groups_can_organize_non_favorite_artworks(
     assert [item["artworkId"] for item in filtered.json()["items"]] == [701]
 
 
+def test_artwork_deletion_protects_favorites_and_keeps_bulk_progress(
+    app_client: tuple[ApiTestClient, AppContainer],
+) -> None:
+    client, container = app_client
+    artwork = RemoteArtwork(
+        artwork_id=801,
+        artwork_type=ArtworkType.ILLUST,
+        title="收藏保护作品",
+        description="",
+        author_id=901,
+        author_name="测试作者",
+        author_account=None,
+        author_avatar_url=None,
+        series_id=None,
+        series_title=None,
+        page_count=1,
+        width=1000,
+        height=1200,
+        x_restrict=0,
+        is_ai=False,
+        published_at=None,
+        original_urls=("https://i.pximg.net/801.jpg",),
+        thumbnail_url=None,
+    )
+    for artwork_id in (801, 802):
+        current = replace(
+            artwork,
+            artwork_id=artwork_id,
+            title=f"删除测试作品 {artwork_id}",
+            original_urls=(f"https://i.pximg.net/{artwork_id}.jpg",),
+        )
+        container.download_commits.commit(
+            current,
+            [MediaRecord("page", f"901/{artwork_id}/{artwork_id}_p0.jpg", "image/jpeg", 4, 0)],
+        )
+        media_path = container.settings.get().library_root / "901" / str(artwork_id) / f"{artwork_id}_p0.jpg"
+        media_path.parent.mkdir(parents=True, exist_ok=True)
+        media_path.write_bytes(b"test")
+    container.favorites.replace_state(801, is_favorite=True)
+
+    single = client.delete("/api/artworks/801")
+
+    assert single.status_code == 409
+    assert single.json()["error"]["code"] == "favorite_artwork_delete_forbidden"
+    assert client.get("/api/artworks/801").status_code == 200
+    assert (container.settings.get().library_root / "901" / "801" / "801_p0.jpg").is_file()
+
+    bulk = client.post("/api/artworks/bulk-delete", json={"artworkIds": [801, 802]})
+
+    assert bulk.status_code == 200
+    assert bulk.json() == {"deleted": 1, "skippedFavoriteArtworkIds": [801]}
+    assert client.get("/api/artworks/801").status_code == 200
+    assert client.get("/api/artworks/802").status_code == 404
+    assert (container.settings.get().library_root / "901" / "801" / "801_p0.jpg").is_file()
+    assert not (container.settings.get().library_root / "901" / "802").exists()
+
+
 def test_favorite_update_keeps_local_state_when_pixiv_sync_fails(
     app_client: tuple[ApiTestClient, AppContainer],
     monkeypatch: MonkeyPatch,

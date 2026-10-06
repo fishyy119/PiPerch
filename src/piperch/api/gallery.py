@@ -12,18 +12,18 @@ from pydantic import Field
 from piperch.api.converters import artwork_detail_response, artwork_summary_response
 from piperch.api.dependencies import get_container
 from piperch.api.models import (
+    ArtworkDeleteResponse,
     ArtworkDetailResponse,
     ArtworkPage,
     ArtworkSummaryResponse,
     BulkDeleteRequest,
-    DeleteResponse,
     NamedCountPage,
     NamedCountResponse,
     TagResponse,
 )
 from piperch.container import AppContainer
 from piperch.domain import ArtworkType
-from piperch.errors import NotFoundError
+from piperch.errors import ConflictError, NotFoundError
 from piperch.pixiv.parsing import parse_artwork_ids
 
 router = APIRouter(tags=["gallery"])
@@ -170,22 +170,32 @@ def get_thumbnail(
     return FileResponse(thumbnail, media_type="image/webp")
 
 
-@router.delete("/artworks/{artwork_id}", response_model=DeleteResponse)
+@router.delete("/artworks/{artwork_id}", response_model=ArtworkDeleteResponse)
 def delete_artwork(
     artwork_id: int = PathParameter(gt=0),
     container: AppContainer = Depends(get_container),
-) -> DeleteResponse:
+) -> ArtworkDeleteResponse:
     container.storage.require_available()
-    return DeleteResponse(deleted=container.library.delete_artworks([artwork_id]))
+    result = container.library.delete_artworks([artwork_id])
+    if result.skipped_favorite_artwork_ids:
+        raise ConflictError(
+            "favorite_artwork_delete_forbidden",
+            "收藏作品不可永久删除，请先取消收藏。",
+        )
+    return ArtworkDeleteResponse(deleted=result.deleted, skipped_favorite_artwork_ids=[])
 
 
-@router.post("/artworks/bulk-delete", response_model=DeleteResponse)
+@router.post("/artworks/bulk-delete", response_model=ArtworkDeleteResponse)
 def bulk_delete_artworks(
     request: BulkDeleteRequest,
     container: AppContainer = Depends(get_container),
-) -> DeleteResponse:
+) -> ArtworkDeleteResponse:
     container.storage.require_available()
-    return DeleteResponse(deleted=container.library.delete_artworks(request.artwork_ids))
+    result = container.library.delete_artworks(request.artwork_ids)
+    return ArtworkDeleteResponse(
+        deleted=result.deleted,
+        skipped_favorite_artwork_ids=list(result.skipped_favorite_artwork_ids),
+    )
 
 
 @router.get("/tags", response_model=list[TagResponse])
