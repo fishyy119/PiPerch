@@ -45,6 +45,7 @@ async function resolvePreviewUrl(pageIndex: number) {
     :thumbnail-url="artwork.thumbnailUrl"
     :target="target"
     :resolve-preview-url="resolvePreviewUrl"
+    :selected="selected"
     :show-author="showAuthor"
   >
     <template #trailing-action>
@@ -54,7 +55,7 @@ async function resolvePreviewUrl(pageIndex: number) {
         :class="[
           'group/queue absolute right-2 bottom-2 z-10 inline-flex size-10 items-center justify-center rounded-xl',
           'cursor-pointer shadow-sm ring-1 ring-transparent backdrop-blur-sm transition',
-          'opacity-100 sm:opacity-0 sm:group-focus-within:opacity-100 sm:group-hover:opacity-100',
+          'opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-visible:opacity-100',
           selected
             ? 'bg-primary/15 text-primary ring-primary/25 sm:opacity-100'
             : 'bg-overlay/65 text-overlay-foreground',
