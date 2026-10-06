@@ -78,7 +78,7 @@ function handleCardDragStart(event: DragEvent) {
   <LibraryArtworkContextMenu v-model:open="contextMenuOpen" :artwork="artwork">
     <ArtworkCard
       :class="{ 'cursor-crosshair': selection.enabled }"
-      :data-gallery-artwork-id="artwork.artworkId"
+      :data-selection-id="artwork.artworkId"
       :title="artwork.title"
       :author-name="artwork.authorName"
       :page-count="artwork.pageCount"

@@ -17,7 +17,6 @@ export interface PreferenceConfig {
     relatedCount: number
   }
   downloadCandidates: {
-    viewStyle: string
     cardWidth: number
   }
 }
@@ -39,7 +38,6 @@ export const PREFERENCE_DEFAULTS: PreferenceConfig = {
     relatedCount: 12,
   },
   downloadCandidates: {
-    viewStyle: 'list',
     cardWidth: 220,
   },
 }

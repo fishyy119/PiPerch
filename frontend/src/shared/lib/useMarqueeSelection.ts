@@ -1,21 +1,33 @@
 import SelectionArea, { type SelectionEvent } from '@viselect/vanilla'
 import { onBeforeUnmount, type Ref, watch } from 'vue'
 
-import { useGallerySelectionStore } from '@/features/gallery/gallery-selection'
-
-const SELECTABLE_SELECTOR = '[data-gallery-artwork-id]'
+const SELECTABLE_SELECTOR = '[data-selection-id]'
 const REMOVING_CLASS = 'selection-area--removing'
+const IGNORED_START_SELECTOR = 'button, input, select, textarea, [data-selection-ignore]'
 
-function artworkIds(elements: Element[]) {
+let nextScopeId = 0
+
+interface MarqueeSelectionOptions {
+  selectedIds: () => readonly number[]
+  setSelectedIds: (artworkIds: readonly number[]) => void
+  enabled?: () => boolean
+  canStart?: (event: MouseEvent) => boolean
+}
+
+function selectionIds(elements: Element[]) {
   return elements.flatMap((element) => {
     if (!(element instanceof HTMLElement)) return []
-    const artworkId = Number(element.dataset.galleryArtworkId)
-    return Number.isSafeInteger(artworkId) && artworkId > 0 ? [artworkId] : []
+    const selectionId = Number(element.dataset.selectionId)
+    return Number.isSafeInteger(selectionId) && selectionId > 0 ? [selectionId] : []
   })
 }
 
-export function useGalleryMarqueeSelection(grid: Ref<HTMLElement | null>) {
-  const selection = useGallerySelectionStore()
+export function useMarqueeSelection(
+  root: Ref<HTMLElement | null>,
+  options: MarqueeSelectionOptions,
+) {
+  const scopeId = `marquee-${String(nextScopeId++)}`
+  let selectionRoot: HTMLElement | null = null
   let selectionArea: SelectionArea | null = null
   let initialIds: number[] = []
   let intersectingIds: number[] = []
@@ -24,15 +36,19 @@ export function useGalleryMarqueeSelection(grid: Ref<HTMLElement | null>) {
   let suppressClick = false
   let suppressClickTimer: ReturnType<typeof setTimeout> | null = null
 
+  function isEnabled() {
+    return options.enabled?.() ?? true
+  }
+
   function applySelection() {
     if (!active) return
     // 普通框选追加，按住 Shift 时从初始选择中移除。
     const nextIds = new Set(initialIds)
-    intersectingIds.forEach((artworkId) => {
-      if (removing) nextIds.delete(artworkId)
-      else nextIds.add(artworkId)
+    intersectingIds.forEach((selectionId) => {
+      if (removing) nextIds.delete(selectionId)
+      else nextIds.add(selectionId)
     })
-    selection.setSelected([...nextIds])
+    options.setSelectedIds([...nextIds])
   }
 
   function setRemoving(value: boolean) {
@@ -77,14 +93,21 @@ export function useGalleryMarqueeSelection(grid: Ref<HTMLElement | null>) {
 
   function handleBeforeStart({ event, selection: area }: SelectionEvent) {
     const target = event?.target
-    if (!selection.enabled || (target instanceof Element && target.closest('button'))) {
+    if (
+      !isEnabled() ||
+      !(event instanceof MouseEvent) ||
+      !(target instanceof Element) ||
+      target.closest(IGNORED_START_SELECTOR) ||
+      (target.closest('a, img') && !target.closest(SELECTABLE_SELECTOR)) ||
+      options.canStart?.(event) === false
+    ) {
       return false
     }
     area.clearSelection(true, true)
   }
 
   function handleStart({ event }: SelectionEvent) {
-    initialIds = selection.selectedIds
+    initialIds = [...options.selectedIds()]
     intersectingIds = []
     active = true
     setRemoving(event instanceof MouseEvent && event.shiftKey)
@@ -94,13 +117,13 @@ export function useGalleryMarqueeSelection(grid: Ref<HTMLElement | null>) {
 
   function handleMove({ store }: SelectionEvent) {
     if (!active) return
-    intersectingIds = artworkIds(store.selected)
+    intersectingIds = selectionIds(store.selected)
     applySelection()
   }
 
   function handleStop({ store }: SelectionEvent) {
     if (!active) return
-    intersectingIds = artworkIds(store.selected)
+    intersectingIds = selectionIds(store.selected)
     applySelection()
     armClickSuppression()
     stopInteraction()
@@ -111,13 +134,19 @@ export function useGalleryMarqueeSelection(grid: Ref<HTMLElement | null>) {
     clearClickSuppression()
     selectionArea?.destroy()
     selectionArea = null
+    if (selectionRoot?.dataset.marqueeSelectionScope === scopeId) {
+      delete selectionRoot.dataset.marqueeSelectionScope
+    }
+    selectionRoot = null
   }
 
   function createSelectionArea(element: HTMLElement) {
     destroySelectionArea()
+    selectionRoot = element
+    element.dataset.marqueeSelectionScope = scopeId
     selectionArea = new SelectionArea({
       container: document.body,
-      selectables: SELECTABLE_SELECTOR,
+      selectables: `[data-marquee-selection-scope="${scopeId}"] ${SELECTABLE_SELECTOR}`,
       startAreas: [element],
       boundaries: [document.documentElement],
       selectionContainerClass: 'selection-area-container',
@@ -138,7 +167,7 @@ export function useGalleryMarqueeSelection(grid: Ref<HTMLElement | null>) {
       .on('move', handleMove)
       .on('stop', handleStop)
 
-    if (!selection.enabled) selectionArea.disable()
+    if (!isEnabled()) selectionArea.disable()
   }
 
   function reset() {
@@ -148,12 +177,12 @@ export function useGalleryMarqueeSelection(grid: Ref<HTMLElement | null>) {
     clearClickSuppression()
   }
 
-  watch(grid, (element) => {
+  watch(root, (element) => {
     if (element) createSelectionArea(element)
     else destroySelectionArea()
   })
   watch(
-    () => selection.enabled,
+    () => isEnabled(),
     (enabled) => {
       if (!selectionArea) return
       if (enabled) selectionArea.enable()

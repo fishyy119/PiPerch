@@ -53,6 +53,10 @@ export const useDownloadSelection = defineStore('download-selection', () => {
     ids.value = next
   }
 
+  function setSelected(artworkIds: readonly number[]) {
+    ids.value = new Set(artworkIds)
+  }
+
   function clear() {
     ids.value = new Set()
   }
@@ -66,6 +70,7 @@ export const useDownloadSelection = defineStore('download-selection', () => {
     removeAll,
     addIds,
     removeIds,
+    setSelected,
     clear,
   }
 })

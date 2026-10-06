@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Check, ChevronLeft, ChevronRight, X } from '@lucide/vue'
-import { computed, type Ref } from 'vue'
+import { computed } from 'vue'
 
 import { usePreference } from '@/app/usePreference'
 import type { DiscoveryItem } from '@/features/discovery/discovery-api'
@@ -8,7 +8,6 @@ import { useDownloadSelection } from '@/features/downloads/download-selection'
 import DiscoveryCandidateResults from '@/pages/downloads/DiscoveryCandidateResults.vue'
 import Button from '@ui/Button.vue'
 import Card from '@ui/Card.vue'
-import Select from '@ui/Select.vue'
 import SettingsPopover from '@ui/SettingsPopover.vue'
 import Slider from '@ui/Slider.vue'
 
@@ -24,14 +23,7 @@ const emit = defineEmits<{
   loadPage: [page: number]
 }>()
 
-const viewStyleOptions = [
-  { value: 'list', label: '列表' },
-  { value: 'artwork', label: '作品' },
-] as const
-type DownloadCandidateViewStyle = (typeof viewStyleOptions)[number]['value']
-
 const selection = useDownloadSelection()
-const viewStyle = usePreference('downloadCandidates.viewStyle') as Ref<DownloadCandidateViewStyle>
 const cardWidth = usePreference('downloadCandidates.cardWidth')
 const pageFullySelected = computed(() => {
   const selectable = props.candidates.filter((item) => !item.inLibrary)
@@ -45,12 +37,6 @@ function togglePage() {
   const selectable = props.candidates.filter((item) => !item.inLibrary)
   if (pageFullySelected.value) selection.removeAll(selectable)
   else selection.addAll(selectable)
-}
-
-function setViewStyle(value: string) {
-  const selected = viewStyleOptions.find((option) => option.value === value)
-  if (selected === undefined) return
-  viewStyle.value = selected.value
 }
 </script>
 
@@ -79,22 +65,11 @@ function setViewStyle(value: string) {
             <X :size="17" />清空
           </Button>
           <SettingsPopover variant="ghost" title="候选作品显示设置">
-            <div class="space-y-5">
-              <div class="flex items-center justify-between gap-3">
-                <p class="text-sm font-medium">候选作品样式</p>
-                <Select
-                  size="small"
-                  :options="viewStyleOptions"
-                  :model-value="viewStyle"
-                  @update:model-value="setViewStyle"
-                />
-              </div>
-              <div v-if="viewStyle === 'artwork'" class="space-y-2">
-                <p class="text-sm font-medium">卡片大小</p>
-                <div class="flex items-center gap-3">
-                  <Slider v-model="cardWidth" class="flex-1" :min="140" :max="360" :step="10" />
-                  <output class="w-11 text-right text-xs tabular-nums"> {{ cardWidth }}px </output>
-                </div>
+            <div class="space-y-2">
+              <p class="text-sm font-medium">卡片大小</p>
+              <div class="flex items-center gap-3">
+                <Slider v-model="cardWidth" class="flex-1" :min="140" :max="360" :step="10" />
+                <output class="w-11 text-right text-xs tabular-nums"> {{ cardWidth }}px </output>
               </div>
             </div>
           </SettingsPopover>
@@ -105,8 +80,8 @@ function setViewStyle(value: string) {
         v-if="candidates.length"
         :candidates="candidates"
         :selected-ids="selection.selectedIds"
-        :view-style="viewStyle"
         :card-width="cardWidth"
+        @set-selection="selection.setSelected"
         @toggle="selection.toggle"
       />
       <p v-else class="p-10 text-center text-muted-foreground">{{ emptyMessage }}</p>

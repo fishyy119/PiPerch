@@ -17,7 +17,6 @@ import {
   provideGalleryFilters,
 } from '@/features/gallery/gallery-filter'
 import { useGallerySelectionStore } from '@/features/gallery/gallery-selection'
-import { useGalleryMarqueeSelection } from '@/features/gallery/useGalleryMarqueeSelection'
 import { artworkQueryKeys } from '@/features/library/library-query-cache'
 import GalleryBulkSelectionBar from '@/pages/gallery/GalleryBulkSelectionBar.vue'
 import GalleryFilterPopup from '@/pages/gallery/GalleryFilterPopup.vue'
@@ -25,6 +24,7 @@ import GalleryPreferencesPopover from '@/pages/gallery/GalleryPreferencesPopover
 import LibraryArtworkCard from '@/pages/gallery/LibraryArtworkCard.vue'
 import TopbarActions from '@/pages/gallery/TopbarActions.vue'
 import { firstQueryValue } from '@/shared/lib/route-query'
+import { useMarqueeSelection } from '@/shared/lib/useMarqueeSelection'
 import { usePageKeyboardShortcuts } from '@/shared/lib/usePageKeyboardShortcuts'
 import Button from '@ui/Button.vue'
 import Card from '@ui/Card.vue'
@@ -40,7 +40,11 @@ const filterOpen = ref(false)
 const preferredCardWidth = usePreference('gallery.cardWidth')
 const preferredPageSize = usePreference('gallery.pageSize')
 const galleryGrid = ref<HTMLElement | null>(null)
-const marquee = useGalleryMarqueeSelection(galleryGrid)
+const marquee = useMarqueeSelection(galleryGrid, {
+  enabled: () => selection.enabled,
+  selectedIds: () => selection.selectedIds,
+  setSelectedIds: selection.setSelected,
+})
 
 function positiveInt(value: string | null | undefined) {
   const parsed = Number(value)

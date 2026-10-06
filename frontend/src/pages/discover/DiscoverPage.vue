@@ -14,6 +14,7 @@ import DiscoverAuthorCard from '@/pages/discover/DiscoverAuthorCard.vue'
 import DiscoverDownloadButton from '@/pages/discover/DiscoverDownloadButton.vue'
 import DiscoveryArtworkCard from '@/shared/components/discovery/DiscoveryArtworkCard.vue'
 import { errorMessage } from '@/shared/errors'
+import { useMarqueeSelection } from '@/shared/lib/useMarqueeSelection'
 import Button from '@ui/Button.vue'
 import Card from '@ui/Card.vue'
 import Select from '@ui/Select.vue'
@@ -27,6 +28,13 @@ type DiscoveryView = 'artworks' | 'authors'
 const selection = useDownloadSelection()
 const queryClient = useQueryClient()
 const activeView = ref<DiscoveryView>('artworks')
+const selectionRoot = ref<HTMLElement | null>(null)
+const marquee = useMarqueeSelection(selectionRoot, {
+  selectedIds: () => selection.selectedIds,
+  setSelectedIds: selection.setSelected,
+  canStart: (event) =>
+    !event.ctrlKey || !(event.target instanceof Element) || !event.target.closest('a'),
+})
 const cardWidth = usePreference('discovery.cardWidth')
 const authorColumns = usePreference('discovery.authorColumns')
 const DISCOVERY_AUTHOR_COLUMN_OPTIONS = [1, 2, 3] as const
@@ -120,102 +128,104 @@ function updateAuthorFollowState(userId: number, followed: boolean) {
 </script>
 
 <template>
-  <Tabs v-model="activeView" :items="viewOptions" teleport-to="#topbar-actions">
-    <template #actions>
-      <div class="flex items-center gap-2">
-        <Button variant="secondary" :disabled="isRefreshing" @click="refreshCurrentView">
-          <RefreshCw :class="isRefreshing ? 'animate-spin' : ''" :size="17" />
-          刷新
-        </Button>
-        <SettingsPopover title="发现页显示设置">
-          <div v-if="activeView === 'artworks'" class="space-y-2">
-            <p class="text-sm font-medium">卡片大小</p>
-            <div class="flex items-center gap-3">
-              <Slider v-model="cardWidth" class="flex-1" :min="140" :max="360" :step="10" />
-              <output class="w-11 text-right text-xs tabular-nums"> {{ cardWidth }}px </output>
+  <div ref="selectionRoot" @click.capture="marquee.handleClick">
+    <Tabs v-model="activeView" :items="viewOptions" teleport-to="#topbar-actions">
+      <template #actions>
+        <div class="flex items-center gap-2">
+          <Button variant="secondary" :disabled="isRefreshing" @click="refreshCurrentView">
+            <RefreshCw :class="isRefreshing ? 'animate-spin' : ''" :size="17" />
+            刷新
+          </Button>
+          <SettingsPopover title="发现页显示设置">
+            <div v-if="activeView === 'artworks'" class="space-y-2">
+              <p class="text-sm font-medium">卡片大小</p>
+              <div class="flex items-center gap-3">
+                <Slider v-model="cardWidth" class="flex-1" :min="140" :max="360" :step="10" />
+                <output class="w-11 text-right text-xs tabular-nums"> {{ cardWidth }}px </output>
+              </div>
             </div>
-          </div>
-          <div v-else class="flex items-center justify-between gap-3">
-            <p class="text-sm font-medium">作者栏数</p>
-            <Select
-              size="small"
-              :options="authorColumnOptions"
-              :model-value="String(authorColumns)"
-              @update:model-value="setAuthorColumns"
-            />
-          </div>
-        </SettingsPopover>
-      </div>
-    </template>
+            <div v-else class="flex items-center justify-between gap-3">
+              <p class="text-sm font-medium">作者栏数</p>
+              <Select
+                size="small"
+                :options="authorColumnOptions"
+                :model-value="String(authorColumns)"
+                @update:model-value="setAuthorColumns"
+              />
+            </div>
+          </SettingsPopover>
+        </div>
+      </template>
 
-    <template #artworks>
-      <div
-        v-if="recommendationsQuery.isPending.value"
-        class="py-20 text-center text-muted-foreground"
-      >
-        正在读取发现作品…
-      </div>
-      <Card
-        v-else-if="
-          recommendationsQuery.error.value && recommendationsQuery.data.value === undefined
-        "
-        class="flex flex-col items-center gap-4 py-20 text-center"
-      >
-        <p class="text-destructive">{{ errorMessage(recommendationsQuery.error.value) }}</p>
-        <Button variant="secondary" @click="refreshRecommendations">重新加载</Button>
-      </Card>
-      <div
-        v-else-if="recommendationsQuery.data.value?.length"
-        class="grid gap-x-3.5 gap-y-6"
-        :style="artworkGridStyle"
-      >
-        <DiscoveryArtworkCard
-          v-for="artwork in recommendationsQuery.data.value"
-          :key="artwork.artworkId"
-          :artwork="artwork"
-          :selected="selection.selectedIds.includes(artwork.artworkId)"
-          @toggle="selection.toggle"
-        />
-      </div>
-      <Card v-else class="py-20 text-center text-muted-foreground">
-        当前没有可展示的发现作品。
-      </Card>
-    </template>
+      <template #artworks>
+        <div
+          v-if="recommendationsQuery.isPending.value"
+          class="py-20 text-center text-muted-foreground"
+        >
+          正在读取发现作品…
+        </div>
+        <Card
+          v-else-if="
+            recommendationsQuery.error.value && recommendationsQuery.data.value === undefined
+          "
+          class="flex flex-col items-center gap-4 py-20 text-center"
+        >
+          <p class="text-destructive">{{ errorMessage(recommendationsQuery.error.value) }}</p>
+          <Button variant="secondary" @click="refreshRecommendations">重新加载</Button>
+        </Card>
+        <div
+          v-else-if="recommendationsQuery.data.value?.length"
+          class="grid gap-x-3.5 gap-y-6"
+          :style="artworkGridStyle"
+        >
+          <DiscoveryArtworkCard
+            v-for="artwork in recommendationsQuery.data.value"
+            :key="artwork.artworkId"
+            :artwork="artwork"
+            :selected="selection.selectedIds.includes(artwork.artworkId)"
+            @toggle="selection.toggle"
+          />
+        </div>
+        <Card v-else class="py-20 text-center text-muted-foreground">
+          当前没有可展示的发现作品。
+        </Card>
+      </template>
 
-    <template #authors>
-      <div
-        v-if="recommendedUsersQuery.isPending.value"
-        class="py-20 text-center text-muted-foreground"
-      >
-        正在读取发现作者…
-      </div>
-      <Card
-        v-else-if="
-          recommendedUsersQuery.error.value && recommendedUsersQuery.data.value === undefined
-        "
-        class="flex flex-col items-center gap-4 py-20 text-center"
-      >
-        <p class="text-destructive">{{ errorMessage(recommendedUsersQuery.error.value) }}</p>
-        <Button variant="secondary" @click="refreshRecommendedUsers">重新加载</Button>
-      </Card>
-      <div
-        v-else-if="recommendedUsersQuery.data.value?.length"
-        class="grid gap-4"
-        :style="authorGridStyle"
-      >
-        <DiscoverAuthorCard
-          v-for="author in recommendedUsersQuery.data.value"
-          :key="author.userId"
-          :author="author"
-          :selected-ids="selection.selectedIds"
-          @follow-change="updateAuthorFollowState"
-          @toggle="selection.toggle"
-        />
-      </div>
-      <Card v-else class="py-20 text-center text-muted-foreground">
-        当前没有可展示的发现作者。
-      </Card>
-    </template>
-  </Tabs>
+      <template #authors>
+        <div
+          v-if="recommendedUsersQuery.isPending.value"
+          class="py-20 text-center text-muted-foreground"
+        >
+          正在读取发现作者…
+        </div>
+        <Card
+          v-else-if="
+            recommendedUsersQuery.error.value && recommendedUsersQuery.data.value === undefined
+          "
+          class="flex flex-col items-center gap-4 py-20 text-center"
+        >
+          <p class="text-destructive">{{ errorMessage(recommendedUsersQuery.error.value) }}</p>
+          <Button variant="secondary" @click="refreshRecommendedUsers">重新加载</Button>
+        </Card>
+        <div
+          v-else-if="recommendedUsersQuery.data.value?.length"
+          class="grid gap-4"
+          :style="authorGridStyle"
+        >
+          <DiscoverAuthorCard
+            v-for="author in recommendedUsersQuery.data.value"
+            :key="author.userId"
+            :author="author"
+            :selected-ids="selection.selectedIds"
+            @follow-change="updateAuthorFollowState"
+            @toggle="selection.toggle"
+          />
+        </div>
+        <Card v-else class="py-20 text-center text-muted-foreground">
+          当前没有可展示的发现作者。
+        </Card>
+      </template>
+    </Tabs>
+  </div>
   <DiscoverDownloadButton />
 </template>
