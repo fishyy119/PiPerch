@@ -1,16 +1,21 @@
 <script setup lang="ts">
 import { Heart } from '@lucide/vue'
+import { useMutation, useQueryClient } from '@tanstack/vue-query'
 import { computed, ref } from 'vue'
 
 import { usePreference } from '@/app/usePreference'
 import type { ArtworkCardTarget } from '@/features/artworks/artwork-card'
 import type { ArtworkSummary } from '@/features/artworks/artworks-api'
+import { replaceFavoriteState } from '@/features/favorites/favorites-api'
 import { useGalleryFilters } from '@/features/gallery/gallery-filter'
 import { galleryNavigationRouteState } from '@/features/gallery/gallery-navigation'
 import { useGallerySelectionStore } from '@/features/gallery/gallery-selection'
+import { invalidateArtworkData } from '@/features/library/library-query-cache'
 import LibraryArtworkContextMenu from '@/pages/gallery/LibraryArtworkContextMenu.vue'
 import ArtworkCard from '@/shared/components/artworks/ArtworkCard.vue'
+import { errorMessage } from '@/shared/errors'
 import Checkbox from '@ui/Checkbox.vue'
+import { toast } from '@ui/toast'
 
 const props = defineProps<{
   artwork: ArtworkSummary
@@ -25,12 +30,23 @@ const target = computed<ArtworkCardTarget>(() => ({
   },
 }))
 const contextMenuOpen = ref(false)
+const queryClient = useQueryClient()
 const selection = useGallerySelectionStore()
 const { update: updateFilters } = useGalleryFilters()
 const showTitle = usePreference('gallery.showTitle')
 const showAuthor = usePreference('gallery.showAuthor')
 const showFavoriteIndicator = usePreference('gallery.showFavoriteIndicator')
 const thumbnailUrl = computed(() => `/api/artworks/${String(props.artwork.artworkId)}/thumbnail`)
+const favoriteMutation = useMutation({
+  mutationFn: () => replaceFavoriteState(props.artwork.artworkId, !props.artwork.isFavorite),
+  onSuccess: async (favoriteState) => {
+    await invalidateArtworkData(queryClient)
+    toast.success(favoriteState.isFavorite ? '已收藏' : '已取消收藏')
+  },
+  onError: (error) => {
+    toast.error('更新收藏失败', { description: errorMessage(error) })
+  },
+})
 
 function resolvePreviewUrl(pageIndex: number) {
   return props.artwork.artworkType === 'ugoira'
@@ -40,6 +56,12 @@ function resolvePreviewUrl(pageIndex: number) {
 
 function handleCardClick(event: MouseEvent) {
   if (!selection.enabled) return
+  if (
+    event.target instanceof Element &&
+    event.target.closest('[data-artwork-card-favorite]') !== null
+  ) {
+    return
+  }
 
   event.preventDefault()
   event.stopPropagation()
@@ -63,10 +85,7 @@ function handleCardClick(event: MouseEvent) {
       :show-page-preview="!selection.enabled && !contextMenuOpen"
       @click.capture="handleCardClick"
     >
-      <template
-        v-if="selection.enabled || (artwork.isFavorite && showFavoriteIndicator)"
-        #leading-action
-      >
+      <template v-if="selection.enabled || showFavoriteIndicator" #leading-action>
         <Checkbox
           v-if="selection.enabled"
           :class="[
@@ -77,12 +96,24 @@ function handleCardClick(event: MouseEvent) {
           @click.stop
           @update:model-value="selection.toggleArtwork(artwork.artworkId)"
         />
-        <span
-          v-else
-          class="pointer-events-none absolute top-2 left-2 z-10 grid size-7 place-items-center rounded-full bg-overlay/60 text-white shadow-sm backdrop-blur-sm"
+        <button
+          type="button"
+          data-artwork-card-favorite
+          :class="[
+            'absolute bottom-2 left-2 z-10 grid size-8 cursor-pointer place-items-center',
+            'drop-shadow-sm transition hover:scale-110 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
+            'disabled:cursor-wait disabled:opacity-60',
+            artwork.isFavorite ? 'text-foreground' : 'text-foreground/60 hover:text-foreground',
+          ]"
+          :title="artwork.isFavorite ? '取消收藏' : '收藏'"
+          :disabled="favoriteMutation.isPending.value"
+          @click.prevent.stop="favoriteMutation.mutate()"
         >
-          <Heart :size="16" fill="currentColor" />
-        </span>
+          <Heart
+            :size="28"
+            :class="artwork.isFavorite ? 'fill-red-500 dark:fill-red-400' : 'fill-card'"
+          />
+        </button>
       </template>
 
       <template #author>
