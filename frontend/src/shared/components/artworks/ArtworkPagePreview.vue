@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ImageOff, LoaderCircle } from '@lucide/vue'
-import { ref, watch } from 'vue'
+import { nextTick, ref, watch } from 'vue'
 
 import type { ArtworkPreviewUrlResolver } from '@/features/artworks/artwork-card'
 import HoverCard from '@ui/HoverCard.vue'
@@ -19,6 +19,7 @@ const previewImageLoaded = ref(false)
 const previewImageFailed = ref(false)
 const cachedUrls = new Map<number, string | null>()
 let requestId = 0
+let previewPointActivated = false
 
 watch(
   () => props.resolveUrl,
@@ -31,6 +32,11 @@ watch(
     previewImageFailed.value = false
   },
 )
+
+watch(previewOpen, (open) => {
+  // 保证进入边缘但是未进入预览点时，仍然有图片加载
+  if (open && !previewPointActivated) void showPreview(0)
+})
 
 function applyPreviewUrl(url: string | null) {
   if (previewUrl.value !== url) {
@@ -67,6 +73,14 @@ async function showPreview(page: number) {
   } finally {
     if (currentRequest === requestId) previewLoading.value = false
   }
+}
+
+function showPreviewFromPoint(page: number) {
+  previewPointActivated = true
+  void showPreview(page)
+  void nextTick(() => {
+    previewPointActivated = false
+  })
 }
 
 function hidePreviewOnFocusOut(event: FocusEvent) {
@@ -110,8 +124,8 @@ function hidePreviewOnFocusOut(event: FocusEvent) {
             'hover:scale-125 hover:bg-primary focus-visible:scale-125 focus-visible:bg-primary',
             { 'bg-primary!': previewOpen && previewPage === page - 1 },
           ]"
-          @pointerenter="showPreview(page - 1)"
-          @focus="showPreview(page - 1)"
+          @pointerenter="showPreviewFromPoint(page - 1)"
+          @focus="showPreviewFromPoint(page - 1)"
           @click.prevent.stop
         />
       </div>
