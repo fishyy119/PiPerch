@@ -48,7 +48,7 @@ function handleCardClick(event: MouseEvent) {
 
 <template>
   <ArtworkCard
-    class="cursor-crosshair select-none"
+    class="select-none"
     :data-selection-id="artwork.inLibrary ? undefined : artwork.artworkId"
     :title="artwork.title"
     :author-name="artwork.authorName"

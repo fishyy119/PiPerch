@@ -313,7 +313,8 @@ usePageKeyboardShortcuts((event) => {
     <div
       v-else-if="artworksQuery.data.value?.items.length"
       ref="galleryGrid"
-      :class="['gallery-grid', selection.enabled ? 'cursor-crosshair select-none' : '']"
+      class="gallery-grid"
+      :class="{ 'select-none': selection.enabled }"
       :style="{ '--gallery-card-width': `${String(preferredCardWidth)}px` }"
       @click.capture="marquee.handleClick"
     >
