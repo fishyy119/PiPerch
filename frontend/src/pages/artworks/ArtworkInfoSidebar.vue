@@ -9,6 +9,7 @@ import type { ArtworkDetail } from '@/features/artworks/artworks-api'
 import { getUserProfile, type UserProfile, userProfileKey } from '@/features/authors/author-api'
 import AuthorFollowButton from '@/shared/components/authors/AuthorFollowButton.vue'
 import AuthorIdButton from '@/shared/components/authors/AuthorIdButton.vue'
+import { writeToClipboard } from '@/shared/lib/clipboard'
 import Card from '@ui/Card.vue'
 
 const props = defineProps<{ artwork: ArtworkDetail }>()
@@ -47,6 +48,10 @@ function filterSeries() {
     path: '/gallery',
     query: { seriesId: String(props.artwork.seriesId) },
   })
+}
+
+function copyArtworkId() {
+  void writeToClipboard(String(props.artwork.artworkId))
 }
 
 function formatDate(value: string | null) {
@@ -121,7 +126,13 @@ function formatDate(value: string | null) {
       <h3 class="text-sm font-semibold">作品信息</h3>
       <dl class="mt-3 grid gap-3 text-sm">
         <div class="flex justify-between gap-3">
-          <dt class="text-muted-foreground">作品 ID</dt>
+          <dt
+            class="cursor-pointer text-muted-foreground transition-colors hover:text-primary"
+            title="复制作品 ID"
+            @click="copyArtworkId"
+          >
+            作品 ID
+          </dt>
           <dd>{{ artwork.artworkId }}</dd>
         </div>
         <div class="flex justify-between gap-3">
