@@ -121,6 +121,7 @@ def create_app(paths: AppPaths | None = None, control: AppControl | None = None)
             artwork_repository,
             pixiv,
             download_commit_service,
+            favorite_repository,
             thumbnail_cache,
             library_files,
         )

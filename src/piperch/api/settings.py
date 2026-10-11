@@ -29,6 +29,7 @@ def _response(settings: AppSettings) -> SettingsResponse:
         library_root=str(settings.library_root),
         download_concurrency=settings.download_concurrency,
         request_interval_ms=settings.request_interval_ms,
+        auto_bookmark_on_download=settings.auto_bookmark_on_download,
         webp_enabled=settings.webp_enabled,
         webp_quality=settings.webp_quality,
     )

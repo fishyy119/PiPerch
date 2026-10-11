@@ -17,6 +17,7 @@ function settingsPayload(pixivCookie = 'PHPSESSID=stored'): Settings {
     libraryRoot: 'C:\\PiPerch\\library',
     downloadConcurrency: 3,
     requestIntervalMs: 500,
+    autoBookmarkOnDownload: true,
     webpEnabled: true,
     webpQuality: 85,
   }

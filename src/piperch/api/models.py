@@ -39,6 +39,7 @@ class SettingsResponse(ApiModel):
     library_root: str
     download_concurrency: int
     request_interval_ms: int
+    auto_bookmark_on_download: bool
     webp_enabled: bool
     webp_quality: int
 
@@ -48,6 +49,7 @@ class SettingsPatch(ApiModel):
     proxy_url: str | None = None
     download_concurrency: int = Field(default=3, ge=1, le=8)
     request_interval_ms: int = Field(default=500, ge=0, le=60_000)
+    auto_bookmark_on_download: bool = Field(default=True, strict=True)
     webp_enabled: bool = True
     webp_quality: int = Field(default=85, ge=1, le=100)
 

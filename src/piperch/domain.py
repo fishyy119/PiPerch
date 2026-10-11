@@ -50,6 +50,7 @@ class AppSettings:
     library_root: Path
     download_concurrency: int
     request_interval_ms: int
+    auto_bookmark_on_download: bool
     webp_enabled: bool
     webp_quality: int
 

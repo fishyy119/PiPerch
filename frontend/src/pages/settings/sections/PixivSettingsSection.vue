@@ -7,6 +7,7 @@ import { validatePixivCookie } from '@/features/settings/settings-api'
 import { useSettingField } from '@/features/settings/useSettingField'
 import { errorMessage } from '@/shared/errors'
 import Button from '@ui/Button.vue'
+import Switch from '@ui/Switch.vue'
 import Textarea from '@ui/Textarea.vue'
 import { toast } from '@ui/toast'
 
@@ -21,6 +22,12 @@ const cookieField = useSettingField<'pixivCookie', string>('pixivCookie', {
 })
 const cookie = cookieField.value
 const configured = computed(() => Boolean(cookieField.savedValue.value))
+
+const autoBookmarkField = useSettingField('autoBookmarkOnDownload', {
+  label: '入库后自动收藏 Pixiv',
+  initialValue: true,
+})
+const autoBookmark = autoBookmarkField.value
 
 const validationMutation = useMutation({
   mutationFn: () => validatePixivCookie(cookie.value.trim()),
@@ -77,6 +84,19 @@ const validationMutation = useMutation({
           <ShieldCheck :size="16" />
           {{ validationMutation.isPending.value ? '验证中…' : '验证' }}
         </Button>
+      </div>
+    </SettingItem>
+    <SettingItem
+      title="入库后自动收藏 Pixiv"
+      description="首次入库后自动公开收藏到 Pixiv，并同步本地收藏"
+      control-id="auto-bookmark-on-download"
+    >
+      <div class="flex justify-end">
+        <Switch
+          id="auto-bookmark-on-download"
+          v-model="autoBookmark"
+          @update:model-value="autoBookmarkField.save"
+        />
       </div>
     </SettingItem>
   </SettingsSection>

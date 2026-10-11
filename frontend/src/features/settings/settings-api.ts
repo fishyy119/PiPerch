@@ -8,6 +8,7 @@ export const settingsSchema = z.object({
   libraryRoot: z.string(),
   downloadConcurrency: z.number().int().min(1).max(8),
   requestIntervalMs: z.number().int().min(0).max(60_000),
+  autoBookmarkOnDownload: z.boolean(),
   webpEnabled: z.boolean(),
   webpQuality: z.number().int().min(1).max(100),
 })

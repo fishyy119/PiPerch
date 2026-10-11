@@ -305,6 +305,7 @@ def test_health_and_settings_return_cookie(
     settings = client.get("/api/settings")
     assert settings.status_code == 200
     assert settings.json()["pixivCookie"] == cookie
+    assert settings.json()["autoBookmarkOnDownload"] is True
 
     cleared = client.patch(
         "/api/settings",
@@ -392,15 +393,26 @@ def test_settings_patch_updates_only_requested_fields(
     assert concurrency.status_code == 200
     assert concurrency.json()["downloadConcurrency"] == 6
     assert concurrency.json()["requestIntervalMs"] == current.request_interval_ms
+    assert concurrency.json()["autoBookmarkOnDownload"] is True
 
     disabled = client.patch("/api/settings", json={"webpEnabled": False})
     assert disabled.status_code == 200
     assert disabled.json()["downloadConcurrency"] == 6
     assert disabled.json()["webpEnabled"] is False
 
+    bookmark_disabled = client.patch("/api/settings", json={"autoBookmarkOnDownload": False})
+    assert bookmark_disabled.status_code == 200
+    assert bookmark_disabled.json()["autoBookmarkOnDownload"] is False
+    assert bookmark_disabled.json()["downloadConcurrency"] == 6
+    assert bookmark_disabled.json()["webpEnabled"] is False
+
     persisted = json.loads(container.paths.settings.read_text(encoding="utf-8"))
     assert persisted["download_concurrency"] == 6
     assert persisted["webp_enabled"] is False
+    assert persisted["auto_bookmark_on_download"] is False
+    container.settings.initialize()
+    assert container.settings.get().auto_bookmark_on_download is False
+    assert client.get("/api/settings").json()["autoBookmarkOnDownload"] is False
 
 
 def test_settings_patch_rejects_empty_or_invalid_changes(
@@ -410,6 +422,7 @@ def test_settings_patch_rejects_empty_or_invalid_changes(
 
     assert client.patch("/api/settings", json={}).status_code == 422
     assert client.patch("/api/settings", json={"downloadConcurrency": 9}).status_code == 422
+    assert client.patch("/api/settings", json={"autoBookmarkOnDownload": "false"}).status_code == 422
 
 
 def test_settings_rejects_invalid_proxy_without_persisting(

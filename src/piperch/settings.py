@@ -23,6 +23,7 @@ class StoredSettings(BaseModel):
     library_root: Path
     download_concurrency: int = Field(default=3, ge=1, le=8, strict=True)
     request_interval_ms: int = Field(default=500, ge=0, le=60_000, strict=True)
+    auto_bookmark_on_download: bool = Field(default=True, strict=True)
     webp_enabled: bool = Field(default=True, strict=True)
     webp_quality: int = Field(default=85, ge=1, le=100, strict=True)
 
@@ -131,6 +132,7 @@ class SettingsManager:
             library_root=settings.library_root,
             download_concurrency=settings.download_concurrency,
             request_interval_ms=settings.request_interval_ms,
+            auto_bookmark_on_download=settings.auto_bookmark_on_download,
             webp_enabled=settings.webp_enabled,
             webp_quality=settings.webp_quality,
         )

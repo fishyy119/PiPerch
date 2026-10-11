@@ -22,7 +22,7 @@ if TYPE_CHECKING:
 
     from piperch.paths import AppPaths
     from piperch.pixiv import PixivClient
-    from piperch.repositories import ArtworkRepository
+    from piperch.repositories import ArtworkRepository, FavoriteRepository
     from piperch.services.downloads.cancellation import DownloadCancellation
     from piperch.services.downloads.commit import ArtworkDownloadCommitService
     from piperch.settings import SettingsManager
@@ -39,6 +39,7 @@ class ArtworkDownloadService:
         artworks: ArtworkRepository,
         pixiv: PixivClient,
         commits: ArtworkDownloadCommitService,
+        favorites: FavoriteRepository,
         thumbnails: ArtworkThumbnailCache | None = None,
         files: LibraryFileOperations | None = None,
     ) -> None:
@@ -46,6 +47,7 @@ class ArtworkDownloadService:
         self._artworks = artworks
         self._pixiv = pixiv
         self._commits = commits
+        self._favorites = favorites
         self._thumbnails = thumbnails or ArtworkThumbnailCache(paths)
         self._files = files or LibraryFileOperations()
 
@@ -135,9 +137,27 @@ class ArtworkDownloadService:
                 await to_thread.run_sync(self._create_thumbnails, artwork_id, final_dir, final_media)
             except Exception:
                 logger.exception("作品 %d 缩略图缓存生成失败，将在访问时重试。", artwork_id)
+            if is_new_artwork and settings.auto_bookmark_on_download:
+                await self._auto_bookmark(artwork_id, settings.pixiv_cookie)
             return ItemState.SUCCEEDED
         finally:
             await to_thread.run_sync(self._files.cleanup_download_stage, settings.library_root, stage)
+
+    async def _auto_bookmark(self, artwork_id: int, cookie: str | None) -> None:
+        """入库成功后尝试收藏，收藏失败不影响已提交的下载结果。"""
+        try:
+            await self._pixiv.sync_bookmark_state(artwork_id, True, cookie)
+        except AppError as error:
+            logger.warning("作品 %d 的 Pixiv 自动收藏失败，下载已完成: %s", artwork_id, error.message)
+            return
+        except Exception:
+            logger.exception("作品 %d 的 Pixiv 自动收藏失败，下载已完成。", artwork_id)
+            return
+
+        try:
+            await to_thread.run_sync(lambda: self._favorites.replace_state(artwork_id, is_favorite=True))
+        except Exception:
+            logger.exception("作品 %d 已收藏到 Pixiv，但本地收藏更新失败，下载已完成。", artwork_id)
 
     async def _download_media(
         self,
