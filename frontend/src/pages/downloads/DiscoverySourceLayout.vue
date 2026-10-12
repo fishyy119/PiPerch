@@ -91,7 +91,9 @@ function togglePage() {
       />
       <p v-else class="p-10 text-center text-muted-foreground">{{ emptyMessage }}</p>
 
-      <slot name="errors" />
+      <div v-if="$slots.errors" class="border-t">
+        <slot name="errors" />
+      </div>
 
       <div class="flex items-center justify-between border-t p-4">
         <Button

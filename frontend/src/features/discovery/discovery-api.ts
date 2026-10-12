@@ -46,6 +46,9 @@ const discoveryResponseSchema = z.object({
   items: z.array(discoveryItemSchema),
   page: z.number().int().nonnegative(),
   nextPage: z.number().int().nonnegative().nullable(),
+  failures: z
+    .array(z.object({ artworkId: z.number().int().positive(), message: z.string() }))
+    .default([]),
 })
 
 const recommendationsResponseSchema = z.object({

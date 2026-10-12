@@ -6,6 +6,8 @@ from typing import TYPE_CHECKING, cast
 import httpx
 
 from piperch.domain import (
+    ArtworkDiscoveryFailure,
+    ArtworkDiscoveryResult,
     ArtworkType,
     BookmarkFolder,
     BookmarkFolderKind,
@@ -90,19 +92,22 @@ class PixivClient:
         cookie: str | None,
         *,
         page_size: int = 24,
-    ) -> tuple[list[DiscoveryCandidate], int | None]:
+    ) -> ArtworkDiscoveryResult:
         artwork_ids = parse_artwork_ids(inputs)
         start = page * page_size
         selected = artwork_ids[start : start + page_size]
-        candidates = [
-            candidate_from_artwork_body(
-                artwork_id,
-                _mapping(await self._transport.get_body(f"/ajax/illust/{artwork_id}", cookie=cookie)),
-            )
-            for artwork_id in selected
-        ]
+        candidates: list[DiscoveryCandidate] = []
+        failures: list[ArtworkDiscoveryFailure] = []
+        for artwork_id in selected:
+            try:
+                body = await self._transport.get_body(f"/ajax/illust/{artwork_id}", cookie=cookie)
+            except UpstreamError as error:
+                failures.append(ArtworkDiscoveryFailure(artwork_id, error.message))
+                continue
+            candidates.append(candidate_from_artwork_body(artwork_id, _mapping(body)))
+        # 分页按输入 ID 计算，失败项不改变后续页的范围。
         next_page = page + 1 if start + page_size < len(artwork_ids) else None
-        return candidates, next_page
+        return ArtworkDiscoveryResult(candidates, next_page, failures)
 
     async def discover_recommended_artworks(
         self,

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Search } from '@lucide/vue'
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 
 import DiscoverySourceLayout from '@/pages/downloads/DiscoverySourceLayout.vue'
 import { errorMessage } from '@/shared/errors'
@@ -21,6 +21,7 @@ const { candidates, page, nextPage, emptyMessage, mutation, loadPage } = useDisc
     return { sourceType: 'artwork', inputs, page: targetPage }
   },
 )
+const failures = computed(() => mutation.data.value?.failures ?? [])
 </script>
 
 <template>
@@ -43,10 +44,21 @@ const { candidates, page, nextPage, emptyMessage, mutation, loadPage } = useDisc
           <Search :size="18" />
           {{ mutation.isPending.value ? '加载中…' : '预览' }}
         </Button>
+        <!-- TODO: 搜索来源 -->
       </form>
       <p v-if="mutation.error.value" class="mt-3 text-sm text-destructive">
         {{ errorMessage(mutation.error.value) }}
       </p>
+    </template>
+    <template v-if="failures.length" #errors>
+      <div class="p-4 text-sm">
+        <p>以下 {{ failures.length }} 个作品未能加载：</p>
+        <ul class="mt-2 space-y-1">
+          <li v-for="failure in failures" :key="failure.artworkId" class="wrap-break-word">
+            {{ failure.artworkId }}：<span class="text-destructive">{{ failure.message }}</span>
+          </li>
+        </ul>
+      </div>
     </template>
   </DiscoverySourceLayout>
 </template>

@@ -8,6 +8,8 @@ from typing import TYPE_CHECKING
 from PIL import Image
 
 from piperch.domain import (
+    ArtworkDiscoveryFailure,
+    ArtworkDiscoveryResult,
     ArtworkType,
     BookmarkFolder,
     BookmarkFolderKind,
@@ -249,11 +251,11 @@ def test_discovery_marks_artwork_already_in_library(
         inputs: list[str],
         page: int,
         cookie: str | None,
-    ) -> tuple[list[DiscoveryCandidate], None]:
-        assert inputs == ["101", "102"]
+    ) -> ArtworkDiscoveryResult:
+        assert inputs == ["101", "103", "102"]
         assert page == 0
         assert cookie is None
-        return (
+        return ArtworkDiscoveryResult(
             [
                 DiscoveryCandidate(101, "本地作品", "作者", ArtworkType.ILLUST, 1, 0, False, None),
                 DiscoveryCandidate(
@@ -268,19 +270,21 @@ def test_discovery_marks_artwork_already_in_library(
                 ),
             ],
             None,
+            [ArtworkDiscoveryFailure(103, "作品已删除。")],
         )
 
     monkeypatch.setattr(container.pixiv, "discover_artworks", discover_artworks)
 
     response = client.post(
         "/api/discovery",
-        json={"sourceType": "artwork", "inputs": ["101", "102"], "page": 0},
+        json={"sourceType": "artwork", "inputs": ["101", "103", "102"], "page": 0},
     )
 
     assert response.status_code == 200
     items = response.json()["items"]
     assert [item["inLibrary"] for item in items] == [True, False]
     assert items[1]["thumbnailUrl"] == "/api/pixiv-images?url=https%3A%2F%2Fi.pximg.net%2F102.jpg"
+    assert response.json()["failures"] == [{"artworkId": 103, "message": "作品已删除。"}]
 
 
 def test_health_and_settings_return_cookie(

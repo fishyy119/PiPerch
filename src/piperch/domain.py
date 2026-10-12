@@ -127,6 +127,19 @@ class DiscoveryCandidate:
 
 
 @dataclass(frozen=True, slots=True)
+class ArtworkDiscoveryFailure:
+    artwork_id: int
+    message: str
+
+
+@dataclass(frozen=True, slots=True)
+class ArtworkDiscoveryResult:
+    candidates: list[DiscoveryCandidate]
+    next_page: int | None
+    failures: list[ArtworkDiscoveryFailure]
+
+
+@dataclass(frozen=True, slots=True)
 class RecommendedUser:
     user_id: int
     name: str

@@ -147,10 +147,18 @@ class DiscoveryItem(ApiModel):
     in_library: bool
 
 
+class ArtworkDiscoveryFailureResponse(ApiModel):
+    artwork_id: int
+    message: str
+
+
 class DiscoveryResponse(ApiModel):
     items: list[DiscoveryItem]
     page: int
     next_page: int | None
+    failures: list[ArtworkDiscoveryFailureResponse] = Field(
+        default_factory=lambda: list[ArtworkDiscoveryFailureResponse]()
+    )
 
 
 class RecommendationsResponse(ApiModel):

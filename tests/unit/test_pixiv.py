@@ -583,7 +583,7 @@ async def test_list_bookmark_artwork_ids_rejects_more_than_safety_limit(
 
 
 @pytest.mark.asyncio
-async def test_discover_artworks_fetches_only_current_page_summaries() -> None:
+async def test_discover_artworks_preserves_page_results_when_one_artwork_is_unavailable() -> None:
     with respx.mock(assert_all_called=True) as router:
         first_route = router.get("https://www.pixiv.net/ajax/illust/103").mock(
             return_value=httpx.Response(
@@ -615,22 +615,27 @@ async def test_discover_artworks_fetches_only_current_page_summaries() -> None:
                 },
             )
         )
+        unavailable_route = router.get("https://www.pixiv.net/ajax/illust/104").mock(
+            return_value=httpx.Response(200, json={"error": True, "message": "作品已删除。"})
+        )
         client = PixivClient(proxy_url=None, request_interval_ms=0)
         try:
-            candidates, next_page = await client.discover_artworks(
-                ["103", "102", "101"],
+            result = await client.discover_artworks(
+                ["103", "104", "102", "101"],
                 0,
                 None,
-                page_size=2,
+                page_size=3,
             )
         finally:
             await client.close()
 
     assert first_route.call_count == 1
     assert second_route.call_count == 1
-    assert [candidate.artwork_id for candidate in candidates] == [103, 102]
-    assert candidates[0].thumbnail_url == "https://i.pximg.net/103.jpg"
-    assert next_page == 1
+    assert unavailable_route.call_count == 1
+    assert [candidate.artwork_id for candidate in result.candidates] == [103, 102]
+    assert result.candidates[0].thumbnail_url == "https://i.pximg.net/103.jpg"
+    assert result.next_page == 1
+    assert [(failure.artwork_id, failure.message) for failure in result.failures] == [(104, "作品已删除。")]
 
 
 @pytest.mark.asyncio

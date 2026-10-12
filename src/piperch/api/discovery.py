@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, Path
 
 from piperch.api.dependencies import get_container
 from piperch.api.models import (
+    ArtworkDiscoveryFailureResponse,
     ArtworkDiscoveryRequest,
     ArtworkPreviewResponse,
     BookmarkArtworkIdsRequest,
@@ -57,12 +58,18 @@ async def discover(
 ) -> DiscoveryResponse:
     settings = await to_thread.run_sync(container.settings.get)
     next_page: int | None = None
+    failures: list[ArtworkDiscoveryFailureResponse] = []
     if isinstance(request, ArtworkDiscoveryRequest):
-        candidates, next_page = await container.pixiv.discover_artworks(
+        result = await container.pixiv.discover_artworks(
             request.inputs,
             request.page,
             settings.pixiv_cookie,
         )
+        candidates, next_page = result.candidates, result.next_page
+        failures = [
+            ArtworkDiscoveryFailureResponse(artwork_id=item.artwork_id, message=item.message)
+            for item in result.failures
+        ]
     elif isinstance(request, UserDiscoveryRequest):
         candidates, next_page = await container.pixiv.discover_user(
             request.user_id,
@@ -94,6 +101,7 @@ async def discover(
         items=_discovery_items(candidates, existing_ids),
         page=request.page,
         next_page=next_page,
+        failures=failures,
     )
 
 
