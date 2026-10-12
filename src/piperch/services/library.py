@@ -15,6 +15,7 @@ if TYPE_CHECKING:
 
     from piperch.paths import AppPaths
     from piperch.repositories import ArtworkRepository
+    from piperch.services.library_commits import LibraryCommitCoordinator
     from piperch.settings import SettingsManager
 
 
@@ -33,6 +34,8 @@ class LibraryService:
         thumbnails: ArtworkThumbnailCache | None = None,
         mutation_lock: Lock | None = None,
         files: LibraryFileOperations | None = None,
+        *,
+        library_commits: LibraryCommitCoordinator,
     ) -> None:
         self._paths = paths
         self._settings = settings
@@ -40,6 +43,7 @@ class LibraryService:
         self._thumbnails = thumbnails or ArtworkThumbnailCache(paths)
         self._mutation_lock = mutation_lock or Lock()
         self._files = files or LibraryFileOperations()
+        self._library_commits = library_commits
 
     def delete_artworks(self, artwork_ids: Sequence[int]) -> ArtworkDeleteResult:
         with self._mutation_lock:
@@ -74,7 +78,7 @@ class LibraryService:
                     target.parent.mkdir(parents=True, exist_ok=True)
                     source.replace(target)
                     staged.append((artwork_id, source, target))
-            deleted_ids = self._artworks.delete_metadata(deletable_ids)
+            deleted_ids = self._library_commits.commit_removal(lambda: self._artworks.delete_metadata(deletable_ids))
         except Exception:
             for _, source, target in reversed(staged):
                 if target.exists():
@@ -83,6 +87,7 @@ class LibraryService:
             self._files.cleanup_delete_root(root)
             raise
 
+        # 清理发生在删除事件入队之后，不延迟状态通知，也不占用提交锁。
         for artwork_id, source, target in staged:
             if artwork_id in deleted_ids:
                 shutil.rmtree(target, ignore_errors=True)

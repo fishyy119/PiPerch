@@ -10,6 +10,7 @@ import {
 } from '@/features/discovery/discovery-api'
 import { useDownloadSelection } from '@/features/downloads/download-selection'
 import { useBookmarkPreview } from '@/features/downloads/useBookmarkPreview'
+import { useLibraryMembershipStore } from '@/features/library/library-membership'
 import BookmarkFolderSelector from '@/pages/downloads/BookmarkFolderSelector.vue'
 import DiscoverySourceLayout from '@/pages/downloads/DiscoverySourceLayout.vue'
 import { errorMessage } from '@/shared/errors'
@@ -21,6 +22,7 @@ interface LoadedBookmarkSelection {
 }
 
 const selection = useDownloadSelection()
+const library = useLibraryMembershipStore()
 const preview = useBookmarkPreview()
 const { candidates, page, nextPage } = preview
 const draftFolders = ref<BookmarkFolderReference[]>([])
@@ -69,13 +71,16 @@ const confirmedFolderSummary = computed(() => {
     .join('、')
 })
 
+const selectableArtworkIds = computed(() =>
+  (loadedSelection.value?.artworkIds ?? []).filter((id) => !library.isInLibrary(id)),
+)
 const allWorksSelected = computed(() => {
   const loaded = loadedSelection.value
   return (
     loaded !== null &&
     loaded.key === selectionKey(confirmedFolders.value) &&
-    loaded.artworkIds.length > 0 &&
-    loaded.artworkIds.every((artworkId) => selection.selectedIds.includes(artworkId))
+    selectableArtworkIds.value.length > 0 &&
+    selectableArtworkIds.value.every((artworkId) => selection.selectedIds.includes(artworkId))
   )
 })
 
@@ -88,15 +93,20 @@ const emptyMessage = computed(() => {
 const bookmarkPageMutation = useMutation({ mutationFn: preview.loadPage })
 
 const selectAllMutation = useMutation({
-  mutationFn: async (selectedFolders: BookmarkFolderReference[]) => ({
-    key: selectionKey(selectedFolders),
-    artworkIds: await listSelectableBookmarkArtworkIds(selectedFolders),
-  }),
+  mutationFn: async (selectedFolders: BookmarkFolderReference[]) => {
+    const key = selectionKey(selectedFolders)
+    const loaded = loadedSelection.value
+    const artworkIds =
+      loaded?.key === key
+        ? loaded.artworkIds
+        : await listSelectableBookmarkArtworkIds(selectedFolders)
+    return { key, artworkIds }
+  },
   onSuccess: (result) => {
     loadedSelection.value = result
-    selection.addIds(result.artworkIds)
-    selectionNotice.value = result.artworkIds.length
-      ? `已选择收藏夹中的全部 ${String(result.artworkIds.length)} 个作品。`
+    const artworkIds = selection.addIds(result.artworkIds)
+    selectionNotice.value = artworkIds.length
+      ? `已选择收藏夹中的全部 ${String(artworkIds.length)} 个作品。`
       : '所选收藏夹中没有可选择的作品。'
   },
 })
@@ -129,9 +139,8 @@ function toggleAllWorks() {
   if (confirmedFolders.value.length === 0) return
   const key = selectionKey(confirmedFolders.value)
   const loaded = loadedSelection.value
-  if (loaded?.key === key) {
-    if (allWorksSelected.value) selection.removeIds(loaded.artworkIds)
-    else selection.addIds(loaded.artworkIds)
+  if (loaded?.key === key && allWorksSelected.value) {
+    selection.removeIds(selectableArtworkIds.value)
     return
   }
   selectAllMutation.mutate(confirmedFolders.value.map(cloneFolder))
@@ -218,7 +227,7 @@ function toggleAllWorks() {
         <Check :size="17" />
         <template v-if="selectAllMutation.isPending.value">读取全部…</template>
         <template v-else-if="allWorksSelected">
-          取消全部（{{ loadedSelection?.artworkIds.length ?? 0 }}）
+          取消全部（{{ selectableArtworkIds.length }}）
         </template>
         <template v-else>选择全部</template>
       </Button>

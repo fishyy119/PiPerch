@@ -10,9 +10,9 @@ from piperch.domain import DownloadItemRecord, ItemState
 from piperch.services.downloads import (
     DownloadCancellation,
     DownloadCancelledError,
-    DownloadEventBroker,
     DownloadSupervisor,
 )
+from piperch.services.events import AppEventBroker
 
 if TYPE_CHECKING:
     from piperch.repositories import DownloadRepository
@@ -210,7 +210,7 @@ async def test_stop_cancels_an_active_download() -> None:
     supervisor = DownloadSupervisor(
         cast("DownloadRepository", repository),
         cast("ArtworkDownloadService", service),
-        DownloadEventBroker(),
+        AppEventBroker(),
         cast("SettingsManager", StubSettings(1)),
     )
 
@@ -229,7 +229,7 @@ async def test_supervisor_limits_concurrent_artworks() -> None:
     supervisor = DownloadSupervisor(
         cast("DownloadRepository", repository),
         cast("ArtworkDownloadService", service),
-        DownloadEventBroker(),
+        AppEventBroker(),
         cast("SettingsManager", StubSettings(2)),
     )
 
@@ -254,7 +254,7 @@ async def test_cancelled_job_releases_slot_for_next_job() -> None:
     supervisor = DownloadSupervisor(
         cast("DownloadRepository", repository),
         cast("ArtworkDownloadService", service),
-        DownloadEventBroker(),
+        AppEventBroker(),
         cast("SettingsManager", StubSettings(1)),
     )
 

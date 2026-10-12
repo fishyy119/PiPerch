@@ -19,8 +19,7 @@ export function useDiscoveryPagination(makeRequest: (page: number) => DiscoveryR
     mutationFn: async (targetPage: number) => discover(makeRequest(targetPage)),
     onSuccess: (result) => {
       candidates.value = result.items
-      selection.remember(result.items)
-      selection.removeAll(result.items.filter((item) => item.inLibrary))
+      selection.cacheItems(result.items)
       page.value = result.page
       nextPage.value = result.nextPage
       emptyMessage.value = result.items.length === 0 ? '这一页没有找到候选作品。' : ''

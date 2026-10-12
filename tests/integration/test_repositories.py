@@ -3,6 +3,9 @@ from __future__ import annotations
 from dataclasses import replace
 from typing import TYPE_CHECKING
 
+import pytest
+from anyio import to_thread
+
 from piperch.database import Database, run_migrations
 from piperch.database.tables import tag_search_cache
 from piperch.domain import (
@@ -21,13 +24,18 @@ from piperch.repositories import (
     FavoriteRepository,
 )
 from piperch.services.downloads import ArtworkDownloadCommitService
+from piperch.services.events import AppEventBroker
 from piperch.services.library import LibraryService
+from piperch.services.library_commits import LibraryCommitCoordinator
 from piperch.services.tag_search import TagSearchIndex
+from piperch.services.thumbnails import ArtworkThumbnailCache
 from piperch.settings import SettingsManager
 
 if TYPE_CHECKING:
     from pathlib import Path
     from typing import Literal
+
+    from pytest import MonkeyPatch
 
 
 def _artwork(artwork_id: int, tags: tuple[TagRecord, ...]) -> RemoteArtwork:
@@ -56,6 +64,8 @@ def _artwork(artwork_id: int, tags: tuple[TagRecord, ...]) -> RemoteArtwork:
 
 def _repositories(
     tmp_path: Path,
+    *,
+    library_commits: LibraryCommitCoordinator | None = None,
 ) -> tuple[
     AppPaths,
     Database,
@@ -77,8 +87,43 @@ def _repositories(
         FavoriteRepository(database),
         ArtworkGroupRepository(database),
         TagSearchIndex(database),
+        library_commits=library_commits or LibraryCommitCoordinator(AppEventBroker()),
     )
     return paths, database, settings, artworks, commits, DownloadRepository(database)
+
+
+@pytest.mark.asyncio
+async def test_library_events_follow_commits_when_artwork_is_restored_during_delete_cleanup(
+    tmp_path: Path,
+    monkeypatch: MonkeyPatch,
+) -> None:
+    events = AppEventBroker()
+    library_commits = LibraryCommitCoordinator(events)
+    paths, database, settings, artworks, commits, _ = _repositories(tmp_path, library_commits=library_commits)
+    thumbnails = ArtworkThumbnailCache(paths)
+    library = LibraryService(paths, settings, artworks, thumbnails, library_commits=library_commits)
+    artwork = _artwork(123, ())
+    media = [MediaRecord("page", "100/123/123_p0.jpg", "image/jpeg", 10, 0)]
+
+    def restore_during_cleanup(_artwork_id: int) -> None:
+        commits.commit(artwork, media)
+
+    monkeypatch.setattr(thumbnails, "delete_artwork", restore_during_cleanup)
+    try:
+        async with events.subscribe() as queue:
+            await to_thread.run_sync(commits.commit, artwork, media)
+            assert queue.get_nowait().name == "library-added"
+
+            result = await to_thread.run_sync(library.delete_artworks, [123])
+
+            assert result.deleted == 1
+            assert artworks.find_existing_ids([123]) == {123}
+            assert [(event.name, event.data) for event in (queue.get_nowait(), queue.get_nowait())] == [
+                ("library-removed", {"artworkIds": [123]}),
+                ("library-added", {"artworkIds": [123]}),
+            ]
+    finally:
+        database.close()
 
 
 def test_gallery_multi_value_filters_apply_selected_match_modes(tmp_path: Path) -> None:
@@ -348,7 +393,8 @@ def test_download_job_transitions_and_retry(tmp_path: Path) -> None:
 
 
 def test_interrupted_delete_is_restored_when_metadata_still_exists(tmp_path: Path) -> None:
-    paths, database, settings, artworks, commits, _ = _repositories(tmp_path)
+    library_commits = LibraryCommitCoordinator(AppEventBroker())
+    paths, database, settings, artworks, commits, _ = _repositories(tmp_path, library_commits=library_commits)
     source = settings.get().library_root / "100" / "1"
     pending = paths.staging / "delete" / "100" / "1-interrupted"
     try:
@@ -361,7 +407,7 @@ def test_interrupted_delete_is_restored_when_metadata_still_exists(tmp_path: Pat
         pending.parent.mkdir(parents=True)
         source.replace(pending)
 
-        LibraryService(paths, settings, artworks).recover_pending_deletes()
+        LibraryService(paths, settings, artworks, library_commits=library_commits).recover_pending_deletes()
     finally:
         database.close()
 

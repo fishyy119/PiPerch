@@ -4,7 +4,6 @@ from piperch.services.downloads.cancellation import (
     DownloadCancelledError,
 )
 from piperch.services.downloads.commit import ArtworkDownloadCommitService
-from piperch.services.downloads.events import DownloadEventBroker
 from piperch.services.downloads.supervisor import DownloadSupervisor
 
 __all__ = [
@@ -12,6 +11,5 @@ __all__ = [
     "ArtworkDownloadService",
     "DownloadCancellation",
     "DownloadCancelledError",
-    "DownloadEventBroker",
     "DownloadSupervisor",
 ]

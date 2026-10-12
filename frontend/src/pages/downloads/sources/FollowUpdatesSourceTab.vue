@@ -35,8 +35,7 @@ watch(
   () => updatesQuery.data.value,
   (result) => {
     if (result === undefined) return
-    selection.remember(result.items)
-    selection.removeAll(result.items.filter((item) => item.inLibrary))
+    selection.cacheItems(result.items)
   },
   { immediate: true },
 )

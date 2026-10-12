@@ -4,6 +4,7 @@ import { computed } from 'vue'
 
 import type { ArtworkCardTarget } from '@/features/artworks/artwork-card'
 import { type DiscoveryItem, listArtworkPreviewUrls } from '@/features/discovery/discovery-api'
+import { useLibraryMembershipStore } from '@/features/library/library-membership'
 import ArtworkCard from '@/shared/components/artworks/ArtworkCard.vue'
 
 const props = withDefaults(
@@ -20,6 +21,10 @@ const emit = defineEmits<{
 }>()
 
 const queryClient = useQueryClient()
+const library = useLibraryMembershipStore()
+const inLibrary = computed(() =>
+  library.isInLibrary(props.artwork.artworkId, props.artwork.inLibrary),
+)
 const target = computed<ArtworkCardTarget>(() => ({
   kind: 'external',
   href: `https://www.pixiv.net/artworks/${String(props.artwork.artworkId)}`,
@@ -42,14 +47,14 @@ function handleCardClick(event: MouseEvent) {
   const link = target.closest('a')
   if (event.ctrlKey && link) return
   if (link) event.preventDefault()
-  if (!props.artwork.inLibrary) emit('toggle', props.artwork)
+  if (!inLibrary.value) emit('toggle', props.artwork)
 }
 </script>
 
 <template>
   <ArtworkCard
     class="select-none"
-    :data-selection-id="artwork.inLibrary ? undefined : artwork.artworkId"
+    :data-selection-id="inLibrary ? undefined : artwork.artworkId"
     :title="artwork.title"
     :author-name="artwork.authorName"
     :page-count="artwork.pageCount"
@@ -62,9 +67,8 @@ function handleCardClick(event: MouseEvent) {
     @dragstart.capture.prevent
   >
     <template #trailing-action>
-      <!-- TODO: 此状态不会动态同步 -->
       <span
-        v-if="artwork.inLibrary"
+        v-if="inLibrary"
         class="absolute right-2 bottom-2 z-10 rounded-lg bg-success px-2 py-1 text-xs font-medium text-success-foreground shadow-sm"
       >
         已在图库

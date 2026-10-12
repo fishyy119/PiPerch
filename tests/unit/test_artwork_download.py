@@ -25,6 +25,8 @@ from piperch.services.downloads import (
     DownloadCancellation,
     DownloadCancelledError,
 )
+from piperch.services.events import AppEventBroker
+from piperch.services.library_commits import LibraryCommitCoordinator
 from piperch.services.tag_search import TagSearchIndex
 from piperch.services.thumbnails import ArtworkThumbnailCache
 from piperch.settings import SettingsManager
@@ -353,6 +355,7 @@ async def test_bookmark_failure_keeps_downloaded_artwork_without_marking_local_f
         favorites,
         ArtworkGroupRepository(database),
         TagSearchIndex(database),
+        library_commits=LibraryCommitCoordinator(AppEventBroker()),
     )
     pixiv = StubPixivClient(artwork)
     bookmark_failed = False

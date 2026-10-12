@@ -32,11 +32,12 @@ from piperch.runtime import AppControl
 from piperch.services.downloads import (
     ArtworkDownloadCommitService,
     ArtworkDownloadService,
-    DownloadEventBroker,
     DownloadSupervisor,
 )
+from piperch.services.events import AppEventBroker
 from piperch.services.favorite_sync import FavoriteSyncService
 from piperch.services.library import LibraryService
+from piperch.services.library_commits import LibraryCommitCoordinator
 from piperch.services.library_files import LibraryFileOperations
 from piperch.services.storage import StorageMigrationService
 from piperch.services.tag_search import TagSearchIndex
@@ -105,15 +106,17 @@ def create_app(paths: AppPaths | None = None, control: AppControl | None = None)
         favorite_sync_service = FavoriteSyncService(favorite_repository)
         group_repository = ArtworkGroupRepository(database)
         download_repository = DownloadRepository(database)
-        events = DownloadEventBroker()
+        events = AppEventBroker()
         thumbnail_cache = ArtworkThumbnailCache(resolved_paths)
         library_files = LibraryFileOperations()
+        library_commits = LibraryCommitCoordinator(events)
         download_commit_service = ArtworkDownloadCommitService(
             database,
             artwork_repository,
             favorite_repository,
             group_repository,
             tag_search_index,
+            library_commits=library_commits,
         )
         download_service = ArtworkDownloadService(
             resolved_paths,
@@ -134,6 +137,7 @@ def create_app(paths: AppPaths | None = None, control: AppControl | None = None)
             thumbnail_cache,
             mutation_lock,
             library_files,
+            library_commits=library_commits,
         )
         storage_service = StorageMigrationService(
             resolved_paths,

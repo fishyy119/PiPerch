@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ChevronDown, ChevronUp, Download, ImageOff, LoaderCircle, RefreshCw, X } from '@lucide/vue'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query'
-import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 
 import { discover } from '@/features/discovery/discovery-api'
 import {
@@ -81,7 +81,7 @@ const previewQuery = useQuery({
 watch(
   () => previewQuery.data.value,
   (items) => {
-    if (items !== undefined) selection.remember(items)
+    if (items !== undefined) selection.cacheItems(items)
   },
 )
 
@@ -129,17 +129,6 @@ const actionMutation = useMutation({
     else await retryDownloadJob(jobId)
   },
   onSuccess: async () => queryClient.invalidateQueries({ queryKey: ['download-jobs'] }),
-})
-
-const events = new EventSource('/api/events/downloads')
-events.addEventListener('job-updated', () => {
-  void queryClient.invalidateQueries({ queryKey: ['download-jobs'] })
-})
-events.addEventListener('error', () => {
-  void queryClient.invalidateQueries({ queryKey: ['download-jobs'] })
-})
-onBeforeUnmount(() => {
-  events.close()
 })
 
 function stateLabel(state: string) {

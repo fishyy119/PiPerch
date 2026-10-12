@@ -5,6 +5,7 @@ import { computed } from 'vue'
 import { usePreference } from '@/app/usePreference'
 import type { DiscoveryItem } from '@/features/discovery/discovery-api'
 import { useDownloadSelection } from '@/features/downloads/download-selection'
+import { useLibraryMembershipStore } from '@/features/library/library-membership'
 import DiscoveryCandidateResults from '@/pages/downloads/DiscoveryCandidateResults.vue'
 import Button from '@ui/Button.vue'
 import Card from '@ui/Card.vue'
@@ -24,9 +25,13 @@ const emit = defineEmits<{
 }>()
 
 const selection = useDownloadSelection()
+const library = useLibraryMembershipStore()
 const cardWidth = usePreference('downloadCandidates.cardWidth')
+const selectableCandidates = computed(() =>
+  props.candidates.filter((item) => !library.isInLibrary(item.artworkId, item.inLibrary)),
+)
 const pageFullySelected = computed(() => {
-  const selectable = props.candidates.filter((item) => !item.inLibrary)
+  const selectable = selectableCandidates.value
   return (
     selectable.length > 0 &&
     selectable.every((item) => selection.selectedIds.includes(item.artworkId))
@@ -34,7 +39,7 @@ const pageFullySelected = computed(() => {
 })
 
 function togglePage() {
-  const selectable = props.candidates.filter((item) => !item.inLibrary)
+  const selectable = selectableCandidates.value
   if (pageFullySelected.value) selection.removeAll(selectable)
   else selection.addAll(selectable)
 }

@@ -18,7 +18,7 @@ from piperch.services.downloads.cancellation import (
 if TYPE_CHECKING:
     from piperch.repositories import DownloadRepository
     from piperch.services.downloads.artwork import ArtworkDownloadService
-    from piperch.services.downloads.events import DownloadEventBroker
+    from piperch.services.events import AppEventBroker
     from piperch.settings import SettingsManager
 
 logger = logging.getLogger(__name__)
@@ -35,7 +35,7 @@ class DownloadSupervisor:
         self,
         repository: DownloadRepository,
         service: ArtworkDownloadService,
-        events: DownloadEventBroker,
+        events: AppEventBroker,
         settings: SettingsManager,
     ) -> None:
         self._repository = repository
@@ -72,7 +72,7 @@ class DownloadSupervisor:
             if active.job_id == job_id:
                 active.cancellation.request()
         self._wakeup.set()
-        await self._events.publish(job_id)
+        await self._events.publish_job_update(job_id)
 
     async def _run(self) -> None:
         try:
@@ -123,7 +123,7 @@ class DownloadSupervisor:
         item: DownloadItemRecord,
         cancellation: DownloadCancellation,
     ) -> None:
-        await self._events.publish(job_id)
+        await self._events.publish_job_update(job_id)
         try:
             if await to_thread.run_sync(self._repository.is_cancel_requested, job_id):
                 cancellation.request()
@@ -164,4 +164,4 @@ class DownloadSupervisor:
                 ItemState.FAILED,
                 "下载过程中发生未预期错误。",
             )
-        await self._events.publish(job_id)
+        await self._events.publish_job_update(job_id)

@@ -6,6 +6,7 @@ import { computed, ref } from 'vue'
 import { type FollowedUser, listFollowedUsers } from '@/features/authors/author-api'
 import { listSelectableUserArtworkIds } from '@/features/discovery/discovery-api'
 import { useDownloadSelection } from '@/features/downloads/download-selection'
+import { useLibraryMembershipStore } from '@/features/library/library-membership'
 import DiscoverySourceLayout from '@/pages/downloads/DiscoverySourceLayout.vue'
 import FollowedUserSelector from '@/pages/downloads/FollowedUserSelector.vue'
 import { errorMessage } from '@/shared/errors'
@@ -15,6 +16,7 @@ import Input from '@ui/Input.vue'
 import { useDiscoveryPagination } from './useDiscoveryPagination'
 
 const selection = useDownloadSelection()
+const library = useLibraryMembershipStore()
 const sourceInput = ref('')
 const followedUsers = ref<FollowedUser[]>([])
 const showFollowedUsers = ref(false)
@@ -33,13 +35,16 @@ const { candidates, page, nextPage, emptyMessage, mutation, loadPage } = useDisc
   },
 )
 
+const selectableAuthorArtworkIds = computed(() =>
+  (loadedAuthorSelection.value?.artworkIds ?? []).filter((id) => !library.isInLibrary(id)),
+)
 const allAuthorWorksSelected = computed(() => {
   const loaded = loadedAuthorSelection.value
   return (
     loaded !== null &&
     loaded.userId === currentUserId.value &&
-    loaded.artworkIds.length > 0 &&
-    loaded.artworkIds.every((artworkId) => selection.selectedIds.includes(artworkId))
+    selectableAuthorArtworkIds.value.length > 0 &&
+    selectableAuthorArtworkIds.value.every((artworkId) => selection.selectedIds.includes(artworkId))
   )
 })
 
@@ -52,15 +57,17 @@ const followedUsersMutation = useMutation({
 })
 
 const selectAllMutation = useMutation({
-  mutationFn: async (userId: number) => ({
-    userId,
-    artworkIds: await listSelectableUserArtworkIds(userId),
-  }),
+  mutationFn: async (userId: number) => {
+    const loaded = loadedAuthorSelection.value
+    const artworkIds =
+      loaded?.userId === userId ? loaded.artworkIds : await listSelectableUserArtworkIds(userId)
+    return { userId, artworkIds }
+  },
   onSuccess: (result) => {
     loadedAuthorSelection.value = result
-    selection.addIds(result.artworkIds)
-    selectionNotice.value = result.artworkIds.length
-      ? `已选择该作者的全部 ${String(result.artworkIds.length)} 个作品。`
+    const artworkIds = selection.addIds(result.artworkIds)
+    selectionNotice.value = artworkIds.length
+      ? `已选择该作者的全部 ${String(artworkIds.length)} 个作品。`
       : '该作者没有可选择的插画或漫画。'
   },
 })
@@ -84,9 +91,8 @@ function toggleAllWorks() {
   const userId = currentUserId.value
   if (userId === null) return
   const loaded = loadedAuthorSelection.value
-  if (loaded?.userId === userId) {
-    if (allAuthorWorksSelected.value) selection.removeIds(loaded.artworkIds)
-    else selection.addIds(loaded.artworkIds)
+  if (loaded?.userId === userId && allAuthorWorksSelected.value) {
+    selection.removeIds(selectableAuthorArtworkIds.value)
     return
   }
   selectAllMutation.mutate(userId)
@@ -146,7 +152,7 @@ function toggleAllWorks() {
         <Check :size="17" />
         <template v-if="selectAllMutation.isPending.value">读取全部…</template>
         <template v-else-if="allAuthorWorksSelected">
-          取消全部（{{ loadedAuthorSelection?.artworkIds.length ?? 0 }}）
+          取消全部（{{ selectableAuthorArtworkIds.length }}）
         </template>
         <template v-else>选择全部</template>
       </Button>

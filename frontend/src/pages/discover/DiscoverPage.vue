@@ -80,8 +80,7 @@ watch(
       ...(recommendations ?? []),
       ...(authors ?? []).flatMap((author) => author.artworks),
     ]
-    selection.remember(items)
-    selection.removeAll(items.filter((item) => item.inLibrary))
+    selection.cacheItems(items)
   },
   { immediate: true },
 )

@@ -30,6 +30,7 @@ if TYPE_CHECKING:
     from tests.support import ApiTestClient
 
     from piperch.container import AppContainer
+    from piperch.services.events import ServerEvent
 
 
 def test_user_artwork_ids_returns_all_ids_without_loading_pages(
@@ -682,8 +683,10 @@ def test_local_groups_can_organize_non_favorite_artworks(
 
 def test_artwork_deletion_protects_favorites_and_keeps_bulk_progress(
     app_client: tuple[ApiTestClient, AppContainer],
+    monkeypatch: MonkeyPatch,
 ) -> None:
     client, container = app_client
+    published_events: list[ServerEvent] = []
     artwork = RemoteArtwork(
         artwork_id=801,
         artwork_type=ArtworkType.ILLUST,
@@ -719,6 +722,7 @@ def test_artwork_deletion_protects_favorites_and_keeps_bulk_progress(
         media_path.parent.mkdir(parents=True, exist_ok=True)
         media_path.write_bytes(b"test")
     container.favorites.replace_state(801, is_favorite=True)
+    monkeypatch.setattr(container.events, "_publish", published_events.append)
 
     single = client.delete("/api/artworks/801")
 
@@ -726,11 +730,13 @@ def test_artwork_deletion_protects_favorites_and_keeps_bulk_progress(
     assert single.json()["error"]["code"] == "favorite_artwork_delete_forbidden"
     assert client.get("/api/artworks/801").status_code == 200
     assert (container.settings.get().library_root / "901" / "801" / "801_p0.jpg").is_file()
+    assert published_events == []
 
-    bulk = client.post("/api/artworks/bulk-delete", json={"artworkIds": [801, 802]})
+    bulk = client.post("/api/artworks/bulk-delete", json={"artworkIds": [801, 802, 803]})
 
     assert bulk.status_code == 200
     assert bulk.json() == {"deleted": 1, "skippedFavoriteArtworkIds": [801]}
+    assert [(event.name, event.data) for event in published_events] == [("library-removed", {"artworkIds": [802]})]
     assert client.get("/api/artworks/801").status_code == 200
     assert client.get("/api/artworks/802").status_code == 404
     assert (container.settings.get().library_root / "901" / "801" / "801_p0.jpg").is_file()

@@ -3,6 +3,10 @@ import { Compass, Download, Folders, Images, Menu, Settings, X } from '@lucide/v
 import { computed, ref } from 'vue'
 import { RouterLink, RouterView, useRoute } from 'vue-router'
 
+import { useAppEvents } from '@/app/useAppEvents'
+
+useAppEvents()
+
 const route = useRoute()
 const mobileOpen = ref(false)
 const pageTitle = computed(() =>

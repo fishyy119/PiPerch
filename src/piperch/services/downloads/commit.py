@@ -10,6 +10,7 @@ if TYPE_CHECKING:
     from piperch.database import Database
     from piperch.domain import MediaRecord, RemoteArtwork
     from piperch.repositories import ArtworkGroupRepository, ArtworkRepository, FavoriteRepository
+    from piperch.services.library_commits import LibraryCommitCoordinator
     from piperch.services.tag_search import TagSearchIndex
 
 
@@ -23,18 +24,32 @@ class ArtworkDownloadCommitService:
         favorites: FavoriteRepository,
         groups: ArtworkGroupRepository,
         tag_search: TagSearchIndex,
+        *,
+        library_commits: LibraryCommitCoordinator,
     ) -> None:
         self._database = database
         self._artworks = artworks
         self._favorites = favorites
         self._groups = groups
         self._tag_search = tag_search
+        self._library_commits = library_commits
 
     def commit(
         self,
         artwork: RemoteArtwork,
         media: Sequence[MediaRecord],
         bookmark_tags: Sequence[str] | None = None,
+    ) -> None:
+        self._library_commits.commit_addition(
+            artwork.artwork_id,
+            lambda: self._commit(artwork, media, bookmark_tags),
+        )
+
+    def _commit(
+        self,
+        artwork: RemoteArtwork,
+        media: Sequence[MediaRecord],
+        bookmark_tags: Sequence[str] | None,
     ) -> None:
         now = utc_now_text()
         prepared_tag_search = self._tag_search.prepare([tag.name for tag in artwork.tags])

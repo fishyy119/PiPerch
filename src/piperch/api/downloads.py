@@ -35,7 +35,7 @@ async def create_job(
         request.source_label,
     )
     container.supervisor.notify()
-    await container.events.publish(job_id)
+    await container.events.publish_job_update(job_id)
     return DownloadJobCreated(job_id=job_id)
 
 
@@ -79,7 +79,7 @@ async def retry_job(
     container.storage.require_available()
     await to_thread.run_sync(container.downloads.retry, job_id)
     container.supervisor.notify()
-    await container.events.publish(job_id)
+    await container.events.publish_job_update(job_id)
 
 
 async def _event_stream(request: Request, container: AppContainer) -> AsyncIterator[str]:
@@ -87,12 +87,12 @@ async def _event_stream(request: Request, container: AppContainer) -> AsyncItera
     async with container.events.subscribe() as queue:
         while not await request.is_disconnected():
             try:
-                job_id = await asyncio.wait_for(queue.get(), timeout=15)
+                event = await asyncio.wait_for(queue.get(), timeout=15)
             except TimeoutError:
                 yield ": heartbeat\n\n"
                 continue
-            data = json.dumps({"jobId": job_id})
-            yield f"event: job-updated\ndata: {data}\n\n"
+            data = json.dumps(event.data)
+            yield f"event: {event.name}\ndata: {data}\n\n"
 
 
 @events_router.get("/downloads", response_class=StreamingResponse)
