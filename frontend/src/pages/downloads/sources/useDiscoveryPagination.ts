@@ -30,5 +30,13 @@ export function useDiscoveryPagination(makeRequest: (page: number) => DiscoveryR
     mutation.mutate(targetPage)
   }
 
-  return { candidates, page, nextPage, emptyMessage, mutation, loadPage }
+  function reset() {
+    candidates.value = []
+    page.value = 0
+    nextPage.value = null
+    emptyMessage.value = '请先输入来源并预览。'
+    mutation.reset()
+  }
+
+  return { candidates, page, nextPage, emptyMessage, mutation, loadPage, reset }
 }

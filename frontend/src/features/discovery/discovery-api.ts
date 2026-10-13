@@ -65,6 +65,7 @@ const artworkPreviewResponseSchema = z.object({
 
 export type DiscoveryRequest =
   | { sourceType: 'artwork'; inputs: string[]; page: number }
+  | { sourceType: 'search'; keyword: string; page: number }
   | { sourceType: 'user'; userId: number; page: number }
   | { sourceType: 'followUpdates'; page: number }
   | { sourceType: 'bookmark'; folder: BookmarkFolderReference; page: number }

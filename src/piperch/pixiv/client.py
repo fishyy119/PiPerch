@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from typing import TYPE_CHECKING, cast
+from urllib.parse import quote
 
 import httpx
 
@@ -108,6 +109,42 @@ class PixivClient:
         # 分页按输入 ID 计算，失败项不改变后续页的范围。
         next_page = page + 1 if start + page_size < len(artwork_ids) else None
         return ArtworkDiscoveryResult(candidates, next_page, failures)
+
+    async def discover_search(
+        self,
+        keyword: str,
+        page: int,
+        cookie: str | None,
+    ) -> tuple[list[DiscoveryCandidate], int | None]:
+        """搜索作品标签、标题和说明文字，保留 Pixiv 的结果顺序和分页。"""
+        body = _mapping(
+            await self._transport.get_body(
+                f"/ajax/search/artworks/{quote(keyword, safe='')}",
+                cookie=cookie,
+                params={
+                    "word": keyword,
+                    "order": "date_d",
+                    "mode": "all",
+                    "p": page + 1,
+                    "s_mode": "tag_tc",
+                    "type": "all",
+                    "lang": "zh",
+                },
+            )
+        )
+        results = _mapping(body.get("illustManga"))
+        if not isinstance(results.get("data"), list):
+            raise UpstreamError("invalid_pixiv_response", "Pixiv 返回的搜索结果结构无效。")
+        candidates: dict[int, DiscoveryCandidate] = {}
+        for raw_item in _sequence(results.get("data")):
+            item = _mapping(raw_item)
+            artwork_id = _integer(item.get("id"))
+            if artwork_id <= 0:
+                continue
+            candidates.setdefault(artwork_id, candidate_from_mapping(item))
+        # 末页由上游决定，不因无效条目或页内去重而提前停止翻页。
+        next_page = page + 1 if page + 1 < _integer(results.get("lastPage")) else None
+        return list(candidates.values()), next_page
 
     async def discover_recommended_artworks(
         self,

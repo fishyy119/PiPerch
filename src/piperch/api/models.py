@@ -97,6 +97,20 @@ class ArtworkDiscoveryRequest(ApiModel):
     page: int = Field(default=0, ge=0)
 
 
+class SearchDiscoveryRequest(ApiModel):
+    source_type: Literal["search"]
+    keyword: str = Field(min_length=1)
+    page: int = Field(default=0, ge=0)
+
+    @field_validator("keyword")
+    @classmethod
+    def validate_keyword(cls, value: str) -> str:
+        keyword = value.strip()
+        if not keyword:
+            raise ValueError("请输入搜索内容。")
+        return keyword
+
+
 class UserDiscoveryRequest(ApiModel):
     source_type: Literal["user"]
     user_id: int = Field(gt=0)
@@ -127,6 +141,7 @@ class BookmarkDiscoveryRequest(ApiModel):
 
 DiscoveryRequest = Annotated[
     ArtworkDiscoveryRequest
+    | SearchDiscoveryRequest
     | UserDiscoveryRequest
     | FollowUpdatesDiscoveryRequest
     | SeriesDiscoveryRequest

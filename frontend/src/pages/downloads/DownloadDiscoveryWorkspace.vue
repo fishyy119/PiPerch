@@ -4,16 +4,18 @@ import { ref, watch } from 'vue'
 import ArtworkSourceTab from '@/pages/downloads/sources/ArtworkSourceTab.vue'
 import BookmarkSourceTab from '@/pages/downloads/sources/BookmarkSourceTab.vue'
 import FollowUpdatesSourceTab from '@/pages/downloads/sources/FollowUpdatesSourceTab.vue'
+import SearchSourceTab from '@/pages/downloads/sources/SearchSourceTab.vue'
 import SeriesSourceTab from '@/pages/downloads/sources/SeriesSourceTab.vue'
 import UserSourceTab from '@/pages/downloads/sources/UserSourceTab.vue'
 import Tabs from '@ui/Tabs.vue'
 
-type SourceType = 'artwork' | 'user' | 'followUpdates' | 'bookmark' | 'series'
+type SourceType = 'artwork' | 'search' | 'user' | 'followUpdates' | 'bookmark' | 'series'
 
 const sourceLabel = defineModel<string>('sourceLabel', { default: '作品' })
 const sourceType = ref<SourceType>('artwork')
 const sourceOptions = [
   { value: 'artwork', label: '作品' },
+  { value: 'search', label: '搜索' },
   { value: 'user', label: '用户' },
   { value: 'followUpdates', label: '更新' },
   { value: 'bookmark', label: '收藏' },
@@ -29,6 +31,9 @@ watch(sourceType, (value) => {
   <Tabs v-model="sourceType" :items="sourceOptions" teleport-to="#topbar-actions">
     <template #artwork>
       <ArtworkSourceTab />
+    </template>
+    <template #search>
+      <SearchSourceTab />
     </template>
     <template #user>
       <UserSourceTab />

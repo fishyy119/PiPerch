@@ -21,6 +21,7 @@ from piperch.api.models import (
     RecommendationsResponse,
     RecommendedUserResponse,
     RecommendedUsersResponse,
+    SearchDiscoveryRequest,
     UserArtworkIdsResponse,
     UserDiscoveryRequest,
 )
@@ -70,6 +71,12 @@ async def discover(
             ArtworkDiscoveryFailureResponse(artwork_id=item.artwork_id, message=item.message)
             for item in result.failures
         ]
+    elif isinstance(request, SearchDiscoveryRequest):
+        candidates, next_page = await container.pixiv.discover_search(
+            request.keyword,
+            request.page,
+            settings.pixiv_cookie,
+        )
     elif isinstance(request, UserDiscoveryRequest):
         candidates, next_page = await container.pixiv.discover_user(
             request.user_id,
