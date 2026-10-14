@@ -16,7 +16,7 @@ from piperch.api.models import (
     SettingsResponse,
 )
 from piperch.container import AppContainer
-from piperch.domain import AppSettings
+from piperch.settings_models import AppSettings
 from piperch.utils.urls import redact_url_password
 
 router = APIRouter(prefix="/settings", tags=["settings"])

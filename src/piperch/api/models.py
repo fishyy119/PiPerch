@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from typing import Annotated, Literal
+from typing import Annotated, ClassVar, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from piperch.domain import ArtworkType, BookmarkFolderKind, BookmarkVisibility, ItemState, JobState
-from piperch.utils.urls import normalize_proxy_url
+from piperch.settings_models import EditableSettings
 
 
 def to_camel(value: str) -> str:
@@ -13,8 +13,11 @@ def to_camel(value: str) -> str:
     return head + "".join(part.capitalize() for part in tail)
 
 
+_API_MODEL_CONFIG = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+
+
 class ApiModel(BaseModel):
-    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+    model_config = _API_MODEL_CONFIG
 
 
 class ErrorBody(ApiModel):
@@ -44,19 +47,10 @@ class SettingsResponse(ApiModel):
     webp_quality: int
 
 
-class SettingsPatch(ApiModel):
-    pixiv_cookie: str | None = None
-    proxy_url: str | None = None
-    download_concurrency: int = Field(default=3, ge=1, le=8)
-    request_interval_ms: int = Field(default=500, ge=0, le=60_000)
-    auto_bookmark_on_download: bool = Field(default=True, strict=True)
-    webp_enabled: bool = True
-    webp_quality: int = Field(default=85, ge=1, le=100)
+class SettingsPatch(EditableSettings):
+    """仅提交显式提供的字段，共用的默认值不参与局部更新。"""
 
-    @field_validator("proxy_url")
-    @classmethod
-    def validate_proxy(cls, value: str | None) -> str | None:
-        return normalize_proxy_url(value)
+    model_config: ClassVar[ConfigDict] = {**_API_MODEL_CONFIG, **EditableSettings.model_config}
 
     @model_validator(mode="after")
     def require_change(self) -> SettingsPatch:

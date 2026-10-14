@@ -2,10 +2,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import StrEnum
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from pathlib import Path
 
 
 class ArtworkType(StrEnum):
@@ -41,18 +37,6 @@ class ItemState(StrEnum):
     SUCCEEDED = "succeeded"
     FAILED = "failed"
     CANCELLED = "cancelled"
-
-
-@dataclass(frozen=True, slots=True)
-class AppSettings:
-    pixiv_cookie: str | None
-    proxy_url: str | None
-    library_root: Path
-    download_concurrency: int
-    request_interval_ms: int
-    auto_bookmark_on_download: bool
-    webp_enabled: bool
-    webp_quality: int
 
 
 @dataclass(frozen=True, slots=True)

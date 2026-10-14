@@ -327,7 +327,6 @@ def test_settings_patch_and_proxy_redaction(
     app_client: tuple[ApiTestClient, AppContainer],
 ) -> None:
     client, container = app_client
-    original_library = container.settings.get().library_root
     response = client.patch(
         "/api/settings",
         json={"proxyUrl": "http://user:password@127.0.0.1:7890"},
@@ -339,9 +338,14 @@ def test_settings_patch_and_proxy_redaction(
     persisted = json.loads(container.paths.settings.read_text(encoding="utf-8"))
     assert persisted["proxy_url"] == "http://user:password@127.0.0.1:7890"
 
-    library_response = client.patch("/api/settings", json={"libraryRoot": "C:\\other-library"})
+    current = container.settings.get()
+    library_response = client.patch(
+        "/api/settings",
+        json={"libraryRoot": "C:\\other-library", "downloadConcurrency": 4},
+    )
     assert library_response.status_code == 422
-    assert container.settings.get().library_root == original_library
+    assert container.settings.get() == current
+    assert json.loads(container.paths.settings.read_text(encoding="utf-8")) == persisted
 
     repeated = client.patch(
         "/api/settings",

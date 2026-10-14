@@ -9,7 +9,6 @@ from PIL import Image
 
 from piperch.database import Database, run_migrations
 from piperch.domain import (
-    AppSettings,
     ArtworkType,
     FavoriteState,
     ItemState,
@@ -30,6 +29,7 @@ from piperch.services.library_commits import LibraryCommitCoordinator
 from piperch.services.tag_search import TagSearchIndex
 from piperch.services.thumbnails import ArtworkThumbnailCache
 from piperch.settings import SettingsManager
+from piperch.settings_models import AppSettings
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Sequence
