@@ -115,7 +115,12 @@ def get_artwork_page(
 ) -> FileResponse:
     media = container.artworks.get_media(artwork_id, "page", page_index)
     root = container.settings.get().library_root
-    return FileResponse(_safe_media_path(root, media.relative_path), media_type=media.mime_type)
+    return FileResponse(
+        _safe_media_path(root, media.relative_path),
+        media_type=media.mime_type,
+        filename=Path(media.relative_path).name,
+        content_disposition_type="inline",
+    )
 
 
 @router.get("/artworks/{artwork_id}/pages/{page_index}/thumbnail", response_class=FileResponse)
@@ -128,7 +133,12 @@ def get_artwork_page_thumbnail(
     root = container.settings.get().library_root
     source = _safe_media_path(root, media.relative_path)
     thumbnail = container.thumbnails.ensure_page_thumbnail(artwork_id, page_index, source)
-    return FileResponse(thumbnail, media_type="image/webp")
+    return FileResponse(
+        thumbnail,
+        media_type="image/webp",
+        filename=f"{artwork_id}_p{page_index}_thumbnail.webp",
+        content_disposition_type="inline",
+    )
 
 
 @router.get("/artworks/{artwork_id}/ugoira", response_class=FileResponse)
@@ -152,7 +162,12 @@ def get_ugoira_cover(
 ) -> FileResponse:
     media = container.artworks.get_media(artwork_id, "cover", None)
     root = container.settings.get().library_root
-    return FileResponse(_safe_media_path(root, media.relative_path), media_type=media.mime_type)
+    return FileResponse(
+        _safe_media_path(root, media.relative_path),
+        media_type=media.mime_type,
+        filename=Path(media.relative_path).name,
+        content_disposition_type="inline",
+    )
 
 
 @router.get("/artworks/{artwork_id}/thumbnail", response_class=FileResponse)
@@ -167,7 +182,12 @@ def get_thumbnail(
     root = container.settings.get().library_root
     source = _safe_media_path(root, source_record.relative_path)
     thumbnail = container.thumbnails.ensure_cover_thumbnail(artwork_id, source)
-    return FileResponse(thumbnail, media_type="image/webp")
+    return FileResponse(
+        thumbnail,
+        media_type="image/webp",
+        filename=f"{artwork_id}_thumbnail.webp",
+        content_disposition_type="inline",
+    )
 
 
 @router.delete("/artworks/{artwork_id}", response_model=ArtworkDeleteResponse)

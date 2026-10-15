@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from urllib.parse import quote
+from pathlib import PurePosixPath
+from urllib.parse import quote, unquote, urlsplit
 
 from anyio import to_thread
 from fastapi import APIRouter, Depends, Response
@@ -24,10 +25,12 @@ async def get_pixiv_image(
 ) -> Response:
     settings = await to_thread.run_sync(container.settings.get)
     content, media_type = await container.pixiv.fetch_thumbnail(url, settings.pixiv_cookie)
+    filename = PurePosixPath(unquote(urlsplit(url).path).replace("\\", "/")).name or "image"
     return Response(
         content=content,
         media_type=media_type,
         headers={
+            "Content-Disposition": f"inline; filename*=UTF-8''{quote(filename, safe='')}",
             "Cache-Control": "private, max-age=3600",
             "X-Content-Type-Options": "nosniff",
         },
