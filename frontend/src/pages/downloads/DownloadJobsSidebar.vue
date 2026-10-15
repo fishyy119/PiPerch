@@ -179,8 +179,8 @@ async function submitSelection() {
 </script>
 
 <template>
-  <aside class="space-y-4">
-    <Card class="sticky top-20 p-5">
+  <aside class="flex flex-col gap-4">
+    <Card class="sticky top-20 shrink-0 p-5">
       <h2 class="font-semibold">提交下载</h2>
       <div class="mt-1 flex items-center justify-between gap-3">
         <p class="text-sm text-muted-foreground">已选择 {{ selection.selectedIds.length }} 项</p>
@@ -269,12 +269,15 @@ async function submitSelection() {
       </p>
     </Card>
 
-    <Card class="overflow-hidden">
-      <div class="flex items-center justify-between border-b p-4">
+    <Card class="flex flex-col overflow-hidden xl:min-h-[60vh] xl:flex-1">
+      <div class="flex shrink-0 items-center justify-between border-b p-4">
         <h2 class="font-semibold">任务与历史</h2>
         <Button variant="ghost" @click="jobsQuery.refetch()"><RefreshCw :size="17" />刷新</Button>
       </div>
-      <div v-if="jobsQuery.data.value?.items.length" class="divide-y">
+      <div
+        v-if="jobsQuery.data.value?.items.length"
+        class="max-h-[60vh] divide-y overflow-y-auto xl:max-h-none xl:flex-1 xl:contain-size"
+      >
         <article v-for="job in jobsQuery.data.value.items" :key="job.jobId" class="p-4">
           <div class="flex items-start justify-between gap-2">
             <div class="min-w-0">
