@@ -7,13 +7,7 @@ from uuid import uuid4
 from sqlalchemy import and_, exists, func, insert, select, update
 
 from piperch.database.tables import download_items, download_jobs
-from piperch.domain import (
-    DownloadItemRecord,
-    DownloadJobDetail,
-    DownloadJobSummary,
-    ItemState,
-    JobState,
-)
+from piperch.domain.downloads import DownloadItemRecord, DownloadJobDetail, DownloadJobSummary, ItemState, JobState
 from piperch.errors import ConflictError, NotFoundError
 from piperch.repositories._rows import integer, optional_string, string
 from piperch.utils.datetime import utc_now_text

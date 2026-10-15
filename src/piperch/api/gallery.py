@@ -21,8 +21,8 @@ from piperch.api.models import (
     NamedCountResponse,
     TagResponse,
 )
-from piperch.container import AppContainer
-from piperch.domain import ArtworkType
+from piperch.application.container import AppContainer
+from piperch.domain.artworks import ArtworkType
 from piperch.errors import ConflictError, NotFoundError
 from piperch.pixiv.parsing import parse_artwork_ids
 

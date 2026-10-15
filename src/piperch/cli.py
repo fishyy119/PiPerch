@@ -18,9 +18,9 @@ import uvicorn
 from uvicorn.config import LOGGING_CONFIG
 
 from piperch.app import create_app
+from piperch.application.control import AppControl
 from piperch.database import run_migrations
 from piperch.paths import AppPaths
-from piperch.runtime import AppControl
 
 _GRACEFUL_SHUTDOWN_TIMEOUT_SECONDS = 5
 _LOOPBACK_HOST = "127.0.0.1"

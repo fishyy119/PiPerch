@@ -5,11 +5,11 @@ from typing import TYPE_CHECKING
 
 import pytest
 
+from piperch.application.control import AppControl
 from piperch.database import Database, run_migrations
-from piperch.domain import JobState
+from piperch.domain.downloads import JobState
 from piperch.paths import AppPaths
 from piperch.repositories import DownloadRepository
-from piperch.runtime import AppControl
 from piperch.services.library_files import LibraryFileOperations
 from piperch.services.storage import StorageMigrationJournal, StorageMigrationService
 from piperch.settings import SettingsManager

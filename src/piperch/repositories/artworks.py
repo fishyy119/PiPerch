@@ -17,7 +17,7 @@ from piperch.database.tables import (
     tags,
     ugoira_frames,
 )
-from piperch.domain import (
+from piperch.domain.artworks import (
     ArtworkDetail,
     ArtworkSummary,
     ArtworkType,

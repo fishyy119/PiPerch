@@ -13,8 +13,8 @@ from piperch.api.models import (
     FavoriteSyncPlanResponse,
     FavoriteSyncResultResponse,
 )
-from piperch.container import AppContainer
-from piperch.domain import BookmarkFolderReference, BookmarkVisibility
+from piperch.application.container import AppContainer
+from piperch.domain.bookmarks import BookmarkFolderReference, BookmarkVisibility
 
 router = APIRouter(tags=["favorites"])
 

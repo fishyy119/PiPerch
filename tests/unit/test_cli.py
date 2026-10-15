@@ -12,7 +12,7 @@ if TYPE_CHECKING:
 
     from pytest import MonkeyPatch
 
-    from piperch.runtime import AppControl
+    from piperch.application.control import AppControl
 
 
 class FakeServer:

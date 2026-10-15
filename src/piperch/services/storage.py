@@ -17,9 +17,9 @@ from piperch.errors import AppError, ConflictError
 from piperch.services.library_files import LIBRARY_WORKSPACE_NAME
 
 if TYPE_CHECKING:
+    from piperch.application.control import AppControl
     from piperch.paths import AppPaths
     from piperch.repositories import DownloadRepository
-    from piperch.runtime import AppControl
     from piperch.services.downloads import DownloadSupervisor
     from piperch.settings import SettingsManager
 

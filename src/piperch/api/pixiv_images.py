@@ -7,7 +7,7 @@ from anyio import to_thread
 from fastapi import APIRouter, Depends, Response
 
 from piperch.api.dependencies import get_container
-from piperch.container import AppContainer
+from piperch.application.container import AppContainer
 
 router = APIRouter(prefix="/pixiv-images", tags=["pixiv"])
 

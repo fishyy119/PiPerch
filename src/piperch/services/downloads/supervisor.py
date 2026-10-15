@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 
 from anyio import to_thread
 
-from piperch.domain import DownloadItemRecord, ItemState
+from piperch.domain.downloads import DownloadItemRecord, ItemState
 from piperch.errors import AppError
 from piperch.services.downloads.cancellation import (
     DownloadCancellation,

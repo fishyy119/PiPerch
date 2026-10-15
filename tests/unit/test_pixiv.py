@@ -6,7 +6,7 @@ import httpx
 import pytest
 import respx
 
-from piperch.domain import BookmarkFolderKind, BookmarkFolderReference, BookmarkVisibility
+from piperch.domain.bookmarks import BookmarkFolderKind, BookmarkFolderReference, BookmarkVisibility
 from piperch.errors import UpstreamError
 from piperch.pixiv import PixivClient, parse_artwork_ids, parse_pixiv_user_id
 

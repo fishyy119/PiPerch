@@ -8,7 +8,7 @@ if TYPE_CHECKING:
     from collections.abc import Sequence
 
     from piperch.database import Database
-    from piperch.domain import MediaRecord, RemoteArtwork
+    from piperch.domain.artworks import MediaRecord, RemoteArtwork
     from piperch.repositories import ArtworkGroupRepository, ArtworkRepository, FavoriteRepository
     from piperch.services.library_commits import LibraryCommitCoordinator
     from piperch.services.tag_search import TagSearchIndex

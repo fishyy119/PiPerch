@@ -1,7 +1,8 @@
-"""本地分组名称与数量规则，供请求校验、持久化和收藏标签导入共用。"""
+"""本地分组类型、名称与数量规则，供请求校验、持久化和收藏标签导入共用。"""
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from piperch.errors import AppError
@@ -12,6 +13,19 @@ if TYPE_CHECKING:
 
 MAX_GROUP_NAME_LENGTH = 20
 MAX_ARTWORK_GROUPS = 10
+
+
+@dataclass(frozen=True, slots=True)
+class ArtworkGroup:
+    group_id: int
+    name: str
+    artwork_count: int
+
+
+@dataclass(frozen=True, slots=True)
+class ArtworkGroupMembership:
+    artwork_id: int
+    group_ids: tuple[int, ...]
 
 
 def normalize_group_name(value: str) -> str:

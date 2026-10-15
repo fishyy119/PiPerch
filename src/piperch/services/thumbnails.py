@@ -11,7 +11,7 @@ from PIL import Image, ImageOps
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-    from piperch.domain import MediaRecord
+    from piperch.domain.artworks import MediaRecord
     from piperch.paths import AppPaths
 
 logger = logging.getLogger(__name__)

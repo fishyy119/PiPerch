@@ -6,9 +6,8 @@ from sqlalchemy import delete, func, insert, select, update
 from sqlalchemy.exc import IntegrityError
 
 from piperch.database.tables import artwork_group_items, artwork_groups, artworks
-from piperch.domain import ArtworkGroup, ArtworkGroupMembership
+from piperch.domain.groups import MAX_ARTWORK_GROUPS, ArtworkGroup, ArtworkGroupMembership, normalize_group_name
 from piperch.errors import AppError, ConflictError, NotFoundError
-from piperch.group_rules import MAX_ARTWORK_GROUPS, normalize_group_name
 from piperch.repositories._rows import integer as _integer
 from piperch.repositories._rows import string as _string
 from piperch.utils.datetime import utc_now_text

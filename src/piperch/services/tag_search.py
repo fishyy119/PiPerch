@@ -10,7 +10,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 
 from piperch.database.tables import tag_search_cache, tag_search_cache_state, tags
-from piperch.domain import TagRecord
+from piperch.domain.artworks import TagRecord
 from piperch.utils.text import normalize_search_text
 
 if TYPE_CHECKING:

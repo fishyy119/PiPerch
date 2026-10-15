@@ -7,19 +7,9 @@ from typing import TYPE_CHECKING
 
 from PIL import Image
 
-from piperch.domain import (
-    ArtworkDiscoveryFailure,
-    ArtworkDiscoveryResult,
-    ArtworkType,
-    BookmarkFolder,
-    BookmarkFolderKind,
-    BookmarkFolderReference,
-    BookmarkVisibility,
-    DiscoveryCandidate,
-    FollowedUser,
-    MediaRecord,
-    RemoteArtwork,
-)
+from piperch.domain.artworks import ArtworkType, MediaRecord, RemoteArtwork
+from piperch.domain.bookmarks import BookmarkFolder, BookmarkFolderKind, BookmarkFolderReference, BookmarkVisibility
+from piperch.domain.discovery import ArtworkDiscoveryFailure, ArtworkDiscoveryResult, DiscoveryCandidate, FollowedUser
 from piperch.errors import UpstreamError
 from piperch.services.storage import StorageMigrationSelection
 
@@ -30,7 +20,7 @@ if TYPE_CHECKING:
     from pytest import MonkeyPatch
     from tests.support import ApiTestClient
 
-    from piperch.container import AppContainer
+    from piperch.application.container import AppContainer
     from piperch.services.events import ServerEvent
 
 

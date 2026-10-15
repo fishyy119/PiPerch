@@ -3,7 +3,8 @@ from __future__ import annotations
 import re
 from typing import TYPE_CHECKING, cast
 
-from piperch.domain import ArtworkType, DiscoveryCandidate
+from piperch.domain.artworks import ArtworkType
+from piperch.domain.discovery import DiscoveryCandidate
 
 if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence

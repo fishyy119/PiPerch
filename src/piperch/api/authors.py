@@ -10,7 +10,7 @@ from piperch.api.models import (
     UserProfileResponse,
 )
 from piperch.api.pixiv_images import proxied_image_url
-from piperch.container import AppContainer
+from piperch.application.container import AppContainer
 
 router = APIRouter(prefix="/authors", tags=["authors"])
 

@@ -26,8 +26,9 @@ from piperch.api.models import (
     UserDiscoveryRequest,
 )
 from piperch.api.pixiv_images import proxied_image_url
-from piperch.container import AppContainer
-from piperch.domain import BookmarkFolderReference, DiscoveryCandidate
+from piperch.application.container import AppContainer
+from piperch.domain.bookmarks import BookmarkFolderReference
+from piperch.domain.discovery import DiscoveryCandidate
 
 router = APIRouter(prefix="/discovery", tags=["discovery"])
 

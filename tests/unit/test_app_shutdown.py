@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, cast
 
 import pytest
 
-from piperch.app import shutdown_resources
+from piperch.application.lifecycle import shutdown_resources
 
 if TYPE_CHECKING:
     from piperch.database import Database

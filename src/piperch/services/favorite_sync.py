@@ -11,7 +11,7 @@ from piperch.errors import ConflictError
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-    from piperch.domain import FavoriteSyncDiff, FavoriteSyncResult
+    from piperch.domain.favorites import FavoriteSyncDiff, FavoriteSyncResult
     from piperch.repositories import FavoriteRepository
 
 

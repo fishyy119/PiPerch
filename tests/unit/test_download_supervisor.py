@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, cast
 
 import pytest
 
-from piperch.domain import DownloadItemRecord, ItemState
+from piperch.domain.downloads import DownloadItemRecord, ItemState
 from piperch.services.downloads import (
     DownloadCancellation,
     DownloadCancelledError,

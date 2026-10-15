@@ -12,7 +12,7 @@ from piperch.api.models import (
     DeleteResponse,
     GroupNameRequest,
 )
-from piperch.container import AppContainer
+from piperch.application.container import AppContainer
 
 router = APIRouter(tags=["groups"])
 

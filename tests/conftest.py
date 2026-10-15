@@ -12,7 +12,7 @@ if TYPE_CHECKING:
     from collections.abc import Generator
     from pathlib import Path
 
-    from piperch.container import AppContainer
+    from piperch.application.container import AppContainer
     from tests.support import ApiTestClient
 
 

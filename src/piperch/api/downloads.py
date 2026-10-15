@@ -17,7 +17,7 @@ from piperch.api.models import (
     DownloadJobDetailResponse,
     DownloadJobPage,
 )
-from piperch.container import AppContainer
+from piperch.application.container import AppContainer
 
 router = APIRouter(prefix="/download-jobs", tags=["downloads"])
 events_router = APIRouter(prefix="/events", tags=["downloads"])

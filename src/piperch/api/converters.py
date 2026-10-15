@@ -11,7 +11,8 @@ from piperch.api.models import (
     TagResponse,
     UgoiraFrameResponse,
 )
-from piperch.domain import ArtworkDetail, ArtworkSummary, DownloadJobDetail, DownloadJobSummary, ItemState
+from piperch.domain.artworks import ArtworkDetail, ArtworkSummary
+from piperch.domain.downloads import DownloadJobDetail, DownloadJobSummary, ItemState
 
 
 def artwork_summary_response(summary: ArtworkSummary) -> ArtworkSummaryResponse:

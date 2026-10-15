@@ -4,9 +4,11 @@ from typing import Annotated, ClassVar, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from piperch.domain import ArtworkType, BookmarkFolderKind, BookmarkVisibility, ItemState, JobState
-from piperch.group_rules import MAX_ARTWORK_GROUPS, MAX_GROUP_NAME_LENGTH
-from piperch.settings_models import EditableSettings
+from piperch.domain.artworks import ArtworkType
+from piperch.domain.bookmarks import BookmarkFolderKind, BookmarkVisibility
+from piperch.domain.downloads import ItemState, JobState
+from piperch.domain.groups import MAX_ARTWORK_GROUPS, MAX_GROUP_NAME_LENGTH
+from piperch.settings.models import EditableSettings
 
 
 def to_camel(value: str) -> str:

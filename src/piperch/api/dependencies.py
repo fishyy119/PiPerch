@@ -1,6 +1,6 @@
 from fastapi import Request
 
-from piperch.container import AppContainer
+from piperch.application.container import AppContainer
 
 
 def get_container(request: Request) -> AppContainer:

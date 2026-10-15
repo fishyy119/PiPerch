@@ -8,13 +8,9 @@ from anyio import to_thread
 
 from piperch.database import Database, run_migrations
 from piperch.database.tables import tag_search_cache
-from piperch.domain import (
-    ArtworkType,
-    ItemState,
-    MediaRecord,
-    RemoteArtwork,
-    RemoteBookmarkReference,
-)
+from piperch.domain.artworks import ArtworkType, MediaRecord, RemoteArtwork
+from piperch.domain.bookmarks import RemoteBookmarkReference
+from piperch.domain.downloads import ItemState
 from piperch.paths import AppPaths
 from piperch.repositories import (
     ArtworkGroupRepository,

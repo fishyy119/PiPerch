@@ -11,9 +11,10 @@ from urllib.parse import urlparse
 from anyio import to_thread
 from PIL import Image, ImageOps
 
-from piperch.domain import ArtworkType, ItemState, MediaRecord, RemoteArtwork
+from piperch.domain.artworks import ArtworkType, MediaRecord, RemoteArtwork
+from piperch.domain.downloads import ItemState
+from piperch.domain.groups import validate_imported_group_names
 from piperch.errors import AppError, UpstreamError
-from piperch.group_rules import validate_imported_group_names
 from piperch.services.library_files import LibraryFileOperations
 from piperch.services.thumbnails import ArtworkThumbnailCache
 

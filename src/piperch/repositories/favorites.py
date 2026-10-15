@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 from sqlalchemy import bindparam, delete, insert, select, update
 
 from piperch.database.tables import artworks, favorite_artworks
-from piperch.domain import FavoriteState, FavoriteSyncDiff, FavoriteSyncResult
+from piperch.domain.favorites import FavoriteState, FavoriteSyncDiff, FavoriteSyncResult
 from piperch.errors import NotFoundError
 from piperch.utils.datetime import utc_now_text
 

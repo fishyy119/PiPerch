@@ -8,13 +8,9 @@ from anyio import to_thread
 from PIL import Image
 
 from piperch.database import Database, run_migrations
-from piperch.domain import (
-    ArtworkType,
-    FavoriteState,
-    ItemState,
-    MediaRecord,
-    RemoteArtwork,
-)
+from piperch.domain.artworks import ArtworkType, MediaRecord, RemoteArtwork
+from piperch.domain.downloads import ItemState
+from piperch.domain.favorites import FavoriteState
 from piperch.errors import UpstreamError
 from piperch.paths import AppPaths
 from piperch.repositories import ArtworkGroupRepository, ArtworkRepository, FavoriteRepository
@@ -29,7 +25,7 @@ from piperch.services.library_commits import LibraryCommitCoordinator
 from piperch.services.tag_search import TagSearchIndex
 from piperch.services.thumbnails import ArtworkThumbnailCache
 from piperch.settings import SettingsManager
-from piperch.settings_models import AppSettings
+from piperch.settings.models import AppSettings
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Sequence

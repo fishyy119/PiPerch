@@ -6,21 +6,21 @@ from urllib.parse import quote
 
 import httpx
 
-from piperch.domain import (
-    ArtworkDiscoveryFailure,
-    ArtworkDiscoveryResult,
-    ArtworkType,
+from piperch.domain.artworks import ArtworkType, RemoteArtwork, UgoiraFrame
+from piperch.domain.bookmarks import (
     BookmarkFolder,
     BookmarkFolderKind,
     BookmarkFolderReference,
     BookmarkVisibility,
+    PublicBookmark,
+    RemoteBookmarkReference,
+)
+from piperch.domain.discovery import (
+    ArtworkDiscoveryFailure,
+    ArtworkDiscoveryResult,
     DiscoveryCandidate,
     FollowedUser,
-    PublicBookmark,
     RecommendedUser,
-    RemoteArtwork,
-    RemoteBookmarkReference,
-    UgoiraFrame,
     UserProfile,
 )
 from piperch.errors import UpstreamError
