@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import StrEnum
 
 
@@ -41,7 +41,13 @@ class ItemState(StrEnum):
 
 @dataclass(frozen=True, slots=True)
 class TagRecord:
+    tag_id: int
     name: str
+
+
+@dataclass(frozen=True, slots=True)
+class TagSummary(TagRecord):
+    artwork_count: int
 
 
 @dataclass(frozen=True, slots=True)
@@ -86,7 +92,7 @@ class RemoteArtwork:
     bookmark_data: RemoteBookmarkReference | None = None
     ugoira_zip_url: str | None = None
     ugoira_frames: tuple[UgoiraFrame, ...] = ()
-    tags: tuple[TagRecord, ...] = ()
+    tags: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -176,7 +182,6 @@ class ArtworkSummary:
     downloaded_at: str
     is_favorite: bool = False
     group_ids: tuple[int, ...] = ()
-    tags: tuple[tuple[int, TagRecord], ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -221,16 +226,24 @@ class ArtworkDetail:
     description: str
     width: int | None
     height: int | None
+    tags: tuple[TagRecord, ...]
     media: tuple[MediaRecord, ...]
     ugoira_frames: tuple[UgoiraFrame, ...]
 
 
 @dataclass(frozen=True, slots=True)
-class NamedCount:
-    item_id: int
+class AuthorSummary:
+    author_id: int
     name: str
-    count: int
-    subtitle: str | None = None
+    artwork_count: int
+
+
+@dataclass(frozen=True, slots=True)
+class SeriesSummary:
+    series_id: int
+    title: str
+    author_name: str
+    artwork_count: int
 
 
 @dataclass(frozen=True, slots=True)
@@ -243,7 +256,7 @@ class DownloadItemRecord:
 
 
 @dataclass(frozen=True, slots=True)
-class DownloadJobRecord:
+class DownloadJobSummary:
     job_id: str
     source_label: str
     state: JobState
@@ -252,5 +265,10 @@ class DownloadJobRecord:
     started_at: str | None
     finished_at: str | None
     error_summary: str | None
-    counts: dict[ItemState, int] = field(default_factory=lambda: {})
-    items: tuple[DownloadItemRecord, ...] = ()
+    counts: dict[ItemState, int]
+
+
+@dataclass(frozen=True, slots=True)
+class DownloadJobDetail:
+    summary: DownloadJobSummary
+    items: tuple[DownloadItemRecord, ...]

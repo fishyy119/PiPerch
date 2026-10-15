@@ -11,7 +11,7 @@ from piperch.api.models import (
     TagResponse,
     UgoiraFrameResponse,
 )
-from piperch.domain import ArtworkDetail, ArtworkSummary, DownloadJobRecord, ItemState
+from piperch.domain import ArtworkDetail, ArtworkSummary, DownloadJobDetail, DownloadJobSummary, ItemState
 
 
 def artwork_summary_response(summary: ArtworkSummary) -> ArtworkSummaryResponse:
@@ -45,10 +45,10 @@ def artwork_detail_response(
         height=detail.height,
         tags=[
             TagResponse(
-                tag_id=tag_id,
+                tag_id=tag.tag_id,
                 name=tag.name,
             )
-            for tag_id, tag in detail.summary.tags
+            for tag in detail.tags
         ],
         media=[
             MediaResponse(
@@ -65,7 +65,7 @@ def artwork_detail_response(
     )
 
 
-def download_job_summary_response(job: DownloadJobRecord) -> DownloadJobSummaryResponse:
+def download_job_summary_response(job: DownloadJobSummary) -> DownloadJobSummaryResponse:
     return DownloadJobSummaryResponse(
         job_id=job.job_id,
         source_label=job.source_label,
@@ -85,9 +85,9 @@ def download_job_summary_response(job: DownloadJobRecord) -> DownloadJobSummaryR
     )
 
 
-def download_job_detail_response(job: DownloadJobRecord) -> DownloadJobDetailResponse:
+def download_job_detail_response(job: DownloadJobDetail) -> DownloadJobDetailResponse:
     return DownloadJobDetailResponse(
-        **download_job_summary_response(job).model_dump(),
+        **download_job_summary_response(job.summary).model_dump(),
         items=[
             DownloadItemResponse(
                 item_id=item.item_id,

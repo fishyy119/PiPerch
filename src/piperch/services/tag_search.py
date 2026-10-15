@@ -10,6 +10,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 
 from piperch.database.tables import tag_search_cache, tag_search_cache_state, tags
+from piperch.domain import TagRecord
 from piperch.utils.text import normalize_search_text
 
 if TYPE_CHECKING:
@@ -115,9 +116,11 @@ class TagSearchIndex:
                 target_statement = target_statement.select_from(
                     tags.outerjoin(tag_search_cache, tags.c.id == tag_search_cache.c.tag_id)
                 ).where(tag_search_cache.c.tag_id.is_(None))
-            targets = [(int(row.id), str(row.name)) for row in connection.execute(target_statement)]
+            targets = [
+                TagRecord(tag_id=int(row.id), name=str(row.name)) for row in connection.execute(target_statement)
+            ]
 
-        prepared = self.prepare([name for _, name in targets])
+        prepared = self.prepare([tag.name for tag in targets])
         with self._database.begin() as connection:
             if full_rebuild and prepared.catalog_available:
                 connection.execute(delete(tag_search_cache))
@@ -141,10 +144,10 @@ class TagSearchIndex:
     @staticmethod
     def store(
         connection: Connection,
-        entries: Sequence[tuple[int, str]],
+        entries: Sequence[TagRecord],
         prepared: PreparedTagSearch,
     ) -> None:
-        unique_entries = dict(entries)
+        unique_entries = {tag.tag_id: tag.name for tag in entries}
         if unique_entries:
             rows = [
                 {

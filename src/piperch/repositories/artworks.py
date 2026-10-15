@@ -21,10 +21,12 @@ from piperch.domain import (
     ArtworkDetail,
     ArtworkSummary,
     ArtworkType,
+    AuthorSummary,
     MediaRecord,
-    NamedCount,
     RemoteArtwork,
+    SeriesSummary,
     TagRecord,
+    TagSummary,
     UgoiraFrame,
 )
 from piperch.errors import NotFoundError
@@ -185,18 +187,18 @@ class ArtworkRepository:
     def replace_tags(
         connection: Connection,
         artwork_id: int,
-        tag_records: Sequence[TagRecord],
-    ) -> list[tuple[int, str]]:
+        tag_names: Sequence[str],
+    ) -> list[TagRecord]:
         connection.execute(delete(artwork_tags).where(artwork_tags.c.artwork_id == artwork_id))
-        indexed_tags: list[tuple[int, str]] = []
-        for tag in tag_records:
-            tag_id = connection.scalar(select(tags.c.id).where(tags.c.name == tag.name))
+        indexed_tags: list[TagRecord] = []
+        for name in tag_names:
+            tag_id = connection.scalar(select(tags.c.id).where(tags.c.name == name))
             if tag_id is None:
-                connection.execute(insert(tags).values(name=tag.name))
-                tag_id = connection.scalar(select(tags.c.id).where(tags.c.name == tag.name))
+                connection.execute(insert(tags).values(name=name))
+                tag_id = connection.scalar(select(tags.c.id).where(tags.c.name == name))
                 if tag_id is None:
                     raise RuntimeError("写入标签后未能读取主键。")
-            indexed_tags.append((tag_id, tag.name))
+            indexed_tags.append(TagRecord(tag_id=tag_id, name=name))
             connection.execute(insert(artwork_tags).values(artwork_id=artwork_id, tag_id=tag_id))
         return indexed_tags
 
@@ -446,7 +448,7 @@ class ArtworkRepository:
             if row is None:
                 raise NotFoundError("未找到该作品。")
             summary = self._summaries_with_favorites(connection, [self._summary_from_row(row)])[0]
-            summary = self._summary_with_tags(connection, summary)
+            local_tags = self._tags_for_artwork(connection, artwork_id)
             media_rows = connection.execute(
                 select(media_files)
                 .where(media_files.c.artwork_id == artwork_id)
@@ -462,6 +464,7 @@ class ArtworkRepository:
                 description=_string(row["description"]),
                 width=_optional_integer(row["width"]),
                 height=_optional_integer(row["height"]),
+                tags=local_tags,
                 media=tuple(
                     MediaRecord(
                         role=_string(item["role"]),
@@ -504,7 +507,7 @@ class ArtworkRepository:
         search: str,
         limit: int,
         include_ids: Sequence[int] = (),
-    ) -> list[tuple[int, TagRecord, int]]:
+    ) -> list[TagSummary]:
         included_ids = tuple(dict.fromkeys(include_ids))
         statement = (
             select(
@@ -544,10 +547,10 @@ class ArtworkRepository:
         with self._database.connect() as connection:
             rows = connection.execute(statement).mappings()
             return [
-                (
-                    _integer(row["id"]),
-                    TagRecord(_string(row["name"])),
-                    _integer(row["artwork_count"]),
+                TagSummary(
+                    tag_id=_integer(row["id"]),
+                    name=_string(row["name"]),
+                    artwork_count=_integer(row["artwork_count"]),
                 )
                 for row in rows
             ]
@@ -557,14 +560,14 @@ class ArtworkRepository:
         search: str,
         limit: int = 100,
         include_ids: Sequence[int] = (),
-    ) -> list[NamedCount]:
+    ) -> list[AuthorSummary]:
         included_ids = tuple(dict.fromkeys(include_ids))
         joined = authors.join(artworks, authors.c.id == artworks.c.author_id)
         statement = (
             select(
                 authors.c.id,
                 authors.c.name,
-                func.count(artworks.c.id).label("item_count"),
+                func.count(artworks.c.id).label("artwork_count"),
             )
             .select_from(joined)
             .group_by(authors.c.id, authors.c.name)
@@ -589,15 +592,15 @@ class ArtworkRepository:
         with self._database.connect() as connection:
             rows = connection.execute(statement).mappings()
             return [
-                NamedCount(
-                    item_id=_integer(row["id"]),
+                AuthorSummary(
+                    author_id=_integer(row["id"]),
                     name=_string(row["name"]),
-                    count=_integer(row["item_count"]),
+                    artwork_count=_integer(row["artwork_count"]),
                 )
                 for row in rows
             ]
 
-    def list_series(self, page: int, size: int, search: str) -> tuple[list[NamedCount], int]:
+    def list_series(self, page: int, size: int, search: str) -> tuple[list[SeriesSummary], int]:
         joined = series.join(artworks, series.c.id == artworks.c.series_id).join(
             authors, series.c.author_id == authors.c.id
         )
@@ -605,9 +608,9 @@ class ArtworkRepository:
         statement = (
             select(
                 series.c.id,
-                series.c.title.label("name"),
-                authors.c.name.label("subtitle"),
-                func.count(artworks.c.id).label("item_count"),
+                series.c.title,
+                authors.c.name.label("author_name"),
+                func.count(artworks.c.id).label("artwork_count"),
             )
             .select_from(joined)
             .group_by(series.c.id, authors.c.name)
@@ -624,11 +627,11 @@ class ArtworkRepository:
             rows = connection.execute(statement).mappings()
             return (
                 [
-                    NamedCount(
-                        item_id=_integer(row["id"]),
-                        name=_string(row["name"]),
-                        subtitle=_string(row["subtitle"]),
-                        count=_integer(row["item_count"]),
+                    SeriesSummary(
+                        series_id=_integer(row["id"]),
+                        title=_string(row["title"]),
+                        author_name=_string(row["author_name"]),
+                        artwork_count=_integer(row["artwork_count"]),
                     )
                     for row in rows
                 ],
@@ -679,26 +682,17 @@ class ArtworkRepository:
         )
 
     @staticmethod
-    def _summary_with_tags(connection: Connection, summary: ArtworkSummary) -> ArtworkSummary:
+    def _tags_for_artwork(connection: Connection, artwork_id: int) -> tuple[TagRecord, ...]:
         rows = connection.execute(
             select(
                 tags.c.id,
                 tags.c.name,
             )
             .select_from(artwork_tags.join(tags, artwork_tags.c.tag_id == tags.c.id))
-            .where(artwork_tags.c.artwork_id == summary.artwork_id)
+            .where(artwork_tags.c.artwork_id == artwork_id)
             .order_by(tags.c.name.asc())
         ).mappings()
-        return replace(
-            summary,
-            tags=tuple(
-                (
-                    _integer(row["id"]),
-                    TagRecord(_string(row["name"])),
-                )
-                for row in rows
-            ),
-        )
+        return tuple(TagRecord(tag_id=_integer(row["id"]), name=_string(row["name"])) for row in rows)
 
     @staticmethod
     def _summaries_with_favorites(

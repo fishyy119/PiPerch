@@ -9,7 +9,8 @@ from sqlalchemy import and_, exists, func, insert, select, update
 from piperch.database.tables import download_items, download_jobs
 from piperch.domain import (
     DownloadItemRecord,
-    DownloadJobRecord,
+    DownloadJobDetail,
+    DownloadJobSummary,
     ItemState,
     JobState,
 )
@@ -323,21 +324,43 @@ class DownloadRepository:
                 )
             )
 
-    def list_jobs(self, page: int, size: int, include_items: bool = False) -> tuple[list[DownloadJobRecord], int]:
+    def list_jobs(self, page: int, size: int) -> tuple[list[DownloadJobSummary], int]:
         with self._database.connect() as connection:
             total = int(connection.scalar(select(func.count()).select_from(download_jobs)) or 0)
             rows = connection.execute(
                 select(download_jobs).order_by(download_jobs.c.created_at.desc()).offset(page * size).limit(size)
             ).mappings()
-            jobs = [self._job_from_row(connection, row, include_items) for row in rows]
+            jobs: list[DownloadJobSummary] = []
+            for row in rows:
+                count_rows = connection.execute(
+                    select(download_items.c.state, func.count().label("item_count"))
+                    .where(download_items.c.job_id == row["id"])
+                    .group_by(download_items.c.state)
+                ).all()
+                counts = {ItemState(string(item.state)): integer(item.item_count) for item in count_rows}
+                jobs.append(self._summary_from_row(row, counts))
         return jobs, total
 
-    def get_job(self, job_id: str) -> DownloadJobRecord:
+    def get_job(self, job_id: str) -> DownloadJobDetail:
         with self._database.connect() as connection:
             row = connection.execute(select(download_jobs).where(download_jobs.c.id == job_id)).mappings().first()
             if row is None:
                 raise NotFoundError("未找到下载任务。")
-            return self._job_from_row(connection, row, True)
+            item_rows = connection.execute(
+                select(download_items).where(download_items.c.job_id == job_id).order_by(download_items.c.id.asc())
+            ).mappings()
+            items = tuple(
+                DownloadItemRecord(
+                    item_id=integer(item["id"]),
+                    artwork_id=integer(item["artwork_id"]),
+                    state=ItemState(string(item["state"])),
+                    attempts=integer(item["attempts"]),
+                    error=optional_string(item["error"]),
+                )
+                for item in item_rows
+            )
+            counts = dict(Counter(item.state for item in items))
+            return DownloadJobDetail(summary=self._summary_from_row(row, counts), items=items)
 
     @staticmethod
     def _finalize(connection: Connection, job_id: str) -> None:
@@ -388,41 +411,11 @@ class DownloadRepository:
         )
 
     @staticmethod
-    def _job_from_row(
-        connection: Connection,
+    def _summary_from_row(
         row: RowMapping,
-        include_items: bool,
-    ) -> DownloadJobRecord:
-        if include_items:
-            item_rows = (
-                connection.execute(
-                    select(download_items)
-                    .where(download_items.c.job_id == row["id"])
-                    .order_by(download_items.c.id.asc())
-                )
-                .mappings()
-                .all()
-            )
-            items = tuple(
-                DownloadItemRecord(
-                    item_id=integer(item["id"]),
-                    artwork_id=integer(item["artwork_id"]),
-                    state=ItemState(string(item["state"])),
-                    attempts=integer(item["attempts"]),
-                    error=optional_string(item["error"]),
-                )
-                for item in item_rows
-            )
-            counts = Counter(item.state for item in items)
-        else:
-            count_rows = connection.execute(
-                select(download_items.c.state, func.count().label("item_count"))
-                .where(download_items.c.job_id == row["id"])
-                .group_by(download_items.c.state)
-            ).all()
-            items = ()
-            counts = Counter({ItemState(string(item.state)): integer(item.item_count) for item in count_rows})
-        return DownloadJobRecord(
+        counts: dict[ItemState, int],
+    ) -> DownloadJobSummary:
+        return DownloadJobSummary(
             job_id=string(row["id"]),
             source_label=string(row["source_label"]),
             state=JobState(string(row["state"])),
@@ -431,6 +424,5 @@ class DownloadRepository:
             started_at=optional_string(row["started_at"]),
             finished_at=optional_string(row["finished_at"]),
             error_summary=optional_string(row["error_summary"]),
-            counts=dict(counts),
-            items=items if include_items else (),
+            counts=counts,
         )

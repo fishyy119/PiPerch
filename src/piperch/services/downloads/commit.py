@@ -52,7 +52,7 @@ class ArtworkDownloadCommitService:
         bookmark_tags: Sequence[str] | None,
     ) -> None:
         now = utc_now_text()
-        prepared_tag_search = self._tag_search.prepare([tag.name for tag in artwork.tags])
+        prepared_tag_search = self._tag_search.prepare(artwork.tags)
 
         with self._database.begin() as connection:
             self._artworks.upsert_author(connection, artwork, now)

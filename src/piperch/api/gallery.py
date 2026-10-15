@@ -227,11 +227,11 @@ def list_tags(
 ) -> list[TagResponse]:
     return [
         TagResponse(
-            tag_id=tag_id,
+            tag_id=tag.tag_id,
             name=tag.name,
-            artwork_count=count,
+            artwork_count=tag.artwork_count,
         )
-        for tag_id, tag, count in container.artworks.list_tags(search, limit, include_id)
+        for tag in container.artworks.list_tags(search, limit, include_id)
     ]
 
 
@@ -244,12 +244,12 @@ def list_authors(
 ) -> list[NamedCountResponse]:
     return [
         NamedCountResponse(
-            item_id=item.item_id,
-            name=item.name,
-            count=item.count,
-            subtitle=item.subtitle,
+            item_id=author.author_id,
+            name=author.name,
+            count=author.artwork_count,
+            subtitle=None,
         )
-        for item in container.artworks.list_authors(search, limit, include_id)
+        for author in container.artworks.list_authors(search, limit, include_id)
     ]
 
 
@@ -264,12 +264,12 @@ def list_series(
     return NamedCountPage(
         items=[
             NamedCountResponse(
-                item_id=item.item_id,
-                name=item.name,
-                count=item.count,
-                subtitle=item.subtitle,
+                item_id=series.series_id,
+                name=series.title,
+                count=series.artwork_count,
+                subtitle=series.author_name,
             )
-            for item in items
+            for series in items
         ],
         page=page,
         size=size,

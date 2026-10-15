@@ -13,7 +13,7 @@ from PIL import Image, ImageOps
 
 from piperch.domain import ArtworkType, ItemState, MediaRecord, RemoteArtwork
 from piperch.errors import AppError, UpstreamError
-from piperch.repositories.groups import validate_imported_group_names
+from piperch.group_rules import validate_imported_group_names
 from piperch.services.library_files import LibraryFileOperations
 from piperch.services.thumbnails import ArtworkThumbnailCache
 

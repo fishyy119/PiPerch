@@ -8,6 +8,7 @@ from sqlalchemy.exc import IntegrityError
 from piperch.database.tables import artwork_group_items, artwork_groups, artworks
 from piperch.domain import ArtworkGroup, ArtworkGroupMembership
 from piperch.errors import AppError, ConflictError, NotFoundError
+from piperch.group_rules import MAX_ARTWORK_GROUPS, normalize_group_name
 from piperch.repositories._rows import integer as _integer
 from piperch.repositories._rows import string as _string
 from piperch.utils.datetime import utc_now_text
@@ -18,30 +19,6 @@ if TYPE_CHECKING:
     from sqlalchemy.engine import Connection
 
     from piperch.database import Database
-
-
-MAX_ARTWORK_GROUPS = 10
-
-
-def normalize_group_name(value: str) -> str:
-    name = value.strip()
-    if not name:
-        raise AppError("invalid_group_name", "本地分组名称不能为空。")
-    if len(name) > 20:
-        raise AppError("invalid_group_name", "本地分组名称不能超过 20 个字符。")
-    if any(character.isspace() for character in name):
-        raise AppError("invalid_group_name", "本地分组名称不能包含空白字符。")
-    return name
-
-
-def validate_imported_group_names(values: Sequence[str]) -> tuple[str, ...]:
-    groups = tuple(dict.fromkeys(values))
-    if len(groups) > MAX_ARTWORK_GROUPS:
-        raise AppError("invalid_remote_bookmark_tags", "Pixiv 收藏标签超过本地允许的 10 个分组。")
-    for group in groups:
-        if normalize_group_name(group) != group:
-            raise AppError("invalid_remote_bookmark_tags", "Pixiv 收藏标签不满足本地分组名称约束。")
-    return groups
 
 
 class ArtworkGroupRepository:
@@ -118,7 +95,7 @@ class ArtworkGroupRepository:
     def replace_groups(self, artwork_id: int, *, group_ids: Sequence[int]) -> ArtworkGroupMembership:
         unique_group_ids = tuple(dict.fromkeys(group_ids))
         if len(unique_group_ids) > MAX_ARTWORK_GROUPS:
-            raise AppError("group_limit", "每件作品最多属于 10 个本地分组。")
+            raise AppError("group_limit", f"每件作品最多属于 {MAX_ARTWORK_GROUPS} 个本地分组。")
         with self._database.begin() as connection:
             self._require_artworks(connection, (artwork_id,))
             self._require_groups(connection, unique_group_ids)
@@ -152,7 +129,7 @@ class ArtworkGroupRepository:
                 artwork_id: (groups | set(add_ids)) - set(remove_ids) for artwork_id, groups in current.items()
             }
             if any(len(groups) > MAX_ARTWORK_GROUPS for groups in final_groups.values()):
-                raise AppError("group_limit", "每件作品最多属于 10 个本地分组。")
+                raise AppError("group_limit", f"每件作品最多属于 {MAX_ARTWORK_GROUPS} 个本地分组。")
 
             changed_ids = [artwork_id for artwork_id, groups in final_groups.items() if groups != current[artwork_id]]
             if not changed_ids:

@@ -5,6 +5,7 @@ from typing import Annotated, ClassVar, Literal
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from piperch.domain import ArtworkType, BookmarkFolderKind, BookmarkVisibility, ItemState, JobState
+from piperch.group_rules import MAX_ARTWORK_GROUPS, MAX_GROUP_NAME_LENGTH
 from piperch.settings_models import EditableSettings
 
 
@@ -14,6 +15,16 @@ def to_camel(value: str) -> str:
 
 
 _API_MODEL_CONFIG = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+
+
+ArtworkIdList = Annotated[list[int], Field(min_length=1, max_length=1000)]
+GroupIdList = Annotated[list[int], Field(max_length=MAX_ARTWORK_GROUPS)]
+
+
+def _normalize_ids(values: list[int], *, label: str = "ID") -> list[int]:
+    if any(value <= 0 for value in values):
+        raise ValueError(f"{label} 必须是正整数。")
+    return list(dict.fromkeys(values))
 
 
 class ApiModel(BaseModel):
@@ -236,15 +247,13 @@ class FollowedUsersResponse(ApiModel):
 
 
 class DownloadJobCreate(ApiModel):
-    artwork_ids: list[int] = Field(min_length=1, max_length=1000)
+    artwork_ids: ArtworkIdList
     source_label: str = Field(default="手动选择", min_length=1, max_length=200)
 
     @field_validator("artwork_ids")
     @classmethod
     def validate_artwork_ids(cls, values: list[int]) -> list[int]:
-        if any(value <= 0 for value in values):
-            raise ValueError("作品 ID 必须是正整数。")
-        return list(dict.fromkeys(values))
+        return _normalize_ids(values, label="作品 ID")
 
 
 class DownloadJobCreated(ApiModel):
@@ -360,14 +369,12 @@ class NamedCountPage(ApiModel):
 
 
 class BulkDeleteRequest(ApiModel):
-    artwork_ids: list[int] = Field(min_length=1, max_length=1000)
+    artwork_ids: ArtworkIdList
 
     @field_validator("artwork_ids")
     @classmethod
     def validate_artwork_ids(cls, values: list[int]) -> list[int]:
-        if any(value <= 0 for value in values):
-            raise ValueError("作品 ID 必须是正整数。")
-        return list(dict.fromkeys(values))
+        return _normalize_ids(values, label="作品 ID")
 
 
 class DeleteResponse(ApiModel):
@@ -379,7 +386,7 @@ class ArtworkDeleteResponse(DeleteResponse):
 
 
 class GroupNameRequest(ApiModel):
-    name: str = Field(min_length=1, max_length=20)
+    name: str = Field(min_length=1, max_length=MAX_GROUP_NAME_LENGTH)
 
     @field_validator("name", mode="before")
     @classmethod
@@ -394,14 +401,12 @@ class ArtworkGroupResponse(ApiModel):
 
 
 class ArtworkGroupsRequest(ApiModel):
-    group_ids: list[int] = Field(default_factory=lambda: list[int](), max_length=10)
+    group_ids: GroupIdList = Field(default_factory=lambda: list[int]())
 
     @field_validator("group_ids")
     @classmethod
     def validate_group_ids(cls, values: list[int]) -> list[int]:
-        if any(value <= 0 for value in values):
-            raise ValueError("本地分组 ID 必须是正整数。")
-        return list(dict.fromkeys(values))
+        return _normalize_ids(values, label="本地分组 ID")
 
 
 class FavoriteStateRequest(ApiModel):
@@ -435,16 +440,14 @@ class ArtworkGroupsResponse(ApiModel):
 
 
 class BulkArtworkGroupsRequest(ApiModel):
-    artwork_ids: list[int] = Field(min_length=1, max_length=1000)
-    add_group_ids: list[int] = Field(default_factory=lambda: list[int](), max_length=10)
-    remove_group_ids: list[int] = Field(default_factory=lambda: list[int](), max_length=10)
+    artwork_ids: ArtworkIdList
+    add_group_ids: GroupIdList = Field(default_factory=lambda: list[int]())
+    remove_group_ids: GroupIdList = Field(default_factory=lambda: list[int]())
 
     @field_validator("artwork_ids", "add_group_ids", "remove_group_ids")
     @classmethod
     def validate_ids(cls, values: list[int]) -> list[int]:
-        if any(value <= 0 for value in values):
-            raise ValueError("ID 必须是正整数。")
-        return list(dict.fromkeys(values))
+        return _normalize_ids(values)
 
     @model_validator(mode="after")
     def validate_changes(self) -> BulkArtworkGroupsRequest:

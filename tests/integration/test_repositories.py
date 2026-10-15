@@ -14,7 +14,6 @@ from piperch.domain import (
     MediaRecord,
     RemoteArtwork,
     RemoteBookmarkReference,
-    TagRecord,
 )
 from piperch.paths import AppPaths
 from piperch.repositories import (
@@ -38,7 +37,7 @@ if TYPE_CHECKING:
     from pytest import MonkeyPatch
 
 
-def _artwork(artwork_id: int, tags: tuple[TagRecord, ...]) -> RemoteArtwork:
+def _artwork(artwork_id: int, tags: tuple[str, ...]) -> RemoteArtwork:
     return RemoteArtwork(
         artwork_id=artwork_id,
         artwork_type=ArtworkType.ILLUST,
@@ -130,18 +129,18 @@ def test_gallery_multi_value_filters_apply_selected_match_modes(tmp_path: Path) 
     _, database, _, artworks, commits, _ = _repositories(tmp_path)
     try:
         commits.commit(
-            _artwork(1, (TagRecord("风景"), TagRecord("蓝天"))),
+            _artwork(1, ("风景", "蓝天")),
             [MediaRecord("page", "100/1/1_p0.jpg", "image/jpeg", 10, 0)],
         )
         commits.commit(
-            _artwork(2, (TagRecord("风景"),)),
+            _artwork(2, ("风景",)),
             [MediaRecord("page", "100/2/2_p0.jpg", "image/jpeg", 10, 0)],
         )
         commits.commit(
-            _artwork(3, (TagRecord("蓝天"),)),
+            _artwork(3, ("蓝天",)),
             [MediaRecord("page", "100/3/3_p0.jpg", "image/jpeg", 10, 0)],
         )
-        available_tags = {tag.name: tag_id for tag_id, tag, _ in artworks.list_tags("", 50)}
+        available_tags = {tag.name: tag.tag_id for tag in artworks.list_tags("", 50)}
         tag_ids = (available_tags["风景"], available_tags["蓝天"])
 
         groups = ArtworkGroupRepository(database)
@@ -204,7 +203,7 @@ def test_tag_search_cache_supports_incremental_and_startup_sync(tmp_path: Path) 
     _, database, _, artworks, commits, _ = _repositories(tmp_path)
     try:
         commits.commit(
-            _artwork(1, (TagRecord("女戦闘員"),)),
+            _artwork(1, ("女戦闘員",)),
             [MediaRecord("page", "100/1/1_p0.jpg", "image/jpeg", 10, 0)],
         )
 
@@ -221,8 +220,8 @@ def test_tag_search_cache_supports_incremental_and_startup_sync(tmp_path: Path) 
     assert len(by_original_name) == 1
     assert len(after_incremental_sync) == 1
     assert len(after_startup_sync) == 1
-    assert by_original_name[0][0] == after_incremental_sync[0][0] == after_startup_sync[0][0]
-    assert after_startup_sync[0][1].name == "女戦闘員"
+    assert by_original_name[0].tag_id == after_incremental_sync[0].tag_id == after_startup_sync[0].tag_id
+    assert after_startup_sync[0].name == "女戦闘員"
 
 
 def test_download_commit_initializes_bookmark_state_only_for_new_artwork(tmp_path: Path) -> None:
@@ -249,21 +248,21 @@ def test_download_commit_initializes_bookmark_state_only_for_new_artwork(tmp_pat
 
 def test_related_artworks_combine_author_and_shared_tags(tmp_path: Path) -> None:
     _, database, _, artworks, commits, _ = _repositories(tmp_path)
-    target = _artwork(1, (TagRecord("风景"), TagRecord("蓝天")))
+    target = _artwork(1, ("风景", "蓝天"))
     candidates = (
-        _artwork(2, (TagRecord("人物"),)),
+        _artwork(2, ("人物",)),
         replace(
             _artwork(3, target.tags),
             author_id=200,
             author_name="其他作者",
         ),
         replace(
-            _artwork(4, (TagRecord("风景"),)),
+            _artwork(4, ("风景",)),
             author_id=201,
             author_name="第三作者",
         ),
         replace(
-            _artwork(5, (TagRecord("无关"),)),
+            _artwork(5, ("无关",)),
             author_id=202,
             author_name="无关作者",
         ),
@@ -334,7 +333,7 @@ def test_download_completeness_requires_every_page(tmp_path: Path) -> None:
 def test_delete_metadata_removes_unused_gallery_facets(tmp_path: Path) -> None:
     _, database, _, artworks, commits, _ = _repositories(tmp_path)
     artwork = replace(
-        _artwork(101, (TagRecord("风景"),)),
+        _artwork(101, ("风景",)),
         series_id=200,
         series_title="测试系列",
     )
@@ -371,13 +370,13 @@ def test_download_job_transitions_and_retry(tmp_path: Path) -> None:
 
         downloads.complete_item(first_item.item_id, ItemState.SUCCEEDED)
         running_job = downloads.get_job(job_id)
-        assert running_job.state.value == "running"
-        assert running_job.counts[ItemState.RUNNING] == 1
+        assert running_job.summary.state.value == "running"
+        assert running_job.summary.counts[ItemState.RUNNING] == 1
         downloads.complete_item(second_item.item_id, ItemState.FAILED, "模拟失败")
 
         failed_job = downloads.get_job(job_id)
-        assert failed_job.state.value == "partiallySucceeded"
-        assert failed_job.error_summary == "模拟失败"
+        assert failed_job.summary.state.value == "partiallySucceeded"
+        assert failed_job.summary.error_summary == "模拟失败"
         downloads.retry(job_id)
         retried_job = downloads.get_job(job_id)
         cancel_job_id = downloads.create_job([3], "取消测试")
@@ -386,10 +385,10 @@ def test_download_job_transitions_and_retry(tmp_path: Path) -> None:
     finally:
         database.close()
 
-    assert retried_job.state.value == "queued"
-    assert retried_job.counts[ItemState.QUEUED] == 1
-    assert cancelled_job.state.value == "cancelled"
-    assert cancelled_job.counts[ItemState.CANCELLED] == 1
+    assert retried_job.summary.state.value == "queued"
+    assert retried_job.summary.counts[ItemState.QUEUED] == 1
+    assert cancelled_job.summary.state.value == "cancelled"
+    assert cancelled_job.summary.counts[ItemState.CANCELLED] == 1
 
 
 def test_interrupted_delete_is_restored_when_metadata_still_exists(tmp_path: Path) -> None:
@@ -399,7 +398,7 @@ def test_interrupted_delete_is_restored_when_metadata_still_exists(tmp_path: Pat
     pending = paths.staging / "delete" / "100" / "1-interrupted"
     try:
         commits.commit(
-            _artwork(1, (TagRecord("风景"),)),
+            _artwork(1, ("风景",)),
             [MediaRecord("page", "100/1/1_p0.jpg", "image/jpeg", 4, 0)],
         )
         source.mkdir(parents=True)
@@ -426,5 +425,5 @@ def test_running_download_is_requeued_during_recovery(tmp_path: Path) -> None:
     finally:
         database.close()
 
-    assert recovered.state.value == "queued"
+    assert recovered.summary.state.value == "queued"
     assert recovered.items[0].state is ItemState.QUEUED

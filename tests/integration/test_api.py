@@ -19,7 +19,6 @@ from piperch.domain import (
     FollowedUser,
     MediaRecord,
     RemoteArtwork,
-    TagRecord,
 )
 from piperch.errors import UpstreamError
 from piperch.services.storage import StorageMigrationSelection
@@ -555,7 +554,7 @@ def test_gallery_accepts_camel_case_filter_parameters(
         published_at=None,
         original_urls=("https://i.pximg.net/target.jpg",),
         thumbnail_url=None,
-        tags=(TagRecord("目标标签"), TagRecord("共同标签")),
+        tags=("目标标签", "共同标签"),
     )
     second = RemoteArtwork(
         artwork_id=102,
@@ -576,7 +575,7 @@ def test_gallery_accepts_camel_case_filter_parameters(
         published_at=None,
         original_urls=("https://i.pximg.net/other.jpg",),
         thumbnail_url=None,
-        tags=(TagRecord("其他标签"),),
+        tags=("其他标签",),
     )
     partial_match = RemoteArtwork(
         artwork_id=103,
@@ -597,7 +596,7 @@ def test_gallery_accepts_camel_case_filter_parameters(
         published_at=None,
         original_urls=("https://i.pximg.net/partial.jpg",),
         thumbnail_url=None,
-        tags=(TagRecord("目标标签"),),
+        tags=("目标标签",),
     )
     container.download_commits.commit(
         first,
@@ -611,7 +610,7 @@ def test_gallery_accepts_camel_case_filter_parameters(
         partial_match,
         [MediaRecord("page", "201/103/103_p0.jpg", "image/jpeg", 10, 0)],
     )
-    tag_ids = {tag.name: tag_id for tag_id, tag, _ in container.artworks.list_tags("", 50)}
+    tag_ids = {tag.name: tag.tag_id for tag in container.artworks.list_tags("", 50)}
     target_tag_id = tag_ids["目标标签"]
     shared_tag_id = tag_ids["共同标签"]
 

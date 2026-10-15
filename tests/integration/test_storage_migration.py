@@ -95,7 +95,7 @@ async def test_storage_migration_moves_all_files_and_cancels_unfinished_download
         assert (target / "untracked.txt").read_text(encoding="utf-8") == "untracked"
         assert not (target / workspace.name).exists()
         assert not source.exists()
-        assert downloads.get_job(job_id).state is JobState.CANCELLED
+        assert downloads.get_job(job_id).summary.state is JobState.CANCELLED
         assert not paths.storage_migration.exists()
     finally:
         database.close()
