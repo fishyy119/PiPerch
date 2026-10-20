@@ -4,21 +4,38 @@ build-backend = "hatchling.build"
 
 [project]
 name = "piperch"
-version = "0.1.0"
+version = "0.2.0"
 description = "本地优先的 Pixiv 下载、浏览与管理工具"
 readme = "README.md"
-requires-python = ">=3.12,<3.13"
+requires-python = ">=3.12"
 license = "GPL-3.0-only"
-authors = [{ name = "fishyy119" }]
+license-files = ["LICENSE", "src/piperch/**/*LICENSE*"]
+authors = [{ name = "fishyy119", email = "fishyy109@foxmail.com" }]
+keywords = ["pixiv", "downloader", "gallery", "image-management"]
+classifiers = [
+    "Environment :: Web Environment",
+    "Intended Audience :: End Users/Desktop",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Multimedia :: Graphics",
+]
 dependencies = [
     "alembic>=1.14,<2",
+    "anyio>=4,<5",
     "fastapi>=0.115,<1",
     "httpx>=0.28,<1",
     "pillow>=11,<13",
     "pydantic>=2.10,<3",
     "sqlalchemy>=2.0.36,<3",
+    "starlette>=0.37.2,<2",
     "uvicorn>=0.32,<1",
 ]
+
+[project.urls]
+Source = "https://github.com/fishyy119/PiPerch"
+Issues = "https://github.com/fishyy119/PiPerch/issues"
+Changelog = "https://github.com/fishyy119/PiPerch/blob/master/CHANGELOG.md"
 
 [project.scripts]
 piperch = "piperch.cli:main"
@@ -31,7 +48,12 @@ test = [
     "respx>=0.22,<1",
 ]
 lint = ["pyright>=1.1.390,<2", "ruff>=0.9,<1"]
-dev = [{ include-group = "test" }, { include-group = "lint" }]
+dev = [
+    { include-group = "test" },
+    { include-group = "lint" },
+    "build>=1.6.1,<2",
+    "twine>=7,<8",
+]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/piperch"]

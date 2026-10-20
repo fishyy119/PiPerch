@@ -21,5 +21,8 @@ export default defineConfig({
     target: 'es2022',
     outDir: '../src/piperch/frontend',
     emptyOutDir: true,
+    license: {
+      fileName: 'THIRD_PARTY_LICENSES.md',
+    },
   },
 })
