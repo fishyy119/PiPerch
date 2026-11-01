@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { cn } from '@ui/cn'
+
 withDefaults(
   defineProps<{
     title: string
@@ -16,13 +18,15 @@ withDefaults(
     data-setting-item
     :data-disabled="disabled || undefined"
     :data-layout="layout"
-    :class="[
-      'py-5',
-      layout === 'compact'
-        ? 'grid grid-cols-[minmax(12rem,0.8fr)_minmax(0,1.2fr)] items-center gap-8'
-        : 'space-y-4',
-      disabled ? 'opacity-50' : '',
-    ]"
+    :class="
+      cn(
+        'py-5',
+        layout === 'compact'
+          ? 'grid grid-cols-[minmax(12rem,0.8fr)_minmax(0,1.2fr)] items-center gap-8'
+          : 'space-y-4',
+        disabled ? 'opacity-50' : '',
+      )
+    "
   >
     <div class="min-w-0">
       <div class="flex flex-wrap items-center gap-2">

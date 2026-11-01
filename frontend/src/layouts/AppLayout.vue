@@ -4,6 +4,7 @@ import { computed, ref } from 'vue'
 import { RouterLink, RouterView, useRoute } from 'vue-router'
 
 import { useAppEvents } from '@/app/useAppEvents'
+import { cn } from '@ui/cn'
 
 useAppEvents()
 
@@ -30,12 +31,14 @@ const navigation = [
       @click="mobileOpen = false"
     />
     <aside
-      :class="[
-        'fixed inset-y-0 left-0 z-40 w-60 -translate-x-full lg:sticky lg:top-0 lg:h-screen lg:translate-x-0',
-        'flex flex-col transition',
-        'border-r border-sidebar-border bg-sidebar text-sidebar-foreground',
-        mobileOpen ? 'translate-x-0' : '',
-      ]"
+      :class="
+        cn(
+          'fixed inset-y-0 left-0 z-40 w-60 -translate-x-full lg:sticky lg:top-0 lg:h-screen lg:translate-x-0',
+          'flex flex-col transition',
+          'border-r border-sidebar-border bg-sidebar text-sidebar-foreground',
+          mobileOpen ? 'translate-x-0' : '',
+        )
+      "
     >
       <div class="flex h-16 items-center justify-between border-b px-5">
         <RouterLink to="/gallery" class="flex items-center gap-3" @click="mobileOpen = false">

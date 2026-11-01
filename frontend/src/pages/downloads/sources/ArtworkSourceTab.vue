@@ -4,8 +4,8 @@ import { computed, ref } from 'vue'
 
 import DiscoverySourceLayout from '@/pages/downloads/DiscoverySourceLayout.vue'
 import { errorMessage } from '@/shared/errors'
-import Button from '@ui/Button.vue'
-import Textarea from '@ui/Textarea.vue'
+import { Button } from '@ui/button'
+import { Textarea } from '@ui/textarea'
 
 import { useDiscoveryPagination } from './useDiscoveryPagination'
 

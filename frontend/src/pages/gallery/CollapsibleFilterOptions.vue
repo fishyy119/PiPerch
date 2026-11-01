@@ -2,6 +2,8 @@
 import { ChevronDown, ChevronUp } from '@lucide/vue'
 import { nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 
+import { cn } from '@ui/cn'
+
 const TWO_ROWS_HEIGHT_PX = 72
 
 const content = ref<HTMLElement>()
@@ -34,14 +36,16 @@ onBeforeUnmount(() => resizeObserver?.disconnect())
     <button
       v-if="overflowing"
       type="button"
-      :class="[
-        'group absolute inset-x-0 bottom-0 z-10 flex cursor-pointer items-end justify-center pb-1',
-        'border-0 text-xs font-medium text-primary',
-        'focus-visible:outline-2 focus-visible:outline-offset-2',
-        expanded
-          ? 'h-9 bg-linear-to-b from-transparent via-popover/85 to-popover'
-          : 'h-10 bg-linear-to-b from-transparent via-popover/85 to-popover backdrop-blur-[1.5px]',
-      ]"
+      :class="
+        cn(
+          'group absolute inset-x-0 bottom-0 z-10 flex cursor-pointer items-end justify-center pb-1',
+          'border-0 text-xs font-medium text-primary',
+          'focus-visible:outline-2 focus-visible:outline-offset-2',
+          expanded
+            ? 'h-9 bg-linear-to-b from-transparent via-popover/85 to-popover'
+            : 'h-10 bg-linear-to-b from-transparent via-popover/85 to-popover backdrop-blur-[1.5px]',
+        )
+      "
       @click="expanded = !expanded"
     >
       <span

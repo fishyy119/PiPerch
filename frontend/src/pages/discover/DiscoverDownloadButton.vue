@@ -4,7 +4,8 @@ import { Download, LoaderCircle } from '@lucide/vue'
 import { useDownloadSelection } from '@/features/downloads/download-selection'
 import { useDownloadSubmissionStore } from '@/features/downloads/download-submission'
 import { errorMessage } from '@/shared/errors'
-import Button from '@ui/Button.vue'
+import { Button } from '@ui/button'
+import { cn } from '@ui/cn'
 import { toast } from '@ui/toast'
 
 const selection = useDownloadSelection()
@@ -50,11 +51,13 @@ async function submitSelection() {
       <LoaderCircle v-if="submission.isPending" class="animate-spin" :size="23" />
       <Download v-else :size="23" />
       <span
-        :class="[
-          'absolute -right-1 -bottom-1 grid min-h-5 min-w-5 place-items-center rounded-full px-1',
-          'bg-background text-[0.6875rem] leading-none font-semibold text-primary tabular-nums',
-          'shadow-sm ring-2 ring-background',
-        ]"
+        :class="
+          cn(
+            'absolute -right-1 -bottom-1 grid min-h-5 min-w-5 place-items-center rounded-full px-1',
+            'bg-background text-[0.6875rem] leading-none font-semibold text-primary tabular-nums',
+            'shadow-sm ring-2 ring-background',
+          )
+        "
       >
         {{ selection.selectedIds.length }}
       </span>

@@ -14,9 +14,10 @@ import {
 import { useDownloadSelection } from '@/features/downloads/download-selection'
 import { useDownloadSubmissionStore } from '@/features/downloads/download-submission'
 import { errorMessage } from '@/shared/errors'
-import Button from '@ui/Button.vue'
-import Card from '@ui/Card.vue'
-import Dialog from '@ui/Dialog.vue'
+import { Button } from '@ui/button'
+import { Card } from '@ui/card'
+import { cn } from '@ui/cn'
+import { Dialog } from '@ui/dialog'
 
 const props = defineProps<{ sourceLabel: string }>()
 const queryClient = useQueryClient()
@@ -224,11 +225,13 @@ async function submitSelection() {
             </template>
             <button
               type="button"
-              :class="[
-                'absolute top-1 right-1 inline-flex size-6 cursor-pointer items-center justify-center rounded-full',
-                'bg-background/85 text-foreground shadow-sm backdrop-blur-sm transition',
-                'hover:bg-destructive hover:text-destructive-foreground',
-              ]"
+              :class="
+                cn(
+                  'absolute top-1 right-1 inline-flex size-6 cursor-pointer items-center justify-center rounded-full',
+                  'bg-background/85 text-foreground shadow-sm backdrop-blur-sm transition',
+                  'hover:bg-destructive hover:text-destructive-foreground',
+                )
+              "
               :title="`从队列移除作品 ${String(entry.artworkId)}`"
               @click="selection.removeIds([entry.artworkId])"
             >

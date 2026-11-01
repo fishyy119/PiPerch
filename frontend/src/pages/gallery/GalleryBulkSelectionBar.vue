@@ -13,9 +13,9 @@ import {
 } from '@/features/library/library-query-cache'
 import BulkGroupsDialog from '@/pages/gallery/BulkGroupsDialog.vue'
 import { errorMessage } from '@/shared/errors'
-import Button from '@ui/Button.vue'
-import Card from '@ui/Card.vue'
-import ConfirmDialog from '@ui/ConfirmDialog.vue'
+import { Button } from '@ui/button'
+import { Card } from '@ui/card'
+import { ConfirmDialog } from '@ui/confirm-dialog'
 import { toast } from '@ui/toast'
 
 const props = defineProps<{

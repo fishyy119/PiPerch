@@ -15,8 +15,8 @@ import {
 } from '@/features/library/library-query-cache'
 import CreateGroupDialog from '@/shared/components/groups/CreateGroupDialog.vue'
 import { errorMessage } from '@/shared/errors'
-import ConfirmDialog from '@ui/ConfirmDialog.vue'
-import ContextMenu, { type ContextMenuOption } from '@ui/ContextMenu.vue'
+import { ConfirmDialog } from '@ui/confirm-dialog'
+import { ContextMenu, type ContextMenuOption } from '@ui/context-menu'
 import { toast } from '@ui/toast'
 
 const props = defineProps<{ artwork: ArtworkSummary }>()

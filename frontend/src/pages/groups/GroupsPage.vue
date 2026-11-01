@@ -22,11 +22,11 @@ import {
   invalidateArtworkGroupData,
 } from '@/features/library/library-query-cache'
 import { errorMessage } from '@/shared/errors'
-import Button from '@ui/Button.vue'
-import Card from '@ui/Card.vue'
-import ConfirmDialog from '@ui/ConfirmDialog.vue'
-import Dialog from '@ui/Dialog.vue'
-import Input from '@ui/Input.vue'
+import { Button } from '@ui/button'
+import { Card } from '@ui/card'
+import { ConfirmDialog } from '@ui/confirm-dialog'
+import { Dialog } from '@ui/dialog'
+import { Input } from '@ui/input'
 import { toast } from '@ui/toast'
 
 const router = useRouter()

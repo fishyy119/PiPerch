@@ -2,6 +2,7 @@
 import { settingsSections } from '@/features/settings/settings-sections'
 import { useSettingsLoadFeedback } from '@/features/settings/useSettingField'
 import { useSettingsNavigation } from '@/features/settings/useSettingsNavigation'
+import { cn } from '@ui/cn'
 
 import DownloadSettingsSection from './sections/DownloadSettingsSection.vue'
 import PixivSettingsSection from './sections/PixivSettingsSection.vue'
@@ -21,12 +22,14 @@ useSettingsLoadFeedback()
           v-for="section in settingsSections"
           :key="section.id"
           type="button"
-          :class="[
-            'flex cursor-pointer items-center gap-2.5 rounded-xl px-3 py-2.5 text-left text-sm transition',
-            activeSection === section.id
-              ? 'bg-sidebar-accent text-sidebar-accent-foreground'
-              : 'text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
-          ]"
+          :class="
+            cn(
+              'flex cursor-pointer items-center gap-2.5 rounded-xl px-3 py-2.5 text-left text-sm transition',
+              activeSection === section.id
+                ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+                : 'text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
+            )
+          "
           @click="scrollToSection(section.id)"
         >
           <component :is="section.icon" :size="17" />

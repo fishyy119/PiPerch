@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
 
-import Button from '@ui/Button.vue'
-import Dialog from '@ui/Dialog.vue'
-import Input from '@ui/Input.vue'
+import { Button } from '@ui/button'
+import { Dialog } from '@ui/dialog'
+import { Input } from '@ui/input'
 
 const props = withDefaults(
   defineProps<{

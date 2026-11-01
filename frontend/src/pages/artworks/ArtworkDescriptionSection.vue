@@ -4,7 +4,8 @@ import { useRouter } from 'vue-router'
 import { artworkTypeLabel } from '@/features/artworks/artwork'
 import type { ArtworkDetail } from '@/features/artworks/artworks-api'
 import SafeDescription from '@/pages/artworks/SafeDescription.vue'
-import Card from '@ui/Card.vue'
+import { Card } from '@ui/card'
+import { cn } from '@ui/cn'
 
 defineProps<{ artwork: ArtworkDetail }>()
 const router = useRouter()
@@ -54,11 +55,13 @@ function filterByTag(tagId: number) {
           v-for="tag in artwork.tags"
           :key="tag.tagId"
           type="button"
-          :class="[
-            'inline-flex cursor-pointer items-center gap-[0.35rem] rounded-full',
-            'bg-secondary px-[0.7rem] py-[0.35rem] text-xs text-secondary-foreground',
-            'transition-colors hover:bg-accent hover:text-accent-foreground',
-          ]"
+          :class="
+            cn(
+              'inline-flex cursor-pointer items-center gap-[0.35rem] rounded-full',
+              'bg-secondary px-[0.7rem] py-[0.35rem] text-xs text-secondary-foreground',
+              'transition-colors hover:bg-accent hover:text-accent-foreground',
+            )
+          "
           @click="filterByTag(tag.tagId)"
         >
           <span>{{ tag.name }}</span>

@@ -7,5 +7,6 @@ export default {
   singleQuote: true,
   trailingComma: 'all',
   tailwindStylesheet: './src/styles.css',
+  tailwindFunctions: ['cn', 'cva'],
   plugins: ['prettier-plugin-tailwindcss'],
 }

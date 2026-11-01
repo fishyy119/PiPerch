@@ -26,10 +26,10 @@ import TopbarActions from '@/pages/gallery/TopbarActions.vue'
 import { firstQueryValue } from '@/shared/lib/route-query'
 import { useMarqueeSelection } from '@/shared/lib/useMarqueeSelection'
 import { usePageKeyboardShortcuts } from '@/shared/lib/usePageKeyboardShortcuts'
-import Button from '@ui/Button.vue'
-import Card from '@ui/Card.vue'
-import FilterButton from '@ui/FilterButton.vue'
-import SearchInput from '@ui/SearchInput.vue'
+import { Button } from '@ui/button'
+import { Card } from '@ui/card'
+import { FilterButton } from '@ui/filter-button'
+import { SearchInput } from '@ui/search-input'
 
 const route = useRoute()
 const router = useRouter()

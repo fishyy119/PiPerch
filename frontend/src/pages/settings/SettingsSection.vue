@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { Component } from 'vue'
 
-import Card from '@ui/Card.vue'
+import { Card } from '@ui/card'
 
 defineProps<{
   sectionId: string

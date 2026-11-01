@@ -2,9 +2,9 @@
 import { Download } from '@lucide/vue'
 
 import { useSettingField } from '@/features/settings/useSettingField'
-import Input from '@ui/Input.vue'
-import NumberInput from '@ui/NumberInput.vue'
-import Slider from '@ui/Slider.vue'
+import { Input } from '@ui/input'
+import { NumberInput } from '@ui/number-input'
+import { Slider } from '@ui/slider'
 
 import SettingItem from '../SettingItem.vue'
 import SettingsSection from '../SettingsSection.vue'

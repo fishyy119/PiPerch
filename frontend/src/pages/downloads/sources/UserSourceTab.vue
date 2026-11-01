@@ -10,8 +10,8 @@ import { useLibraryMembershipStore } from '@/features/library/library-membership
 import DiscoverySourceLayout from '@/pages/downloads/DiscoverySourceLayout.vue'
 import FollowedUserSelector from '@/pages/downloads/FollowedUserSelector.vue'
 import { errorMessage } from '@/shared/errors'
-import Button from '@ui/Button.vue'
-import Input from '@ui/Input.vue'
+import { Button } from '@ui/button'
+import { Input } from '@ui/input'
 
 import { useDiscoveryPagination } from './useDiscoveryPagination'
 

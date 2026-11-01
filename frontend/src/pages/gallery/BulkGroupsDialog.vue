@@ -5,9 +5,9 @@ import { ref, watch } from 'vue'
 import { type ArtworkGroup, createGroup as createArtworkGroup } from '@/features/groups/groups-api'
 import CreateGroupDialog from '@/shared/components/groups/CreateGroupDialog.vue'
 import { errorMessage } from '@/shared/errors'
-import Button from '@ui/Button.vue'
-import Checkbox from '@ui/Checkbox.vue'
-import Dialog from '@ui/Dialog.vue'
+import { Button } from '@ui/button'
+import { Checkbox } from '@ui/checkbox'
+import { Dialog } from '@ui/dialog'
 import { toast } from '@ui/toast'
 
 const props = defineProps<{

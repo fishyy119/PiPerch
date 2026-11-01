@@ -7,7 +7,7 @@ import FollowUpdatesSourceTab from '@/pages/downloads/sources/FollowUpdatesSourc
 import SearchSourceTab from '@/pages/downloads/sources/SearchSourceTab.vue'
 import SeriesSourceTab from '@/pages/downloads/sources/SeriesSourceTab.vue'
 import UserSourceTab from '@/pages/downloads/sources/UserSourceTab.vue'
-import Tabs from '@ui/Tabs.vue'
+import { Tabs } from '@ui/tabs'
 
 type SourceType = 'artwork' | 'search' | 'user' | 'followUpdates' | 'bookmark' | 'series'
 

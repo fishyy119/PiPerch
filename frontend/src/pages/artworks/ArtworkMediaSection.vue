@@ -29,12 +29,12 @@ import {
 import CreateGroupDialog from '@/shared/components/groups/CreateGroupDialog.vue'
 import { errorMessage } from '@/shared/errors'
 import { usePageKeyboardShortcuts } from '@/shared/lib/usePageKeyboardShortcuts'
-import Button from '@ui/Button.vue'
-import Card from '@ui/Card.vue'
-import Checkbox from '@ui/Checkbox.vue'
-import ConfirmDialog from '@ui/ConfirmDialog.vue'
-import LightboxGallery, { type LightboxItem } from '@ui/LightboxGallery.vue'
-import Popover from '@ui/Popover.vue'
+import { Button } from '@ui/button'
+import { Card } from '@ui/card'
+import { Checkbox } from '@ui/checkbox'
+import { ConfirmDialog } from '@ui/confirm-dialog'
+import { LightboxGallery, type LightboxItem } from '@ui/lightbox-gallery'
+import { Popover } from '@ui/popover'
 
 const PAGE_SELECTOR_ITEM_SIZE_PX = 80
 const PAGE_SELECTOR_GAP_PX = 8

@@ -3,7 +3,8 @@ import { ImageOff, LoaderCircle } from '@lucide/vue'
 import { nextTick, ref, watch } from 'vue'
 
 import type { ArtworkPreviewUrlResolver } from '@/features/artworks/artwork-card'
-import HoverCard from '@ui/HoverCard.vue'
+import { cn } from '@ui/cn'
+import { HoverCard } from '@ui/hover-card'
 
 const props = defineProps<{
   title: string
@@ -103,27 +104,31 @@ function hidePreviewOnFocusOut(event: FocusEvent) {
   >
     <template #trigger>
       <div
-        :class="[
-          'absolute top-2 right-2 z-10',
-          'max-w-[calc(100%-2rem)]',
-          'grid grid-cols-[repeat(auto-fit,0.625rem)] justify-between gap-0.5 rounded-md p-1',
-          'bg-overlay/55 shadow-sm backdrop-blur-sm transition',
-          previewOpen
-            ? 'opacity-100'
-            : 'opacity-0 group-hover:opacity-100 focus-within:opacity-100',
-        ]"
+        :class="
+          cn(
+            'absolute top-2 right-2 z-10',
+            'max-w-[calc(100%-2rem)]',
+            'grid grid-cols-[repeat(auto-fit,0.625rem)] justify-between gap-0.5 rounded-md p-1',
+            'bg-overlay/55 shadow-sm backdrop-blur-sm transition',
+            previewOpen
+              ? 'opacity-100'
+              : 'opacity-0 group-hover:opacity-100 focus-within:opacity-100',
+          )
+        "
         @focusout="hidePreviewOnFocusOut"
       >
         <button
           v-for="page in pageCount"
           :key="page"
           type="button"
-          :class="[
-            'size-2.5 rounded-full',
-            'bg-overlay-foreground/70 ring-1 ring-overlay/20 transition',
-            'hover:scale-125 hover:bg-primary focus-visible:scale-125 focus-visible:bg-primary',
-            { 'bg-primary!': previewOpen && previewPage === page - 1 },
-          ]"
+          :class="
+            cn(
+              'size-2.5 rounded-full',
+              'bg-overlay-foreground/70 ring-1 ring-overlay/20 transition',
+              'hover:scale-125 hover:bg-primary focus-visible:scale-125 focus-visible:bg-primary',
+              { 'bg-primary!': previewOpen && previewPage === page - 1 },
+            )
+          "
           @pointerenter="showPreviewFromPoint(page - 1)"
           @focus="showPreviewFromPoint(page - 1)"
           @click.prevent.stop
@@ -135,13 +140,15 @@ function hidePreviewOnFocusOut(event: FocusEvent) {
       <img
         v-if="previewUrl && !previewImageFailed"
         :key="previewUrl"
-        :class="[
-          'block h-auto w-auto',
-          'max-h-[min(720px,calc(var(--reka-hover-card-content-available-height)-0.5rem-2px))]',
-          'max-w-[min(600px,max(320px,42vw),calc(var(--reka-hover-card-content-available-width)-0.5rem-2px))]',
-          'rounded-lg object-contain transition-opacity',
-          previewImageLoaded ? 'opacity-100' : 'opacity-0',
-        ]"
+        :class="
+          cn(
+            'block h-auto w-auto',
+            'max-h-[min(720px,calc(var(--reka-hover-card-content-available-height)-0.5rem-2px))]',
+            'max-w-[min(600px,max(320px,42vw),calc(var(--reka-hover-card-content-available-width)-0.5rem-2px))]',
+            'rounded-lg object-contain transition-opacity',
+            previewImageLoaded ? 'opacity-100' : 'opacity-0',
+          )
+        "
         :src="previewUrl"
         :alt="`${title} 第 ${String(previewPage + 1)} 页快速预览`"
         @load="previewImageLoaded = true"

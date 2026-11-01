@@ -6,7 +6,7 @@ import type { DiscoveryItem, RecommendedUser } from '@/features/discovery/discov
 import AuthorFollowButton from '@/shared/components/authors/AuthorFollowButton.vue'
 import AuthorIdButton from '@/shared/components/authors/AuthorIdButton.vue'
 import DiscoveryArtworkCard from '@/shared/components/discovery/DiscoveryArtworkCard.vue'
-import Card from '@ui/Card.vue'
+import { Card } from '@ui/card'
 
 defineProps<{
   author: RecommendedUser

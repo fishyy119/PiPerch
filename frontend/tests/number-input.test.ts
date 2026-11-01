@@ -1,7 +1,7 @@
 import userEvent from '@testing-library/user-event'
 import { render, screen } from '@testing-library/vue'
 
-import NumberInput from '@ui/NumberInput.vue'
+import { NumberInput } from '@ui/number-input'
 
 describe('NumberInput', () => {
   it('失焦时提交范围内的数字', async () => {

@@ -6,10 +6,10 @@ import { RouterLink } from 'vue-router'
 import { usePreference } from '@/app/usePreference'
 import { listRelatedArtworks } from '@/features/artworks/artworks-api'
 import { artworkQueryKeys } from '@/features/library/library-query-cache'
-import Card from '@ui/Card.vue'
-import SettingsPopover from '@ui/SettingsPopover.vue'
-import Slider from '@ui/Slider.vue'
-import SmartCropImage from '@ui/SmartCropImage.vue'
+import { Card } from '@ui/card'
+import { SettingsPopover } from '@ui/settings-popover'
+import { Slider } from '@ui/slider'
+import { SmartCropImage } from '@ui/smart-crop-image'
 
 const props = defineProps<{ artworkId: number }>()
 

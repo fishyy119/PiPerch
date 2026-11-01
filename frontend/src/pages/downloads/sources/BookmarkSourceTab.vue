@@ -14,7 +14,7 @@ import { useLibraryMembershipStore } from '@/features/library/library-membership
 import BookmarkFolderSelector from '@/pages/downloads/BookmarkFolderSelector.vue'
 import DiscoverySourceLayout from '@/pages/downloads/DiscoverySourceLayout.vue'
 import { errorMessage } from '@/shared/errors'
-import Button from '@ui/Button.vue'
+import { Button } from '@ui/button'
 
 interface LoadedBookmarkSelection {
   key: string

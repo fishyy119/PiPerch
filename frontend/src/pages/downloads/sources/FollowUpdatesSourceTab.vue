@@ -7,7 +7,7 @@ import { discover } from '@/features/discovery/discovery-api'
 import { useDownloadSelection } from '@/features/downloads/download-selection'
 import DiscoverySourceLayout from '@/pages/downloads/DiscoverySourceLayout.vue'
 import { errorMessage } from '@/shared/errors'
-import Button from '@ui/Button.vue'
+import { Button } from '@ui/button'
 
 const selection = useDownloadSelection()
 const page = ref(0)

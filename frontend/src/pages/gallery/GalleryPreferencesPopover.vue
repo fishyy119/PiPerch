@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { usePreference } from '@/app/usePreference'
-import Select from '@ui/Select.vue'
-import SettingsPopover from '@ui/SettingsPopover.vue'
-import Slider from '@ui/Slider.vue'
-import Switch from '@ui/Switch.vue'
+import { Select } from '@ui/select'
+import { SettingsPopover } from '@ui/settings-popover'
+import { Slider } from '@ui/slider'
+import { Switch } from '@ui/switch'
 
 const cardWidth = usePreference('gallery.cardWidth')
 const pageSize = usePreference('gallery.pageSize')

@@ -10,7 +10,8 @@ import { getUserProfile, type UserProfile, userProfileKey } from '@/features/aut
 import AuthorFollowButton from '@/shared/components/authors/AuthorFollowButton.vue'
 import AuthorIdButton from '@/shared/components/authors/AuthorIdButton.vue'
 import { writeToClipboard } from '@/shared/lib/clipboard'
-import Card from '@ui/Card.vue'
+import { Card } from '@ui/card'
+import { cn } from '@ui/cn'
 
 const props = defineProps<{ artwork: ArtworkDetail }>()
 
@@ -82,11 +83,13 @@ function formatDate(value: string | null) {
       </div>
       <button
         type="button"
-        :class="[
-          'group mt-3 flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left',
-          'cursor-pointer transition',
-          'focus-visible:bg-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
-        ]"
+        :class="
+          cn(
+            'group mt-3 flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left',
+            'cursor-pointer transition',
+            'focus-visible:bg-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
+          )
+        "
         @click="filterAuthor"
       >
         <span

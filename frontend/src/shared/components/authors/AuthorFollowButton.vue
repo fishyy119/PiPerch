@@ -4,7 +4,7 @@ import { useMutation } from '@tanstack/vue-query'
 
 import { followUser, unfollowUser } from '@/features/authors/author-api'
 import { errorMessage } from '@/shared/errors'
-import Button from '@ui/Button.vue'
+import { Button } from '@ui/button'
 import { toast } from '@ui/toast'
 
 interface FollowChange {

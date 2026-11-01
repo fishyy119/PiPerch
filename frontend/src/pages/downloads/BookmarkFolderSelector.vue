@@ -2,6 +2,7 @@
 import { Check, LockKeyhole } from '@lucide/vue'
 
 import type { BookmarkFolder, BookmarkFolderReference } from '@/features/discovery/discovery-api'
+import { cn } from '@ui/cn'
 
 const props = defineProps<{
   folders: readonly BookmarkFolder[]
@@ -48,11 +49,13 @@ function toggleFolder(folder: BookmarkFolder) {
       v-for="folder in folders"
       :key="folderKey(folder)"
       type="button"
-      :class="[
-        'flex min-w-0 cursor-pointer items-center gap-2.5 rounded-xl border p-3 text-left transition',
-        'hover:border-primary/50 hover:bg-accent',
-        isSelected(folder) ? 'border-primary bg-accent ring-1 ring-primary' : '',
-      ]"
+      :class="
+        cn(
+          'flex min-w-0 cursor-pointer items-center gap-2.5 rounded-xl border p-3 text-left transition',
+          'hover:border-primary/50 hover:bg-accent',
+          isSelected(folder) ? 'border-primary bg-accent ring-1 ring-primary' : '',
+        )
+      "
       :title="`${folder.visibility === 'public' ? '公开收藏' : '非公开收藏'} / ${folder.name}`"
       @click="toggleFolder(folder)"
     >

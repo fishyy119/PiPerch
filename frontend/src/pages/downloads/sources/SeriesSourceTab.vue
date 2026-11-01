@@ -4,8 +4,8 @@ import { ref } from 'vue'
 
 import DiscoverySourceLayout from '@/pages/downloads/DiscoverySourceLayout.vue'
 import { errorMessage } from '@/shared/errors'
-import Button from '@ui/Button.vue'
-import Input from '@ui/Input.vue'
+import { Button } from '@ui/button'
+import { Input } from '@ui/input'
 
 import { useDiscoveryPagination } from './useDiscoveryPagination'
 

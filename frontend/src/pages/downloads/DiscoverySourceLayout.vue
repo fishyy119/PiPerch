@@ -7,10 +7,10 @@ import type { DiscoveryItem } from '@/features/discovery/discovery-api'
 import { useDownloadSelection } from '@/features/downloads/download-selection'
 import { useLibraryMembershipStore } from '@/features/library/library-membership'
 import DiscoveryCandidateResults from '@/pages/downloads/DiscoveryCandidateResults.vue'
-import Button from '@ui/Button.vue'
-import Card from '@ui/Card.vue'
-import SettingsPopover from '@ui/SettingsPopover.vue'
-import Slider from '@ui/Slider.vue'
+import { Button } from '@ui/button'
+import { Card } from '@ui/card'
+import { SettingsPopover } from '@ui/settings-popover'
+import { Slider } from '@ui/slider'
 
 const props = defineProps<{
   candidates: readonly DiscoveryItem[]

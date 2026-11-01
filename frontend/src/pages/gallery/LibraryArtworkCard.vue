@@ -14,7 +14,8 @@ import { invalidateArtworkData } from '@/features/library/library-query-cache'
 import LibraryArtworkContextMenu from '@/pages/gallery/LibraryArtworkContextMenu.vue'
 import ArtworkCard from '@/shared/components/artworks/ArtworkCard.vue'
 import { errorMessage } from '@/shared/errors'
-import Checkbox from '@ui/Checkbox.vue'
+import { Checkbox } from '@ui/checkbox'
+import { cn } from '@ui/cn'
 import { toast } from '@ui/toast'
 
 const props = defineProps<{
@@ -94,10 +95,12 @@ function handleCardDragStart(event: DragEvent) {
       <template v-if="selection.enabled || showFavoriteIndicator" #leading-action>
         <Checkbox
           v-if="selection.enabled"
-          :class="[
-            'absolute top-2 left-2 z-10 size-5',
-            'border-overlay-foreground/80 bg-overlay/55 shadow-sm backdrop-blur-sm transition',
-          ]"
+          :class="
+            cn(
+              'absolute top-2 left-2 z-10 size-5',
+              'border-overlay-foreground/80 bg-overlay/55 shadow-sm backdrop-blur-sm transition',
+            )
+          "
           :model-value="selection.isSelected(artwork.artworkId)"
           @click.stop
           @update:model-value="selection.toggleArtwork(artwork.artworkId)"
@@ -105,12 +108,14 @@ function handleCardDragStart(event: DragEvent) {
         <button
           type="button"
           data-artwork-card-favorite
-          :class="[
-            'absolute bottom-2 left-2 z-10 grid size-8 cursor-pointer place-items-center',
-            'drop-shadow-sm transition hover:scale-110 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
-            'disabled:cursor-wait disabled:opacity-60',
-            artwork.isFavorite ? 'text-foreground' : 'text-foreground/60 hover:text-foreground',
-          ]"
+          :class="
+            cn(
+              'absolute bottom-2 left-2 z-10 grid size-8 cursor-pointer place-items-center',
+              'drop-shadow-sm transition hover:scale-110 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
+              'disabled:cursor-wait disabled:opacity-60',
+              artwork.isFavorite ? 'text-foreground' : 'text-foreground/60 hover:text-foreground',
+            )
+          "
           :title="artwork.isFavorite ? '取消收藏' : '收藏'"
           :disabled="favoriteMutation.isPending.value"
           @click.prevent.stop="favoriteMutation.mutate()"
@@ -125,11 +130,13 @@ function handleCardDragStart(event: DragEvent) {
       <template #author="{ selected }">
         <button
           type="button"
-          :class="[
-            'block max-w-full cursor-pointer truncate text-left text-xs transition-colors',
-            selected ? 'text-primary-foreground' : 'text-muted-foreground hover:text-primary',
-            showTitle ? 'mt-0.5' : '',
-          ]"
+          :class="
+            cn(
+              'block max-w-full cursor-pointer truncate text-left text-xs transition-colors',
+              selected ? 'text-primary-foreground' : 'text-muted-foreground hover:text-primary',
+              showTitle ? 'mt-0.5' : '',
+            )
+          "
           @click="updateFilters({ authorId: artwork.authorId })"
         >
           {{ artwork.authorName }}

@@ -7,9 +7,9 @@ import { useGalleryFilterOptions } from '@/features/gallery/useGalleryFilterOpti
 import CollapsibleFilterOptions from '@/pages/gallery/CollapsibleFilterOptions.vue'
 import FilterMatchToggle from '@/pages/gallery/FilterMatchToggle.vue'
 import FilterOptionButton from '@/pages/gallery/FilterOptionButton.vue'
-import Button from '@ui/Button.vue'
-import Dialog from '@ui/Dialog.vue'
-import SearchInput from '@ui/SearchInput.vue'
+import { Button } from '@ui/button'
+import { Dialog } from '@ui/dialog'
+import { SearchInput } from '@ui/search-input'
 
 const open = defineModel<boolean>('open', { required: true })
 const { filters, update: updateFilters } = useGalleryFilters()
