@@ -101,7 +101,7 @@ function hidePreviewOnFocusOut(event: FocusEvent) {
     :open-delay="0"
     :close-delay="75"
     :side-offset="12"
-    content-class="relative overflow-hidden p-1"
+    content-class="overflow-hidden"
   >
     <template #trigger>
       <div
@@ -137,39 +137,41 @@ function hidePreviewOnFocusOut(event: FocusEvent) {
       </div>
     </template>
 
-    <div class="relative grid min-h-40 min-w-72 place-items-center rounded-lg bg-muted">
-      <img
-        v-if="previewUrl && !previewImageFailed"
-        :key="previewUrl"
-        :class="
-          cn(
-            'block h-auto w-auto',
-            'max-h-[min(720px,calc(var(--reka-hover-card-content-available-height)-0.5rem-2px))]',
-            'max-w-[min(600px,max(320px,42vw),calc(var(--reka-hover-card-content-available-width)-0.5rem-2px))]',
-            'rounded-lg object-contain transition-opacity',
-            previewImageLoaded ? 'opacity-100' : 'opacity-0',
-          )
-        "
-        :src="previewUrl"
-        :alt="`${title} 第 ${String(previewPage + 1)} 页快速预览`"
-        @load="previewImageLoaded = true"
-        @error="previewImageFailed = true"
-      />
-      <LoaderCircle
-        v-if="previewLoading || (previewUrl && !previewImageLoaded && !previewImageFailed)"
-        class="absolute inset-0 m-auto animate-spin text-muted-foreground"
-        :size="28"
-      />
-      <ImageOff
-        v-else-if="!previewUrl || previewImageFailed"
-        class="absolute inset-0 m-auto text-muted-foreground"
-        :size="28"
-      />
+    <div class="relative p-1" @click.left.stop="previewOpen = false">
+      <div class="relative grid min-h-40 min-w-72 place-items-center rounded-lg bg-muted">
+        <img
+          v-if="previewUrl && !previewImageFailed"
+          :key="previewUrl"
+          :class="
+            cn(
+              'block h-auto w-auto',
+              'max-h-[min(720px,calc(var(--reka-hover-card-content-available-height)-0.5rem-2px))]',
+              'max-w-[min(600px,max(320px,42vw),calc(var(--reka-hover-card-content-available-width)-0.5rem-2px))]',
+              'rounded-lg object-contain transition-opacity',
+              previewImageLoaded ? 'opacity-100' : 'opacity-0',
+            )
+          "
+          :src="previewUrl"
+          :alt="`${title} 第 ${String(previewPage + 1)} 页快速预览`"
+          @load="previewImageLoaded = true"
+          @error="previewImageFailed = true"
+        />
+        <LoaderCircle
+          v-if="previewLoading || (previewUrl && !previewImageLoaded && !previewImageFailed)"
+          class="absolute inset-0 m-auto animate-spin text-muted-foreground"
+          :size="28"
+        />
+        <ImageOff
+          v-else-if="!previewUrl || previewImageFailed"
+          class="absolute inset-0 m-auto text-muted-foreground"
+          :size="28"
+        />
+      </div>
+      <span
+        class="absolute right-3 bottom-3 rounded-lg bg-overlay/65 px-2 py-1 text-xs text-overlay-foreground backdrop-blur-sm"
+      >
+        {{ previewPage + 1 }} / {{ pageCount }}
+      </span>
     </div>
-    <span
-      class="absolute right-3 bottom-3 rounded-lg bg-overlay/65 px-2 py-1 text-xs text-overlay-foreground backdrop-blur-sm"
-    >
-      {{ previewPage + 1 }} / {{ pageCount }}
-    </span>
   </HoverCard>
 </template>
