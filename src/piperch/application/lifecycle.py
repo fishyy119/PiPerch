@@ -83,7 +83,7 @@ async def lifespan(app: FastAPI, *, paths: AppPaths, control: AppControl) -> Asy
     )
     artwork_repository = ArtworkRepository(database)
     favorite_repository = FavoriteRepository(database)
-    favorite_sync_service = FavoriteSyncService(favorite_repository)
+    favorite_sync_service = FavoriteSyncService(favorite_repository, pixiv)
     group_repository = ArtworkGroupRepository(database)
     download_repository = DownloadRepository(database)
     events = AppEventBroker()

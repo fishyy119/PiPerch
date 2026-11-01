@@ -783,7 +783,7 @@ def test_favorite_update_keeps_local_state_when_pixiv_sync_fails(
     assert container.favorites.get_state(702).is_favorite is False
 
 
-def test_manual_favorite_sync_previews_before_updating_local_state(
+def test_manual_favorite_sync_preserves_missing_artworks_in_reviewed_changes(
     app_client: tuple[ApiTestClient, AppContainer],
     monkeypatch: MonkeyPatch,
 ) -> None:
@@ -808,7 +808,7 @@ def test_manual_favorite_sync_previews_before_updating_local_state(
         original_urls=("https://i.pximg.net/901.jpg",),
         thumbnail_url=None,
     )
-    for artwork_id in (901, 902, 903):
+    for artwork_id in (901, 902, 903, 904):
         current = replace(
             artwork,
             artwork_id=artwork_id,
@@ -821,6 +821,7 @@ def test_manual_favorite_sync_previews_before_updating_local_state(
         )
     container.favorites.replace_state(901, is_favorite=True)
     container.favorites.replace_state(902, is_favorite=True)
+    container.favorites.replace_state(904, is_favorite=True)
 
     async def list_bookmark_artwork_ids(
         folders: Sequence[BookmarkFolderReference],
@@ -835,6 +836,11 @@ def test_manual_favorite_sync_previews_before_updating_local_state(
 
     monkeypatch.setattr(container.pixiv, "list_bookmark_artwork_ids", list_bookmark_artwork_ids)
 
+    async def artwork_exists(artwork_id: int, cookie: str | None) -> bool:
+        return artwork_id != 904
+
+    monkeypatch.setattr(container.pixiv, "artwork_exists", artwork_exists)
+
     preview = client.post("/api/favorite-sync-plans")
 
     assert preview.status_code == 200
@@ -843,16 +849,18 @@ def test_manual_favorite_sync_previews_before_updating_local_state(
     assert isinstance(plan_id, str)
     assert preview_payload == {
         "pixivFavoriteCount": 3,
-        "localArtworkCount": 3,
-        "localFavoriteCount": 2,
+        "localArtworkCount": 4,
+        "localFavoriteCount": 3,
         "matchedFavoriteCount": 2,
         "unavailableLocallyCount": 1,
         "addCount": 1,
         "removeCount": 1,
+        "preservedFavoriteCount": 1,
     }
     assert container.favorites.get_state(901).is_favorite is True
     assert container.favorites.get_state(902).is_favorite is True
     assert container.favorites.get_state(903).is_favorite is False
+    assert container.favorites.get_state(904).is_favorite is True
 
     applied = client.post(f"/api/favorite-sync-plans/{plan_id}/apply")
 
@@ -861,4 +869,5 @@ def test_manual_favorite_sync_previews_before_updating_local_state(
     assert container.favorites.get_state(901).is_favorite is False
     assert container.favorites.get_state(902).is_favorite is True
     assert container.favorites.get_state(903).is_favorite is True
+    assert container.favorites.get_state(904).is_favorite is True
     assert client.post(f"/api/favorite-sync-plans/{plan_id}/apply").status_code == 409

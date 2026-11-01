@@ -15,6 +15,7 @@ from piperch.api.models import (
 )
 from piperch.application.container import AppContainer
 from piperch.domain.bookmarks import BookmarkFolderReference, BookmarkVisibility
+from piperch.errors import UpstreamError
 
 router = APIRouter(tags=["favorites"])
 
@@ -31,7 +32,7 @@ async def create_favorite_sync_plan(
         ],
         settings.pixiv_cookie,
     )
-    plan = await to_thread.run_sync(lambda: container.favorite_sync.create_plan(artwork_ids))
+    plan = await container.favorite_sync.create_plan(artwork_ids, settings.pixiv_cookie)
     diff = plan.diff
     return FavoriteSyncPlanResponse(
         plan_id=str(plan.plan_id),
@@ -42,6 +43,7 @@ async def create_favorite_sync_plan(
         unavailable_locally_count=diff.unavailable_locally_count,
         add_count=len(diff.add_artwork_ids),
         remove_count=len(diff.remove_artwork_ids),
+        preserved_favorite_count=diff.preserved_favorite_count,
     )
 
 
@@ -65,11 +67,17 @@ async def replace_favorite_state(
 ) -> FavoriteStateResponse:
     await to_thread.run_sync(container.favorites.get_state, artwork_id)
     settings = await to_thread.run_sync(container.settings.get)
-    await container.pixiv.sync_bookmark_state(
-        artwork_id,
-        request.is_favorite,
-        settings.pixiv_cookie,
-    )
+    pixiv_synced = True
+    try:
+        await container.pixiv.sync_bookmark_state(
+            artwork_id,
+            request.is_favorite,
+            settings.pixiv_cookie,
+        )
+    except UpstreamError as error:
+        if error.code != "pixiv_artwork_not_found":
+            raise
+        pixiv_synced = False
     state = await to_thread.run_sync(
         lambda: container.favorites.replace_state(
             artwork_id,
@@ -79,4 +87,5 @@ async def replace_favorite_state(
     return FavoriteStateResponse(
         artwork_id=state.artwork_id,
         is_favorite=state.is_favorite,
+        pixiv_synced=pixiv_synced,
     )

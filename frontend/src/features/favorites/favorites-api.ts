@@ -5,7 +5,9 @@ import { api } from '@/shared/api/http'
 const favoriteStateSchema = z.object({
   artworkId: z.number().int().positive(),
   isFavorite: z.boolean(),
+  pixivSynced: z.boolean(),
 })
+export type FavoriteState = z.infer<typeof favoriteStateSchema>
 
 const favoriteSyncPlanSchema = z.object({
   planId: z.string(),
@@ -16,6 +18,7 @@ const favoriteSyncPlanSchema = z.object({
   unavailableLocallyCount: z.number().int().nonnegative(),
   addCount: z.number().int().nonnegative(),
   removeCount: z.number().int().nonnegative(),
+  preservedFavoriteCount: z.number().int().nonnegative(),
 })
 export type FavoriteSyncPlan = z.infer<typeof favoriteSyncPlanSchema>
 

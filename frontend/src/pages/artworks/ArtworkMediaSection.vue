@@ -16,6 +16,7 @@ import { toast } from 'vue-sonner'
 
 import { artworkTypeLabel } from '@/features/artworks/artwork'
 import { type ArtworkDetail, deleteArtworks } from '@/features/artworks/artworks-api'
+import { notifyFavoriteUpdate } from '@/features/favorites/favorite-feedback'
 import { replaceFavoriteState } from '@/features/favorites/favorites-api'
 import { createGroupAndAddArtwork } from '@/features/groups/group-actions'
 import { listGroups, replaceArtworkGroups } from '@/features/groups/groups-api'
@@ -80,7 +81,7 @@ const favoriteMutation = useMutation({
       isFavorite: favoriteState.isFavorite,
     }))
     await invalidateArtworkData(queryClient)
-    toast.success(favoriteState.isFavorite ? '已收藏' : '已取消收藏')
+    notifyFavoriteUpdate(favoriteState)
   },
   onError: (error) => {
     toast.error('更新收藏失败', { description: errorMessage(error) })

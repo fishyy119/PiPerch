@@ -1,10 +1,12 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from threading import Lock
 from time import monotonic
 from typing import TYPE_CHECKING
 from uuid import UUID, uuid4
+
+from anyio import to_thread
 
 from piperch.errors import ConflictError
 
@@ -12,6 +14,7 @@ if TYPE_CHECKING:
     from collections.abc import Sequence
 
     from piperch.domain.favorites import FavoriteSyncDiff, FavoriteSyncResult
+    from piperch.pixiv import PixivClient
     from piperch.repositories import FavoriteRepository
 
 
@@ -22,17 +25,33 @@ class FavoriteSyncPlan:
 
 
 class FavoriteSyncService:
-    def __init__(self, favorites: FavoriteRepository, *, plan_ttl_seconds: int = 600) -> None:
+    def __init__(
+        self,
+        favorites: FavoriteRepository,
+        pixiv: PixivClient,
+        *,
+        plan_ttl_seconds: int = 600,
+    ) -> None:
         self._favorites = favorites
+        self._pixiv = pixiv
         self._plan_ttl_seconds = plan_ttl_seconds
         self._lock = Lock()
         self._active_plan: FavoriteSyncPlan | None = None
         self._expires_at = 0.0
 
-    def create_plan(self, remote_artwork_ids: Sequence[int]) -> FavoriteSyncPlan:
+    async def create_plan(self, remote_artwork_ids: Sequence[int], cookie: str | None) -> FavoriteSyncPlan:
+        diff = await to_thread.run_sync(lambda: self._favorites.compare_with_remote(remote_artwork_ids))
+        # 仅复核拟取消的本地收藏，保留 Pixiv 详情已返回 404 的作品。
+        removals = [
+            artwork_id for artwork_id in diff.remove_artwork_ids if await self._pixiv.artwork_exists(artwork_id, cookie)
+        ]
         plan = FavoriteSyncPlan(
             plan_id=uuid4(),
-            diff=self._favorites.compare_with_remote(remote_artwork_ids),
+            diff=replace(
+                diff,
+                remove_artwork_ids=tuple(removals),
+                preserved_favorite_count=len(diff.remove_artwork_ids) - len(removals),
+            ),
         )
         with self._lock:
             self._active_plan = plan

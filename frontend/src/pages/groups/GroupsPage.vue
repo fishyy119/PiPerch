@@ -142,7 +142,7 @@ async function applyFavoriteSync() {
           <h2 class="font-semibold">Pixiv 收藏同步</h2>
           <p class="mt-1 text-sm leading-6 text-muted-foreground">
             读取当前账号的公开与非公开收藏，与本地图库比较。确认差异后只更新本地收藏标记，不修改
-            Pixiv 收藏或本地分组。
+            Pixiv 收藏或本地分组。Pixiv 中已不存在的作品会保留本地收藏。
           </p>
         </div>
         <div class="flex flex-wrap gap-2">
@@ -286,6 +286,10 @@ async function applyFavoriteSync() {
           </dd>
         </div>
       </dl>
+      <p v-if="favoriteSyncPlan.preservedFavoriteCount" class="mt-4 text-sm text-muted-foreground">
+        另有 {{ favoriteSyncPlan.preservedFavoriteCount }}
+        件作品在 Pixiv 中已不存在，将保留本地收藏。
+      </p>
       <p class="mt-4 text-sm text-muted-foreground">
         本地图库共 {{ favoriteSyncPlan.localArtworkCount }} 件作品。同步摘要有效期为 10
         分钟；过期后需重新检查。

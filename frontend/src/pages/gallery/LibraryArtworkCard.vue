@@ -6,6 +6,7 @@ import { computed, ref } from 'vue'
 import { usePreference } from '@/app/usePreference'
 import { type ArtworkCardTarget, localArtworkPreviewUrl } from '@/features/artworks/artwork-card'
 import type { ArtworkSummary } from '@/features/artworks/artworks-api'
+import { notifyFavoriteUpdate } from '@/features/favorites/favorite-feedback'
 import { replaceFavoriteState } from '@/features/favorites/favorites-api'
 import { useGalleryFilters } from '@/features/gallery/gallery-filter'
 import { galleryNavigationRouteState } from '@/features/gallery/gallery-navigation'
@@ -42,7 +43,7 @@ const favoriteMutation = useMutation({
   mutationFn: () => replaceFavoriteState(props.artwork.artworkId, !props.artwork.isFavorite),
   onSuccess: async (favoriteState) => {
     await invalidateArtworkData(queryClient)
-    toast.success(favoriteState.isFavorite ? '已收藏' : '已取消收藏')
+    notifyFavoriteUpdate(favoriteState)
   },
   onError: (error) => {
     toast.error('更新收藏失败', { description: errorMessage(error) })

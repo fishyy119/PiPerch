@@ -18,6 +18,7 @@ class FavoriteSyncDiff:
     unavailable_locally_count: int
     add_artwork_ids: tuple[int, ...]
     remove_artwork_ids: tuple[int, ...]
+    preserved_favorite_count: int = 0
 
 
 @dataclass(frozen=True, slots=True)

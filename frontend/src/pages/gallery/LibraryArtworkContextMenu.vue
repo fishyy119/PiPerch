@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/vue-query'
 import { computed, ref, watch } from 'vue'
 
 import { type ArtworkSummary, deleteArtworks } from '@/features/artworks/artworks-api'
+import { notifyFavoriteUpdate } from '@/features/favorites/favorite-feedback'
 import { replaceFavoriteState } from '@/features/favorites/favorites-api'
 import { useGallerySelectionStore } from '@/features/gallery/gallery-selection'
 import { createGroupAndAddArtwork } from '@/features/groups/group-actions'
@@ -98,9 +99,12 @@ async function toggleFavorite() {
   if (actionPending.value) return
   actionPending.value = true
   try {
-    await replaceFavoriteState(props.artwork.artworkId, !props.artwork.isFavorite)
+    const favoriteState = await replaceFavoriteState(
+      props.artwork.artworkId,
+      !props.artwork.isFavorite,
+    )
     await invalidateArtworkData(queryClient)
-    toast.success('收藏已更新并同步到 Pixiv')
+    notifyFavoriteUpdate(favoriteState)
   } catch (error) {
     toast.error('更新收藏失败', { description: errorMessage(error) })
   } finally {

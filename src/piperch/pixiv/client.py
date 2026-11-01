@@ -644,6 +644,25 @@ class PixivClient:
                 "未能在 Pixiv 公开收藏中找到该作品的收藏标签。",
             )
 
+    async def artwork_exists(self, artwork_id: int, cookie: str | None) -> bool:
+        """仅将作品详情的 404 视为不存在，其他错误继续交由调用方处理。"""
+        try:
+            await self._artwork_body(artwork_id, cookie)
+        except UpstreamError as error:
+            if error.code != "pixiv_artwork_not_found":
+                raise
+            return False
+        return True
+
+    async def _artwork_body(self, artwork_id: int, cookie: str | None) -> Mapping[str, object]:
+        try:
+            return _mapping(await self._transport.get_body(f"/ajax/illust/{artwork_id}", cookie=cookie))
+        except UpstreamError as error:
+            # 仅作品详情不存在时允许调用方降级，收藏写接口的 404 仍应作为失败处理。
+            if error.code == "pixiv_http_error" and error.status_code == 404:
+                raise UpstreamError("pixiv_artwork_not_found", "Pixiv 中已找不到该作品。", 404) from error
+            raise
+
     async def sync_bookmark_state(
         self,
         artwork_id: int,
@@ -652,7 +671,7 @@ class PixivClient:
     ) -> None:
         """将一件作品的本地收藏状态收敛到 Pixiv，不同步收藏标签。"""
         self._require_current_user_id(cookie)
-        body = _mapping(await self._transport.get_body(f"/ajax/illust/{artwork_id}", cookie=cookie))
+        body = await self._artwork_body(artwork_id, cookie)
         reference = self._bookmark_reference(body.get("bookmarkData"))
 
         if not is_favorite:
