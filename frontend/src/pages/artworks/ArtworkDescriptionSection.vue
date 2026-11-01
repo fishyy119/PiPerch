@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { artworkTypeLabel } from '@/features/artworks/artwork'
 import type { ArtworkDetail } from '@/features/artworks/artworks-api'
 import SafeDescription from '@/pages/artworks/SafeDescription.vue'
+import { writeToClipboard } from '@/shared/lib/clipboard'
 import { Card } from '@ui/card'
 import { cn } from '@ui/cn'
 
@@ -63,6 +64,7 @@ function filterByTag(tagId: number) {
             )
           "
           @click="filterByTag(tag.tagId)"
+          @contextmenu.prevent="writeToClipboard(tag.name)"
         >
           <span>{{ tag.name }}</span>
         </button>
