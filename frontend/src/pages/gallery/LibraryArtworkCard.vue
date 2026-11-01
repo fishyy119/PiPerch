@@ -122,11 +122,12 @@ function handleCardDragStart(event: DragEvent) {
         </button>
       </template>
 
-      <template #author>
+      <template #author="{ selected }">
         <button
           type="button"
           :class="[
-            'block max-w-full cursor-pointer truncate text-left text-xs text-muted-foreground hover:text-primary',
+            'block max-w-full cursor-pointer truncate text-left text-xs transition-colors',
+            selected ? 'text-primary-foreground' : 'text-muted-foreground hover:text-primary',
             showTitle ? 'mt-0.5' : '',
           ]"
           @click="updateFilters({ authorId: artwork.authorId })"

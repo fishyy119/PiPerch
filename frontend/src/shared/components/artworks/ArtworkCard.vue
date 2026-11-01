@@ -43,10 +43,13 @@ watch(
 </script>
 
 <template>
-  <article class="min-w-0">
+  <article
+    class="min-w-0 rounded-xl ring-primary transition"
+    :class="selected ? 'bg-primary ring-3' : 'ring-0'"
+  >
     <div
-      class="group relative aspect-square overflow-hidden rounded-xl bg-muted ring-primary transition"
-      :class="selected ? 'ring-3' : 'ring-0'"
+      class="group relative aspect-square overflow-hidden bg-muted"
+      :class="selected && (showTitle || showAuthor) ? 'rounded-t-xl' : 'rounded-xl'"
     >
       <component
         :is="linkComponent"
@@ -74,17 +77,25 @@ watch(
       <slot name="trailing-action" />
     </div>
 
-    <div v-if="showTitle || showAuthor" class="pt-2.5">
+    <div
+      v-if="showTitle || showAuthor"
+      class="rounded-b-xl p-2.5"
+      :class="selected ? 'text-primary-foreground' : ''"
+    >
       <component
         :is="linkComponent"
         v-if="showTitle"
         v-bind="linkAttributes"
-        class="block truncate text-sm font-semibold transition-colors hover:text-primary"
+        class="block truncate text-sm font-semibold transition-colors"
+        :class="selected ? '' : 'hover:text-primary'"
       >
         {{ title }}
       </component>
-      <slot v-if="showAuthor" name="author" :author-name="authorName">
-        <span class="mt-0.5 block truncate text-xs text-muted-foreground">
+      <slot v-if="showAuthor" name="author" :author-name="authorName" :selected="selected">
+        <span
+          class="mt-0.5 block truncate text-xs transition-colors"
+          :class="selected ? '' : 'text-muted-foreground'"
+        >
           {{ authorName }}
         </span>
       </slot>
