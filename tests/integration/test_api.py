@@ -54,7 +54,7 @@ def test_followed_users_returns_safe_author_fields(
 ) -> None:
     client, container = app_client
 
-    async def list_followed_users(cookie: str | None) -> list[FollowedUser]:
+    async def list_followed_users(cookie: str | None, *, refresh: bool = False) -> list[FollowedUser]:
         assert cookie is None
         return [FollowedUser(101, "测试作者", "https://i.pximg.net/avatar.jpg")]
 

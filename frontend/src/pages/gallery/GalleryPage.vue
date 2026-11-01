@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { CheckSquare, ChevronLeft, ChevronRight } from '@lucide/vue'
-import { useQuery } from '@tanstack/vue-query'
+import { CheckSquare, ChevronLeft, ChevronRight, RefreshCw } from '@lucide/vue'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query'
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
@@ -10,6 +10,7 @@ import {
   listArtworks,
   type MultiValueMatch,
 } from '@/features/artworks/artworks-api'
+import { listFollowedUsers } from '@/features/authors/author-api'
 import type { GalleryFilterValues } from '@/features/gallery/gallery-filter'
 import {
   defaultGalleryFilterValues,
@@ -23,6 +24,7 @@ import GalleryFilterPopup from '@/pages/gallery/GalleryFilterPopup.vue'
 import GalleryPreferencesPopover from '@/pages/gallery/GalleryPreferencesPopover.vue'
 import LibraryArtworkCard from '@/pages/gallery/LibraryArtworkCard.vue'
 import TopbarActions from '@/pages/gallery/TopbarActions.vue'
+import { errorMessage } from '@/shared/errors'
 import { firstQueryValue } from '@/shared/lib/route-query'
 import { useMarqueeSelection } from '@/shared/lib/useMarqueeSelection'
 import { usePageKeyboardShortcuts } from '@/shared/lib/usePageKeyboardShortcuts'
@@ -30,9 +32,11 @@ import { Button } from '@ui/button'
 import { Card } from '@ui/card'
 import { FilterButton } from '@ui/filter-button'
 import { SearchInput } from '@ui/search-input'
+import { toast } from '@ui/toast'
 
 const route = useRoute()
 const router = useRouter()
+const queryClient = useQueryClient()
 const selection = useGallerySelectionStore()
 const routeSearch = computed(() => firstQueryValue(route.query.search))
 const searchInput = ref(routeSearch.value)
@@ -84,11 +88,13 @@ function selectedGroupIds() {
 }
 
 const galleryFilterValues = computed<GalleryFilterValues>({
-  get() {
+  get(): GalleryFilterValues {
+    const authorId = firstQueryValue(route.query.authorId)
     return {
       selectedTagIds: selectedTagIds(),
       tagMatch: multiValueMatch(firstQueryValue(route.query.tagMatch)),
-      authorId: positiveInt(firstQueryValue(route.query.authorId)),
+      authorId:
+        authorId === 'followed' || authorId === 'unfollowed' ? authorId : positiveInt(authorId),
       seriesId: positiveInt(firstQueryValue(route.query.seriesId)),
       artworkType: firstQueryValue(route.query.artworkType),
       rating: firstQueryValue(route.query.rating) || 'all',
@@ -132,6 +138,21 @@ function artworkFilters(): ArtworkListFilters {
 const artworksQuery = useQuery({
   queryKey: computed(() => artworkQueryKeys.list(artworkFilters())),
   queryFn: () => listArtworks(artworkFilters()),
+})
+
+const refreshFollowedUsersMutation = useMutation({
+  mutationFn: () => listFollowedUsers(true),
+  onSuccess: async () => {
+    await queryClient.invalidateQueries({ queryKey: ['artworks', 'list'], refetchType: 'none' })
+    marquee.reset()
+    selection.clear()
+    if (pageNumber() === 0) await artworksQuery.refetch()
+    else pushQuery({})
+    toast.success('作者关注状态已刷新')
+  },
+  onError: (error) => {
+    toast.error('刷新作者关注状态失败', { description: errorMessage(error) })
+  },
 })
 
 const activeFilterCount = computed(() => {
@@ -264,6 +285,19 @@ usePageKeyboardShortcuts((event) => {
         <CheckSquare :size="17" />批量管理
       </Button>
     </form>
+    <Button
+      v-if="typeof galleryFilterValues.authorId === 'string'"
+      variant="secondary"
+      class="shrink-0"
+      :disabled="refreshFollowedUsersMutation.isPending.value || artworksQuery.isFetching.value"
+      @click="refreshFollowedUsersMutation.mutate()"
+    >
+      <RefreshCw
+        :size="17"
+        :class="{ 'animate-spin': refreshFollowedUsersMutation.isPending.value }"
+      />
+      <span class="hidden lg:inline">刷新关注</span>
+    </Button>
     <div class="ml-auto shrink-0"><GalleryPreferencesPopover /></div>
   </TopbarActions>
 

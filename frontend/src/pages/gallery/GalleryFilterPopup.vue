@@ -13,12 +13,15 @@ import { SearchInput } from '@ui/search-input'
 
 const open = defineModel<boolean>('open', { required: true })
 const { filters, update: updateFilters } = useGalleryFilters()
+const selectedAuthorId = computed(() =>
+  typeof filters.value.authorId === 'number' ? filters.value.authorId : undefined,
+)
 
 const { tagSearch, authorSearch, seriesSearch, tags, authors, series, groups, groupsReady } =
   useGalleryFilterOptions({
     open: () => open.value,
     selectedTagIds: () => filters.value.selectedTagIds,
-    authorId: () => filters.value.authorId,
+    authorId: () => selectedAuthorId.value,
   })
 
 const visibleTags = computed(() => {
@@ -247,20 +250,37 @@ function updateSort(sort: string, order: string) {
       <section class="filter-row border-t pt-5">
         <h3 class="filter-row-title">作者</h3>
         <div>
-          <SearchInput
-            v-model="authorSearch"
-            class="mb-3 w-full max-w-sm"
-            placeholder="搜索作者…"
-          />
+          <div class="mb-3 flex flex-wrap items-center gap-2">
+            <SearchInput
+              v-model="authorSearch"
+              class="min-w-32 flex-1 sm:max-w-sm"
+              placeholder="搜索作者…"
+            />
+            <FilterOptionButton
+              v-for="option in [
+                { value: 'followed', label: '已关注' },
+                { value: 'unfollowed', label: '未关注' },
+              ] as const"
+              :key="option.value"
+              :active="filters.authorId === option.value"
+              @click="
+                updateFilters({
+                  authorId: filters.authorId === option.value ? undefined : option.value,
+                })
+              "
+            >
+              {{ option.label }}
+            </FilterOptionButton>
+          </div>
           <CollapsibleFilterOptions>
             <FilterOptionButton
               v-if="
-                filters.authorId && !visibleAuthors.some((item) => item.itemId === filters.authorId)
+                selectedAuthorId && !visibleAuthors.some((item) => item.itemId === selectedAuthorId)
               "
               :active="true"
               @click="updateFilters({ authorId: undefined })"
             >
-              作者 #{{ filters.authorId }}
+              作者 #{{ selectedAuthorId }}
             </FilterOptionButton>
             <FilterOptionButton
               v-for="author in visibleAuthors"

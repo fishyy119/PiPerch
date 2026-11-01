@@ -1,11 +1,11 @@
 import { inject, type InjectionKey, provide, type Ref } from 'vue'
 
-import type { MultiValueMatch } from '@/features/artworks/artworks-api'
+import type { AuthorFilter, MultiValueMatch } from '@/features/artworks/artworks-api'
 
 export interface GalleryFilterValues {
   selectedTagIds: number[]
   tagMatch: MultiValueMatch
-  authorId: number | undefined
+  authorId: AuthorFilter | undefined
   seriesId: number | undefined
   artworkType: string
   rating: string

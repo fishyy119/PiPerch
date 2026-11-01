@@ -69,6 +69,8 @@ class PixivClient:
         self._bookmark_cache_offset = 0
         self._bookmark_cache_total: int | None = None
         self._bookmark_cache_complete = False
+        self._followed_users_lock = asyncio.Lock()
+        self._followed_users: tuple[FollowedUser, ...] | None = None
 
     async def reconfigure(self, proxy_url: str | None, request_interval_ms: int) -> None:
         await self._transport.reconfigure(proxy_url, request_interval_ms)
@@ -375,7 +377,16 @@ class PixivClient:
         }
         return sorted((item for item in ids if item > 0), reverse=True)
 
-    async def list_followed_users(self, cookie: str | None) -> list[FollowedUser]:
+    async def list_followed_users(self, cookie: str | None, *, refresh: bool = False) -> list[FollowedUser]:
+        """读取缓存的完整关注列表，仅在首次读取或显式刷新时请求 Pixiv。"""
+        async with self._followed_users_lock:
+            if refresh or self._followed_users is None:
+                users = await self._fetch_followed_users(cookie)
+                # 完整获取成功后再替换快照，刷新失败时保留上一次的名单。
+                self._followed_users = tuple(users)
+            return list(self._followed_users)
+
+    async def _fetch_followed_users(self, cookie: str | None) -> list[FollowedUser]:
         """读取当前账号公开与非公开关注的作者，并按 Pixiv 返回顺序去重。"""
         own_user_id = parse_pixiv_user_id(cookie)
         if own_user_id is None:

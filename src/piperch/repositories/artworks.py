@@ -45,7 +45,7 @@ from piperch.repositories._rows import (
 from piperch.utils.text import normalize_search_text
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    from collections.abc import Collection, Sequence
     from pathlib import Path
 
     from sqlalchemy.engine import Connection, RowMapping
@@ -255,7 +255,7 @@ class ArtworkRepository:
         size: int,
         search: str,
         tag_ids: Sequence[int],
-        author_id: int | None,
+        author_id: int | Literal["followed", "unfollowed"] | None,
         series_id: int | None,
         artwork_type: ArtworkType | None,
         rating: str,
@@ -267,6 +267,7 @@ class ArtworkRepository:
         group_ids: Sequence[int] = (),
         tag_match: Literal["any", "all"] = "any",
         group_match: Literal["any", "all"] = "any",
+        followed_author_ids: Collection[int] = (),
     ) -> tuple[list[ArtworkSummary], int]:
         conditions: list[ColumnElement[bool]] = []
         if search:
@@ -278,7 +279,11 @@ class ArtworkRepository:
             conditions.append(
                 or_(artworks.c.id == int(search_value), text_match) if search_value.isdigit() else text_match
             )
-        if author_id is not None:
+        if author_id == "followed":
+            conditions.append(artworks.c.author_id.in_(followed_author_ids))
+        elif author_id == "unfollowed":
+            conditions.append(artworks.c.author_id.not_in(followed_author_ids))
+        elif author_id is not None:
             conditions.append(artworks.c.author_id == author_id)
         if series_id is not None:
             conditions.append(artworks.c.series_id == series_id)

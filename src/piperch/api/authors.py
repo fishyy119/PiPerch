@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from anyio import to_thread
-from fastapi import APIRouter, Depends, Path, Response, status
+from fastapi import APIRouter, Depends, Path, Query, Response, status
 
 from piperch.api.dependencies import get_container
 from piperch.api.models import (
@@ -17,10 +17,11 @@ router = APIRouter(prefix="/authors", tags=["authors"])
 
 @router.get("/followed", response_model=FollowedUsersResponse)
 async def followed_authors(
+    refresh: bool = Query(default=False),
     container: AppContainer = Depends(get_container),
 ) -> FollowedUsersResponse:
     settings = await to_thread.run_sync(container.settings.get)
-    items = await container.pixiv.list_followed_users(settings.pixiv_cookie)
+    items = await container.pixiv.list_followed_users(settings.pixiv_cookie, refresh=refresh)
     return FollowedUsersResponse(
         items=[
             FollowedUserResponse(

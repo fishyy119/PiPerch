@@ -49,7 +49,7 @@ const allAuthorWorksSelected = computed(() => {
 })
 
 const followedUsersMutation = useMutation({
-  mutationFn: listFollowedUsers,
+  mutationFn: () => listFollowedUsers(true),
   onSuccess: (items) => {
     followedUsers.value = items
     showFollowedUsers.value = true

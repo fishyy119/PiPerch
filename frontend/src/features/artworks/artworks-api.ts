@@ -70,6 +70,7 @@ export const artworkDetailSchema = artworkSummarySchema.extend({
 export type ArtworkDetail = z.infer<typeof artworkDetailSchema>
 
 export type MultiValueMatch = 'any' | 'all'
+export type AuthorFilter = number | 'followed' | 'unfollowed'
 
 export interface ArtworkListFilters {
   page: number
@@ -77,7 +78,7 @@ export interface ArtworkListFilters {
   search: string
   tagIds: number[]
   tagMatch: MultiValueMatch
-  authorId?: number
+  authorId?: AuthorFilter
   seriesId?: number
   artworkType?: string
   rating: string

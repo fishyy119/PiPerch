@@ -306,7 +306,7 @@ async def test_list_user_artwork_ids_combines_illustrations_and_manga() -> None:
 
 
 @pytest.mark.asyncio
-async def test_list_followed_users_combines_public_and_private_follows() -> None:
+async def test_followed_users_cache_keeps_public_and_private_authors() -> None:
     common_params = {
         "offset": 0,
         "limit": 100,
@@ -358,6 +358,7 @@ async def test_list_followed_users_combines_public_and_private_follows() -> None
         client = PixivClient(proxy_url=None, request_interval_ms=0)
         try:
             users = await client.list_followed_users("PHPSESSID=42_secret")
+            assert await client.list_followed_users(None) == users
         finally:
             await client.close()
 

@@ -30,9 +30,10 @@ export async function getUserProfile(userId: number) {
   return userProfileSchema.parse(await api.get<unknown>(path))
 }
 
-export async function listFollowedUsers() {
+export async function listFollowedUsers(refresh = false) {
   const schema = z.object({ items: z.array(followedUserSchema) })
-  return schema.parse(await api.get<unknown>('/api/authors/followed')).items
+  const query = refresh ? '?refresh=true' : ''
+  return schema.parse(await api.get<unknown>(`/api/authors/followed${query}`)).items
 }
 
 export async function followUser(userId: number) {
