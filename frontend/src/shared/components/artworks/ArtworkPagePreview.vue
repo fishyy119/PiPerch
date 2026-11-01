@@ -31,6 +31,7 @@ watch(
     previewLoading.value = false
     previewImageLoaded.value = false
     previewImageFailed.value = false
+    if (previewOpen.value) void showPreview(Math.min(previewPage.value, props.pageCount - 1))
   },
 )
 

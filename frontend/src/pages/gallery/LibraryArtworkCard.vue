@@ -4,7 +4,7 @@ import { useMutation, useQueryClient } from '@tanstack/vue-query'
 import { computed, ref } from 'vue'
 
 import { usePreference } from '@/app/usePreference'
-import type { ArtworkCardTarget } from '@/features/artworks/artwork-card'
+import { type ArtworkCardTarget, localArtworkPreviewUrl } from '@/features/artworks/artwork-card'
 import type { ArtworkSummary } from '@/features/artworks/artworks-api'
 import { replaceFavoriteState } from '@/features/favorites/favorites-api'
 import { useGalleryFilters } from '@/features/gallery/gallery-filter'
@@ -50,9 +50,7 @@ const favoriteMutation = useMutation({
 })
 
 function resolvePreviewUrl(pageIndex: number) {
-  return props.artwork.artworkType === 'ugoira'
-    ? `/api/artworks/${String(props.artwork.artworkId)}/cover`
-    : `/api/artworks/${String(props.artwork.artworkId)}/pages/${String(pageIndex)}`
+  return localArtworkPreviewUrl(props.artwork.artworkId, props.artwork.artworkType, pageIndex)
 }
 
 function handleCardClick(event: MouseEvent) {

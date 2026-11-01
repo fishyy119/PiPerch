@@ -2,7 +2,11 @@
 import { useQueryClient } from '@tanstack/vue-query'
 import { computed } from 'vue'
 
-import type { ArtworkCardTarget } from '@/features/artworks/artwork-card'
+import {
+  type ArtworkCardTarget,
+  type ArtworkPreviewUrlResolver,
+  localArtworkPreviewUrl,
+} from '@/features/artworks/artwork-card'
 import { type DiscoveryItem, listArtworkPreviewUrls } from '@/features/discovery/discovery-api'
 import { useLibraryMembershipStore } from '@/features/library/library-membership'
 import ArtworkCard from '@/shared/components/artworks/ArtworkCard.vue'
@@ -25,20 +29,32 @@ const library = useLibraryMembershipStore()
 const inLibrary = computed(() =>
   library.isInLibrary(props.artwork.artworkId, props.artwork.inLibrary),
 )
+const thumbnailUrl = computed(() =>
+  inLibrary.value
+    ? `/api/artworks/${String(props.artwork.artworkId)}/thumbnail`
+    : props.artwork.thumbnailUrl,
+)
 const target = computed<ArtworkCardTarget>(() => ({
   kind: 'external',
   href: `https://www.pixiv.net/artworks/${String(props.artwork.artworkId)}`,
 }))
 
-async function resolvePreviewUrl(pageIndex: number) {
-  const urls = await queryClient.query({
-    queryKey: ['discovery-artwork-preview', props.artwork.artworkId],
-    queryFn: () => listArtworkPreviewUrls(props.artwork.artworkId),
-    retry: false,
-    staleTime: 'static',
-  })
-  return urls[pageIndex] ?? null
-}
+const resolvePreviewUrl = computed<ArtworkPreviewUrlResolver>(() => {
+  const { artworkId, artworkType } = props.artwork
+  if (inLibrary.value) {
+    return (pageIndex) => localArtworkPreviewUrl(artworkId, artworkType, pageIndex)
+  }
+
+  return async (pageIndex) => {
+    const urls = await queryClient.query({
+      queryKey: ['discovery-artwork-preview', artworkId],
+      queryFn: () => listArtworkPreviewUrls(artworkId),
+      retry: false,
+      staleTime: 'static',
+    })
+    return urls[pageIndex] ?? null
+  }
+})
 
 function handleCardClick(event: MouseEvent) {
   const target = event.target
@@ -58,7 +74,7 @@ function handleCardClick(event: MouseEvent) {
     :title="artwork.title"
     :author-name="artwork.authorName"
     :page-count="artwork.pageCount"
-    :thumbnail-url="artwork.thumbnailUrl"
+    :thumbnail-url="thumbnailUrl"
     :target="target"
     :resolve-preview-url="resolvePreviewUrl"
     :selected="selected"
