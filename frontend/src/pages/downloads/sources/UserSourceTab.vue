@@ -6,6 +6,7 @@ import { computed, ref } from 'vue'
 import { type FollowedUser, listFollowedUsers } from '@/features/authors/author-api'
 import { listSelectableUserArtworkIds } from '@/features/discovery/discovery-api'
 import { useDownloadSelection } from '@/features/downloads/download-selection'
+import { useDownloadWorkspaceStore } from '@/features/downloads/download-workspace'
 import { useLibraryMembershipStore } from '@/features/library/library-membership'
 import DiscoverySourceLayout from '@/pages/downloads/DiscoverySourceLayout.vue'
 import FollowedUserSelector from '@/pages/downloads/FollowedUserSelector.vue'
@@ -15,6 +16,7 @@ import { Input } from '@ui/input'
 
 import { useDiscoveryPagination } from './useDiscoveryPagination'
 
+const { takePreviewRequest } = useDownloadWorkspaceStore()
 const selection = useDownloadSelection()
 const library = useLibraryMembershipStore()
 const sourceInput = ref('')
@@ -96,6 +98,12 @@ function toggleAllWorks() {
     return
   }
   selectAllMutation.mutate(userId)
+}
+
+const previewRequest = takePreviewRequest('user')
+if (previewRequest?.sourceType === 'user') {
+  sourceInput.value = String(previewRequest.userId)
+  loadPage(previewRequest.page)
 }
 </script>
 

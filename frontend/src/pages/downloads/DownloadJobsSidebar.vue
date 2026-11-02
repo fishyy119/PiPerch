@@ -13,13 +13,14 @@ import {
 } from '@/features/downloads/download-api'
 import { useDownloadSelection } from '@/features/downloads/download-selection'
 import { useDownloadSubmissionStore } from '@/features/downloads/download-submission'
+import { useDownloadWorkspaceState } from '@/features/downloads/download-workspace'
 import { errorMessage } from '@/shared/errors'
 import { Button } from '@ui/button'
 import { Card } from '@ui/card'
 import { cn } from '@ui/cn'
 import { Dialog } from '@ui/dialog'
 
-const props = defineProps<{ sourceLabel: string }>()
+const { sourceLabel } = useDownloadWorkspaceState()
 const queryClient = useQueryClient()
 const selection = useDownloadSelection()
 const notice = ref('')
@@ -164,7 +165,7 @@ async function submitSelection() {
   notice.value = ''
   submissionError.value = ''
   try {
-    const result = await submission.submit(props.sourceLabel)
+    const result = await submission.submit(sourceLabel.value)
     if (result.failedError !== null) {
       submissionError.value = `已提交 ${String(result.createdJobCount)} 个下载任务，仍有 ${String(result.remainingCount)} 项未提交：${errorMessage(result.failedError)}`
     } else {

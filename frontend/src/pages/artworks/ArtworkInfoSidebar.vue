@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ExternalLink, UserRound } from '@lucide/vue'
+import { ExternalLink, Search, UserRound } from '@lucide/vue'
 import { useQuery, useQueryClient } from '@tanstack/vue-query'
 import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
@@ -7,9 +7,11 @@ import { useRouter } from 'vue-router'
 import { artworkTypeLabel } from '@/features/artworks/artwork'
 import type { ArtworkDetail } from '@/features/artworks/artworks-api'
 import { getUserProfile, type UserProfile, userProfileKey } from '@/features/authors/author-api'
+import { useDownloadWorkspaceStore } from '@/features/downloads/download-workspace'
 import AuthorFollowButton from '@/shared/components/authors/AuthorFollowButton.vue'
 import AuthorIdButton from '@/shared/components/authors/AuthorIdButton.vue'
 import { writeToClipboard } from '@/shared/lib/clipboard'
+import { Button } from '@ui/button'
 import { Card } from '@ui/card'
 import { cn } from '@ui/cn'
 
@@ -17,6 +19,7 @@ const props = defineProps<{ artwork: ArtworkDetail }>()
 
 const router = useRouter()
 const queryClient = useQueryClient()
+const { requestPreview } = useDownloadWorkspaceStore()
 const authorAvatarFailed = ref(false)
 const authorProfileQuery = useQuery({
   queryKey: computed(() => userProfileKey(props.artwork.authorId)),
@@ -41,6 +44,11 @@ function filterAuthor() {
     path: '/gallery',
     query: { authorId: String(props.artwork.authorId) },
   })
+}
+
+function searchAuthor() {
+  requestPreview({ sourceType: 'user', userId: props.artwork.authorId, page: 0 })
+  void router.push('/downloads')
 }
 
 function filterSeries() {
@@ -81,37 +89,42 @@ function formatDate(value: string | null) {
           @change="updateAuthorFollowState"
         />
       </div>
-      <button
-        type="button"
-        :class="
-          cn(
-            'group mt-3 flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left',
-            'cursor-pointer transition',
-            'focus-visible:bg-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
-          )
-        "
-        @click="filterAuthor"
-      >
-        <span
-          class="grid size-12 shrink-0 place-items-center overflow-hidden rounded-full bg-primary text-primary-foreground shadow-sm"
+      <div class="mt-3 flex items-center gap-2">
+        <button
+          type="button"
+          :class="
+            cn(
+              'group flex min-w-0 flex-1 items-center gap-3 rounded-xl px-2 py-2 text-left',
+              'cursor-pointer transition',
+              'focus-visible:bg-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
+            )
+          "
+          @click="filterAuthor"
         >
-          <img
-            v-if="authorProfileQuery.data.value?.avatarUrl && !authorAvatarFailed"
-            class="size-full object-cover"
-            :src="authorProfileQuery.data.value.avatarUrl"
-            alt=""
-            loading="lazy"
-            @error="authorAvatarFailed = true"
-          />
-          <UserRound v-else :size="22" />
-        </span>
-        <span class="min-w-0">
-          <strong class="block truncate text-sm transition group-hover:text-primary">
-            {{ artwork.authorName }}
-          </strong>
-          <span class="mt-0.5 block text-xs text-muted-foreground">查看本地作品</span>
-        </span>
-      </button>
+          <span
+            class="grid size-12 shrink-0 place-items-center overflow-hidden rounded-full bg-primary text-primary-foreground shadow-sm"
+          >
+            <img
+              v-if="authorProfileQuery.data.value?.avatarUrl && !authorAvatarFailed"
+              class="size-full object-cover"
+              :src="authorProfileQuery.data.value.avatarUrl"
+              alt=""
+              loading="lazy"
+              @error="authorAvatarFailed = true"
+            />
+            <UserRound v-else :size="22" />
+          </span>
+          <span class="min-w-0">
+            <strong class="block truncate text-sm transition group-hover:text-primary">
+              {{ artwork.authorName }}
+            </strong>
+            <span class="mt-0.5 block text-xs text-muted-foreground">查看本地作品</span>
+          </span>
+        </button>
+        <Button size="iconSmall" class="shrink-0 rounded-md" @click="searchAuthor">
+          <Search :size="16" />
+        </Button>
+      </div>
       <div class="mt-2 flex items-center justify-between gap-3 px-2 text-xs text-muted-foreground">
         <AuthorIdButton :user-id="artwork.authorId" />
         <a
