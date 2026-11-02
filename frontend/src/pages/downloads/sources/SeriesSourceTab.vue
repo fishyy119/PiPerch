@@ -10,15 +10,14 @@ import { Input } from '@ui/input'
 import { useDiscoveryPagination } from './useDiscoveryPagination'
 
 const sourceInput = ref('')
-const { candidates, page, nextPage, emptyMessage, mutation, loadPage } = useDiscoveryPagination(
-  (targetPage) => {
+const { candidates, page, nextPage, totalPages, emptyMessage, mutation, loadPage } =
+  useDiscoveryPagination((targetPage) => {
     const seriesId = Number(sourceInput.value.trim())
     if (!Number.isSafeInteger(seriesId) || seriesId <= 0) {
       throw new Error('请输入有效的正整数 ID。')
     }
     return { sourceType: 'series', seriesId, page: targetPage }
-  },
-)
+  })
 </script>
 
 <template>
@@ -26,6 +25,7 @@ const { candidates, page, nextPage, emptyMessage, mutation, loadPage } = useDisc
     :candidates="candidates"
     :page="page"
     :next-page="nextPage"
+    :total-pages="totalPages"
     :pending="mutation.isPending.value"
     :empty-message="emptyMessage"
     @load-page="loadPage"

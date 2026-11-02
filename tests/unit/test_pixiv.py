@@ -111,6 +111,46 @@ async def test_discovery_recommendations_follow_recommended_ids_and_ignore_missi
 
 
 @pytest.mark.asyncio
+async def test_search_preserves_upstream_pagination_after_filtering_candidates() -> None:
+    with respx.mock(assert_all_called=True) as router:
+        route = router.get(
+            "https://www.pixiv.net/ajax/search/artworks/keyword",
+            params={
+                "word": "keyword",
+                "order": "date_d",
+                "mode": "all",
+                "p": 1,
+                "s_mode": "tag_tc",
+                "type": "all",
+                "lang": "zh",
+            },
+        ).mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "error": False,
+                    "body": {
+                        "illustManga": {
+                            "data": [{"id": "101"}, {"id": "101"}, {"id": "invalid"}],
+                            "lastPage": 9,
+                        }
+                    },
+                },
+            )
+        )
+        client = PixivClient(proxy_url=None, request_interval_ms=0)
+        try:
+            result = await client.discover_search("keyword", 0, None)
+        finally:
+            await client.close()
+
+    assert route.call_count == 1
+    assert [candidate.artwork_id for candidate in result.candidates] == [101]
+    assert result.next_page == 1
+    assert result.total_pages == 9
+
+
+@pytest.mark.asyncio
 async def test_follow_updates_reads_ordered_pages_and_stops_at_last_page() -> None:
     with respx.mock(assert_all_called=True) as router:
         first_route = router.get(
@@ -152,17 +192,18 @@ async def test_follow_updates_reads_ordered_pages_and_stops_at_last_page() -> No
         )
         client = PixivClient(proxy_url=None, request_interval_ms=0)
         try:
-            first_page, first_next_page = await client.discover_follow_updates(0, "PHPSESSID=42_secret")
-            last_page, last_next_page = await client.discover_follow_updates(1, "PHPSESSID=42_secret")
+            first_page = await client.discover_follow_updates(0, "PHPSESSID=42_secret")
+            last_page = await client.discover_follow_updates(1, "PHPSESSID=42_secret")
         finally:
             await client.close()
 
     assert first_route.call_count == 1
     assert last_route.call_count == 1
-    assert [item.artwork_id for item in first_page] == [103, 102]
-    assert first_next_page == 1
-    assert [item.artwork_id for item in last_page] == [101]
-    assert last_next_page is None
+    assert [item.artwork_id for item in first_page.candidates] == [103, 102]
+    assert first_page.next_page == 1
+    assert first_page.total_pages is None
+    assert [item.artwork_id for item in last_page.candidates] == [101]
+    assert last_page.next_page is None
 
 
 @pytest.mark.asyncio
@@ -263,7 +304,7 @@ async def test_discover_user_fetches_preview_cards_in_one_batch() -> None:
         )
         client = PixivClient(proxy_url=None, request_interval_ms=0)
         try:
-            candidates, next_page = await client.discover_user(
+            result = await client.discover_user(
                 42,
                 0,
                 "PHPSESSID=valid",
@@ -274,11 +315,12 @@ async def test_discover_user_fetches_preview_cards_in_one_batch() -> None:
 
     assert profile_route.call_count == 1
     assert cards_route.call_count == 1
-    assert [candidate.artwork_id for candidate in candidates] == [103, 102]
-    assert candidates[1].page_count == 3
-    assert candidates[1].x_restrict == 1
-    assert candidates[1].is_ai is True
-    assert next_page == 1
+    assert [candidate.artwork_id for candidate in result.candidates] == [103, 102]
+    assert result.candidates[1].page_count == 3
+    assert result.candidates[1].x_restrict == 1
+    assert result.candidates[1].is_ai is True
+    assert result.next_page == 1
+    assert result.total_pages == 2
 
 
 @pytest.mark.asyncio
@@ -490,7 +532,7 @@ async def test_discover_bookmarks_uses_visibility_tag_and_page() -> None:
         )
         client = PixivClient(proxy_url=None, request_interval_ms=0)
         try:
-            candidates, next_page = await client.discover_bookmarks(
+            result = await client.discover_bookmarks(
                 BookmarkFolderReference(BookmarkVisibility.PRIVATE, "风景"),
                 1,
                 "PHPSESSID=42_secret",
@@ -500,10 +542,11 @@ async def test_discover_bookmarks_uses_visibility_tag_and_page() -> None:
             await client.close()
 
     assert route.call_count == 1
-    assert [candidate.artwork_id for candidate in candidates] == [103, 102]
-    assert candidates[0].page_count == 3
-    assert candidates[0].is_ai is True
-    assert next_page == 2
+    assert [candidate.artwork_id for candidate in result.candidates] == [103, 102]
+    assert result.candidates[0].page_count == 3
+    assert result.candidates[0].is_ai is True
+    assert result.next_page == 2
+    assert result.total_pages is None
 
 
 @pytest.mark.asyncio
@@ -637,6 +680,7 @@ async def test_discover_artworks_preserves_page_results_when_one_artwork_is_unav
     assert result.candidates[0].thumbnail_url == "https://i.pximg.net/103.jpg"
     assert result.next_page == 1
     assert [(failure.artwork_id, failure.message) for failure in result.failures] == [(104, "作品已删除。")]
+    assert result.total_pages == 2
 
 
 @pytest.mark.asyncio
@@ -679,14 +723,15 @@ async def test_discover_series_uses_embedded_thumbnail_metadata() -> None:
         )
         client = PixivClient(proxy_url=None, request_interval_ms=0)
         try:
-            candidates, next_page = await client.discover_series(7, 0, None)
+            result = await client.discover_series(7, 0, None)
         finally:
             await client.close()
 
     assert series_route.call_count == 1
-    assert [candidate.artwork_id for candidate in candidates] == [302, 301]
-    assert candidates[0].thumbnail_url == "https://i.pximg.net/302.jpg"
-    assert next_page is None
+    assert [candidate.artwork_id for candidate in result.candidates] == [302, 301]
+    assert result.candidates[0].thumbnail_url == "https://i.pximg.net/302.jpg"
+    assert result.next_page is None
+    assert result.total_pages == 1
 
 
 @pytest.mark.asyncio

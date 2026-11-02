@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Check, ChevronLeft, ChevronRight, X } from '@lucide/vue'
+import { Check, ChevronLeft, ChevronRight } from '@lucide/vue'
 import { computed } from 'vue'
 
 import { usePreference } from '@/app/usePreference'
@@ -12,13 +12,17 @@ import { Card } from '@ui/card'
 import { SettingsPopover } from '@ui/settings-popover'
 import { Slider } from '@ui/slider'
 
-const props = defineProps<{
-  candidates: readonly DiscoveryItem[]
-  page: number
-  nextPage: number | null
-  pending: boolean
-  emptyMessage: string
-}>()
+const props = withDefaults(
+  defineProps<{
+    candidates: readonly DiscoveryItem[]
+    page: number
+    nextPage: number | null
+    totalPages?: number | null
+    pending: boolean
+    emptyMessage: string
+  }>(),
+  { totalPages: null },
+)
 
 const emit = defineEmits<{
   loadPage: [page: number]
@@ -27,6 +31,11 @@ const emit = defineEmits<{
 const selection = useDownloadSelection()
 const library = useLibraryMembershipStore()
 const cardWidth = usePreference('downloadCandidates.cardWidth')
+const pageLabel = computed(() =>
+  props.totalPages === null
+    ? String(props.page + 1)
+    : `${String(props.page + 1)} / ${String(Math.max(1, props.totalPages))}`,
+)
 const selectableCandidates = computed(() =>
   props.candidates.filter((item) => !library.isInLibrary(item.artworkId, item.inLibrary)),
 )
@@ -57,18 +66,34 @@ function togglePage() {
           <h2 class="font-semibold">候选作品</h2>
           <p class="text-sm text-muted-foreground">跨页选择会保留，提交任务后自动清空。</p>
         </div>
-        <div class="flex items-center gap-2">
+        <div class="flex shrink-0 items-center gap-2">
+          <Button
+            variant="secondary"
+            size="icon"
+            title="上一页"
+            :disabled="page === 0 || pending"
+            @click="emit('loadPage', page - 1)"
+          >
+            <ChevronLeft :size="17" />
+          </Button>
+          <span class="min-w-4 text-center text-sm text-muted-foreground tabular-nums">
+            第 {{ pageLabel }} 页
+          </span>
+          <Button
+            variant="secondary"
+            size="icon"
+            title="下一页"
+            :disabled="nextPage === null || pending"
+            @click="nextPage !== null && emit('loadPage', nextPage)"
+          >
+            <ChevronRight :size="17" />
+          </Button>
+        </div>
+        <div class="flex flex-wrap items-center justify-end gap-2">
           <Button variant="secondary" :disabled="candidates.length === 0" @click="togglePage">
             <Check :size="17" />{{ pageFullySelected ? '取消本页' : '选择本页' }}
           </Button>
           <slot name="bulk-actions" />
-          <Button
-            variant="ghost"
-            :disabled="selection.selectedIds.length === 0"
-            @click="selection.clear"
-          >
-            <X :size="17" />清空
-          </Button>
           <SettingsPopover variant="ghost" title="候选作品显示设置">
             <div class="space-y-2">
               <p class="text-sm font-medium">卡片大小</p>
@@ -103,7 +128,7 @@ function togglePage() {
         >
           <ChevronLeft :size="17" />上一页
         </Button>
-        <span class="text-sm text-muted-foreground">第 {{ page + 1 }} 页</span>
+        <span class="text-sm text-muted-foreground">第 {{ pageLabel }} 页</span>
         <Button
           variant="secondary"
           :disabled="nextPage === null || pending"

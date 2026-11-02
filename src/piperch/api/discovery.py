@@ -59,57 +59,54 @@ async def discover(
     container: AppContainer = Depends(get_container),
 ) -> DiscoveryResponse:
     settings = await to_thread.run_sync(container.settings.get)
-    next_page: int | None = None
-    failures: list[ArtworkDiscoveryFailureResponse] = []
     if isinstance(request, ArtworkDiscoveryRequest):
         result = await container.pixiv.discover_artworks(
             request.inputs,
             request.page,
             settings.pixiv_cookie,
         )
-        candidates, next_page = result.candidates, result.next_page
-        failures = [
-            ArtworkDiscoveryFailureResponse(artwork_id=item.artwork_id, message=item.message)
-            for item in result.failures
-        ]
     elif isinstance(request, SearchDiscoveryRequest):
-        candidates, next_page = await container.pixiv.discover_search(
+        result = await container.pixiv.discover_search(
             request.keyword,
             request.page,
             settings.pixiv_cookie,
         )
     elif isinstance(request, UserDiscoveryRequest):
-        candidates, next_page = await container.pixiv.discover_user(
+        result = await container.pixiv.discover_user(
             request.user_id,
             request.page,
             settings.pixiv_cookie,
         )
     elif isinstance(request, BookmarkDiscoveryRequest):
-        candidates, next_page = await container.pixiv.discover_bookmarks(
+        result = await container.pixiv.discover_bookmarks(
             BookmarkFolderReference(request.folder.visibility, request.folder.tag),
             request.page,
             settings.pixiv_cookie,
         )
     elif isinstance(request, FollowUpdatesDiscoveryRequest):
-        candidates, next_page = await container.pixiv.discover_follow_updates(
+        result = await container.pixiv.discover_follow_updates(
             request.page,
             settings.pixiv_cookie,
         )
     else:
-        candidates, next_page = await container.pixiv.discover_series(
+        result = await container.pixiv.discover_series(
             request.series_id,
             request.page,
             settings.pixiv_cookie,
         )
     existing_ids = await to_thread.run_sync(
         container.artworks.find_existing_ids,
-        [item.artwork_id for item in candidates],
+        [item.artwork_id for item in result.candidates],
     )
     return DiscoveryResponse(
-        items=_discovery_items(candidates, existing_ids),
+        items=_discovery_items(result.candidates, existing_ids),
         page=request.page,
-        next_page=next_page,
-        failures=failures,
+        next_page=result.next_page,
+        total_pages=result.total_pages,
+        failures=[
+            ArtworkDiscoveryFailureResponse(artwork_id=item.artwork_id, message=item.message)
+            for item in result.failures
+        ],
     )
 
 

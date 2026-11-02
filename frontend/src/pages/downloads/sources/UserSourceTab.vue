@@ -30,12 +30,11 @@ const currentUserId = computed(() => {
   return Number.isSafeInteger(value) && value > 0 ? value : null
 })
 
-const { candidates, page, nextPage, emptyMessage, mutation, loadPage } = useDiscoveryPagination(
-  (targetPage) => {
+const { candidates, page, nextPage, totalPages, emptyMessage, mutation, loadPage } =
+  useDiscoveryPagination((targetPage) => {
     if (currentUserId.value === null) throw new Error('请输入有效的正整数 ID。')
     return { sourceType: 'user', userId: currentUserId.value, page: targetPage }
-  },
-)
+  })
 
 const selectableAuthorArtworkIds = computed(() =>
   (loadedAuthorSelection.value?.artworkIds ?? []).filter((id) => !library.isInLibrary(id)),
@@ -112,6 +111,7 @@ if (previewRequest?.sourceType === 'user') {
     :candidates="candidates"
     :page="page"
     :next-page="nextPage"
+    :total-pages="totalPages"
     :pending="mutation.isPending.value"
     :empty-message="emptyMessage"
     @load-page="loadPage"

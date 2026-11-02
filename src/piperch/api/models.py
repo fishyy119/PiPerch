@@ -178,6 +178,7 @@ class DiscoveryResponse(ApiModel):
     items: list[DiscoveryItem]
     page: int
     next_page: int | None
+    total_pages: int | None = None
     failures: list[ArtworkDiscoveryFailureResponse] = Field(
         default_factory=lambda: list[ArtworkDiscoveryFailureResponse]()
     )

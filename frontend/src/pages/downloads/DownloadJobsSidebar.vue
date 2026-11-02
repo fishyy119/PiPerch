@@ -183,7 +183,16 @@ async function submitSelection() {
 <template>
   <aside class="flex flex-col gap-4 xl:sticky xl:top-22 xl:h-[calc(100dvh-7rem)] xl:self-start">
     <Card class="shrink-0 p-5 xl:max-h-[60%] xl:overflow-y-auto">
-      <h2 class="font-semibold">提交下载</h2>
+      <div class="flex items-center justify-between gap-3">
+        <h2 class="font-semibold">提交下载</h2>
+        <Button
+          variant="ghost"
+          :disabled="selection.selectedIds.length === 0"
+          @click="selection.clear"
+        >
+          <X :size="17" />清空
+        </Button>
+      </div>
       <div class="mt-1 flex items-center justify-between gap-3">
         <p class="text-sm text-muted-foreground">已选择 {{ selection.selectedIds.length }} 项</p>
         <button

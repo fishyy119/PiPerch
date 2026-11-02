@@ -9,7 +9,7 @@ from PIL import Image
 
 from piperch.domain.artworks import ArtworkType, MediaRecord, RemoteArtwork
 from piperch.domain.bookmarks import BookmarkFolder, BookmarkFolderKind, BookmarkFolderReference, BookmarkVisibility
-from piperch.domain.discovery import ArtworkDiscoveryFailure, ArtworkDiscoveryResult, DiscoveryCandidate, FollowedUser
+from piperch.domain.discovery import ArtworkDiscoveryFailure, DiscoveryCandidate, DiscoveryResult, FollowedUser
 from piperch.errors import UpstreamError
 from piperch.services.storage import StorageMigrationSelection
 
@@ -132,11 +132,11 @@ def test_bookmark_discovery_marks_existing_artworks(
         folder: BookmarkFolderReference,
         page: int,
         cookie: str | None,
-    ) -> tuple[list[DiscoveryCandidate], int | None]:
+    ) -> DiscoveryResult:
         assert folder == BookmarkFolderReference(BookmarkVisibility.PRIVATE, "私藏")
         assert page == 0
         assert cookie is None
-        return (
+        return DiscoveryResult(
             [
                 DiscoveryCandidate(101, "已有作品", "作者", ArtworkType.ILLUST, 1, 0, False, None),
                 DiscoveryCandidate(102, "收藏作品", "作者", ArtworkType.MANGA, 2, 0, False, None),
@@ -164,6 +164,7 @@ def test_bookmark_discovery_marks_existing_artworks(
     payload = response.json()
     assert payload["page"] == 0
     assert payload["nextPage"] == 1
+    assert payload["totalPages"] is None
     assert [item["inLibrary"] for item in payload["items"]] == [True, False]
 
 
@@ -240,11 +241,11 @@ def test_discovery_marks_artwork_already_in_library(
         inputs: list[str],
         page: int,
         cookie: str | None,
-    ) -> ArtworkDiscoveryResult:
+    ) -> DiscoveryResult:
         assert inputs == ["101", "103", "102"]
         assert page == 0
         assert cookie is None
-        return ArtworkDiscoveryResult(
+        return DiscoveryResult(
             [
                 DiscoveryCandidate(101, "本地作品", "作者", ArtworkType.ILLUST, 1, 0, False, None),
                 DiscoveryCandidate(
@@ -259,7 +260,8 @@ def test_discovery_marks_artwork_already_in_library(
                 ),
             ],
             None,
-            [ArtworkDiscoveryFailure(103, "作品已删除。")],
+            total_pages=1,
+            failures=[ArtworkDiscoveryFailure(103, "作品已删除。")],
         )
 
     monkeypatch.setattr(container.pixiv, "discover_artworks", discover_artworks)
@@ -274,6 +276,7 @@ def test_discovery_marks_artwork_already_in_library(
     assert [item["inLibrary"] for item in items] == [True, False]
     assert items[1]["thumbnailUrl"] == "/api/pixiv-images?url=https%3A%2F%2Fi.pximg.net%2F102.jpg"
     assert response.json()["failures"] == [{"artworkId": 103, "message": "作品已删除。"}]
+    assert response.json()["totalPages"] == 1
 
 
 def test_health_and_settings_return_cookie(

@@ -11,13 +11,12 @@ import { useDiscoveryPagination } from './useDiscoveryPagination'
 
 const keywordInput = ref('')
 const submittedKeyword = ref('')
-const { candidates, page, nextPage, mutation, loadPage, reset } = useDiscoveryPagination(
-  (targetPage) => ({
+const { candidates, page, nextPage, totalPages, mutation, loadPage, reset } =
+  useDiscoveryPagination((targetPage) => ({
     sourceType: 'search',
     keyword: submittedKeyword.value,
     page: targetPage,
-  }),
-)
+  }))
 const emptyMessage = computed(() => {
   if (!submittedKeyword.value) return '请输入搜索内容。'
   if (mutation.isPending.value) return '正在搜索作品…'
@@ -39,6 +38,7 @@ function search() {
     :candidates="candidates"
     :page="page"
     :next-page="nextPage"
+    :total-pages="totalPages"
     :pending="mutation.isPending.value"
     :empty-message="emptyMessage"
     @load-page="loadPage"

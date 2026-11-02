@@ -10,8 +10,8 @@ import { Textarea } from '@ui/textarea'
 import { useDiscoveryPagination } from './useDiscoveryPagination'
 
 const sourceInput = ref('')
-const { candidates, page, nextPage, emptyMessage, mutation, loadPage } = useDiscoveryPagination(
-  (targetPage) => {
+const { candidates, page, nextPage, totalPages, emptyMessage, mutation, loadPage } =
+  useDiscoveryPagination((targetPage) => {
     const inputs = sourceInput.value
       .trim()
       .split(/[\s,]+/u)
@@ -19,8 +19,7 @@ const { candidates, page, nextPage, emptyMessage, mutation, loadPage } = useDisc
       .filter(Boolean)
     if (inputs.length === 0) throw new Error('请输入至少一个作品 URL 或 ID。')
     return { sourceType: 'artwork', inputs, page: targetPage }
-  },
-)
+  })
 const failures = computed(() => mutation.data.value?.failures ?? [])
 </script>
 
@@ -29,6 +28,7 @@ const failures = computed(() => mutation.data.value?.failures ?? [])
     :candidates="candidates"
     :page="page"
     :next-page="nextPage"
+    :total-pages="totalPages"
     :pending="mutation.isPending.value"
     :empty-message="emptyMessage"
     @load-page="loadPage"

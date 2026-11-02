@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import math
 from typing import TYPE_CHECKING, cast
 from urllib.parse import quote
 
@@ -17,8 +18,8 @@ from piperch.domain.bookmarks import (
 )
 from piperch.domain.discovery import (
     ArtworkDiscoveryFailure,
-    ArtworkDiscoveryResult,
     DiscoveryCandidate,
+    DiscoveryResult,
     FollowedUser,
     RecommendedUser,
     UserProfile,
@@ -94,7 +95,7 @@ class PixivClient:
         cookie: str | None,
         *,
         page_size: int = 24,
-    ) -> ArtworkDiscoveryResult:
+    ) -> DiscoveryResult:
         artwork_ids = parse_artwork_ids(inputs)
         start = page * page_size
         selected = artwork_ids[start : start + page_size]
@@ -109,14 +110,19 @@ class PixivClient:
             candidates.append(candidate_from_artwork_body(artwork_id, _mapping(body)))
         # 分页按输入 ID 计算，失败项不改变后续页的范围。
         next_page = page + 1 if start + page_size < len(artwork_ids) else None
-        return ArtworkDiscoveryResult(candidates, next_page, failures)
+        return DiscoveryResult(
+            candidates,
+            next_page,
+            total_pages=math.ceil(len(artwork_ids) / page_size),
+            failures=failures,
+        )
 
     async def discover_search(
         self,
         keyword: str,
         page: int,
         cookie: str | None,
-    ) -> tuple[list[DiscoveryCandidate], int | None]:
+    ) -> DiscoveryResult:
         """搜索作品标签、标题和说明文字，保留 Pixiv 的结果顺序和分页。"""
         body = _mapping(
             await self._transport.get_body(
@@ -144,8 +150,9 @@ class PixivClient:
                 continue
             candidates.setdefault(artwork_id, candidate_from_mapping(item))
         # 末页由上游决定，不因无效条目或页内去重而提前停止翻页。
-        next_page = page + 1 if page + 1 < _integer(results.get("lastPage")) else None
-        return list(candidates.values()), next_page
+        last_page = _integer(results.get("lastPage"), -1)
+        next_page = page + 1 if page + 1 < last_page else None
+        return DiscoveryResult(list(candidates.values()), next_page, total_pages=last_page if last_page >= 0 else None)
 
     async def discover_recommended_artworks(
         self,
@@ -188,7 +195,7 @@ class PixivClient:
         self,
         page: int,
         cookie: str | None,
-    ) -> tuple[list[DiscoveryCandidate], int | None]:
+    ) -> DiscoveryResult:
         """按 Pixiv 返回顺序读取关注作者的最近更新。"""
         self._require_current_user_id(cookie)
         body = _mapping(
@@ -212,7 +219,7 @@ class PixivClient:
 
         is_last_page = _mapping(body.get("page")).get("isLastPage")
         next_page = page + 1 if candidates and is_last_page is False else None
-        return list(candidates.values()), next_page
+        return DiscoveryResult(list(candidates.values()), next_page)
 
     async def discover_recommended_users(
         self,
@@ -343,12 +350,13 @@ class PixivClient:
         cookie: str | None,
         *,
         page_size: int = 48,
-    ) -> tuple[list[DiscoveryCandidate], int | None]:
+    ) -> DiscoveryResult:
         ordered = await self.list_user_artwork_ids(user_id, cookie)
+        total_pages = math.ceil(len(ordered) / page_size)
         start = page * page_size
         selected = ordered[start : start + page_size]
         if not selected:
-            return [], None
+            return DiscoveryResult([], None, total_pages=total_pages)
 
         # 用户主页只返回作品 ID，预览所需的卡片元数据可以一次批量取得。逐个读取完整作品
         # 会为每项额外请求详情和分页数据，在默认限速下单页需要一分钟左右。
@@ -366,7 +374,7 @@ class PixivClient:
             if (card := _mapping(cards.get(str(artwork_id))))
         ]
         next_page = page + 1 if start + page_size < len(ordered) else None
-        return candidates, next_page
+        return DiscoveryResult(candidates, next_page, total_pages=total_pages)
 
     async def list_user_artwork_ids(self, user_id: int, cookie: str | None) -> list[int]:
         """读取作者全部插画和漫画 ID，不为每个作品请求详情。"""
@@ -505,7 +513,7 @@ class PixivClient:
         cookie: str | None,
         *,
         page_size: int = 48,
-    ) -> tuple[list[DiscoveryCandidate], int | None]:
+    ) -> DiscoveryResult:
         """按收藏标签读取当前账号的一页插画收藏。"""
         user_id = self._require_current_user_id(cookie)
         offset = page * page_size
@@ -518,7 +526,7 @@ class PixivClient:
         ]
         total = max(0, _integer(body.get("total")))
         next_page = page + 1 if works and (not total or offset + len(works) < total) else None
-        return candidates, next_page
+        return DiscoveryResult(candidates, next_page)
 
     async def list_bookmark_artwork_ids(
         self,
@@ -735,7 +743,7 @@ class PixivClient:
         series_id: int,
         page: int,
         cookie: str | None,
-    ) -> tuple[list[DiscoveryCandidate], int | None]:
+    ) -> DiscoveryResult:
         body = _mapping(
             await self._transport.get_body(
                 f"/ajax/series/{series_id}",
@@ -758,9 +766,9 @@ class PixivClient:
             if artwork_id in cards
         ]
         series_rows = _sequence(body.get("illustSeries"))
-        total = _integer(_mapping(series_rows[0]).get("total")) if series_rows else 0
-        next_page = page + 1 if entries and (not total or (page + 1) * 12 < total) else None
-        return candidates, next_page
+        total = _integer(_mapping(series_rows[0]).get("total"), -1) if series_rows else -1
+        next_page = page + 1 if entries and (total <= 0 or (page + 1) * 12 < total) else None
+        return DiscoveryResult(candidates, next_page, total_pages=math.ceil(total / 12) if total >= 0 else None)
 
     async def get_artwork(self, artwork_id: int, cookie: str | None) -> RemoteArtwork:
         body = _mapping(await self._transport.get_body(f"/ajax/illust/{artwork_id}", cookie=cookie))

@@ -13,6 +13,7 @@ export function useDiscoveryPagination(makeRequest: (page: number) => DiscoveryR
   const candidates = ref<DiscoveryItem[]>([])
   const page = ref(0)
   const nextPage = ref<number | null>(null)
+  const totalPages = ref<number | null>(null)
   const emptyMessage = ref('请先输入来源并预览。')
 
   const mutation = useMutation({
@@ -22,6 +23,7 @@ export function useDiscoveryPagination(makeRequest: (page: number) => DiscoveryR
       selection.cacheItems(result.items)
       page.value = result.page
       nextPage.value = result.nextPage
+      totalPages.value = result.totalPages
       emptyMessage.value = result.items.length === 0 ? '这一页没有找到候选作品。' : ''
     },
   })
@@ -34,9 +36,10 @@ export function useDiscoveryPagination(makeRequest: (page: number) => DiscoveryR
     candidates.value = []
     page.value = 0
     nextPage.value = null
+    totalPages.value = null
     emptyMessage.value = '请先输入来源并预览。'
     mutation.reset()
   }
 
-  return { candidates, page, nextPage, emptyMessage, mutation, loadPage, reset }
+  return { candidates, page, nextPage, totalPages, emptyMessage, mutation, loadPage, reset }
 }
