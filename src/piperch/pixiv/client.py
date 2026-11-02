@@ -331,7 +331,7 @@ class PixivClient:
         preview_urls: list[str] = []
         for raw_page in pages:
             urls = _mapping(_mapping(raw_page).get("urls"))
-            preview_url = _text(urls.get("regular")) or _text(urls.get("small"))
+            preview_url = _text(urls.get("small")) or _text(urls.get("regular"))
             if preview_url:
                 preview_urls.append(preview_url)
         return preview_urls
