@@ -4,13 +4,20 @@ import { computed, ref } from 'vue'
 
 import DiscoverySourceLayout from '@/pages/downloads/DiscoverySourceLayout.vue'
 import { errorMessage } from '@/shared/errors'
+import { useInputHistory } from '@/shared/lib/useInputHistory'
+import { Autocomplete } from '@ui/autocomplete'
 import { Button } from '@ui/button'
-import { Input } from '@ui/input'
 
 import { useDiscoveryPagination } from './useDiscoveryPagination'
 
 const keywordInput = ref('')
 const submittedKeyword = ref('')
+const historyOpen = ref(false)
+const {
+  items: keywordHistory,
+  record: recordKeyword,
+  remove: removeKeyword,
+} = useInputHistory('download-search')
 const { candidates, page, nextPage, totalPages, mutation, loadPage, reset } =
   useDiscoveryPagination((targetPage) => ({
     sourceType: 'search',
@@ -27,6 +34,8 @@ const emptyMessage = computed(() => {
 function search() {
   const keyword = keywordInput.value.trim()
   if (!keyword || mutation.isPending.value) return
+  historyOpen.value = false
+  recordKeyword(keyword)
   submittedKeyword.value = keyword
   reset()
   loadPage(0)
@@ -45,7 +54,14 @@ function search() {
   >
     <template #source>
       <form class="flex flex-col gap-3 sm:flex-row" @submit.prevent="search">
-        <Input v-model="keywordInput" class="flex-1" placeholder="输入搜索内容" />
+        <Autocomplete
+          v-model="keywordInput"
+          v-model:open="historyOpen"
+          :options="keywordHistory"
+          class="flex-1"
+          placeholder="输入搜索内容"
+          @remove="removeKeyword"
+        />
         <Button
           type="submit"
           class="sm:self-start"
