@@ -18,6 +18,7 @@ const previewUrl = ref<string | null>(null)
 const previewLoading = ref(false)
 const previewImageLoaded = ref(false)
 const previewImageFailed = ref(false)
+const previewImageAspectRatio = ref(1)
 const cachedUrls = new Map<number, string | null>()
 let requestId = 0
 let previewPointActivated = false
@@ -46,6 +47,14 @@ function applyPreviewUrl(url: string | null) {
     previewImageFailed.value = false
   }
   previewUrl.value = url
+}
+
+function handlePreviewImageLoad(event: Event) {
+  const image = event.currentTarget
+  if (!(image instanceof HTMLImageElement)) return
+
+  previewImageAspectRatio.value = image.naturalWidth / image.naturalHeight
+  previewImageLoaded.value = true
 }
 
 async function showPreview(page: number) {
@@ -144,16 +153,15 @@ function hidePreviewOnFocusOut(event: FocusEvent) {
           :key="previewUrl"
           :class="
             cn(
-              'block h-auto w-auto',
-              'max-h-[min(720px,calc(var(--reka-hover-card-content-available-height)-0.5rem-2px))]',
-              'max-w-[min(600px,max(320px,42vw),calc(var(--reka-hover-card-content-available-width)-0.5rem-2px))]',
+              'preview-image block h-auto',
               'rounded-lg object-contain transition-opacity',
-              previewImageLoaded ? 'opacity-100' : 'opacity-0',
+              previewImageLoaded ? 'opacity-100' : 'absolute opacity-0',
             )
           "
+          :style="{ '--preview-aspect-ratio': previewImageAspectRatio }"
           :src="previewUrl"
           :alt="`${title} 第 ${String(previewPage + 1)} 页快速预览`"
-          @load="previewImageLoaded = true"
+          @load="handlePreviewImageLoad"
           @error="previewImageFailed = true"
         />
         <LoaderCircle
@@ -175,3 +183,21 @@ function hidePreviewOnFocusOut(event: FocusEvent) {
     </div>
   </HoverCard>
 </template>
+
+<style scoped>
+.preview-image {
+  --preview-max-width: min(
+    600px,
+    max(320px, 42vw),
+    calc(var(--reka-hover-card-content-available-width) - 0.5rem - 2px)
+  );
+  --preview-max-height: min(
+    720px,
+    calc(var(--reka-hover-card-content-available-height) - 0.5rem - 2px)
+  );
+  width: min(
+    var(--preview-max-width),
+    calc(var(--preview-max-height) * var(--preview-aspect-ratio))
+  );
+}
+</style>

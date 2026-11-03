@@ -38,6 +38,7 @@ export default tseslint.config(
           groups: [['^\\u0000'], ['^node:'], ['^@?\\w'], ['^@/', '^@ui/'], ['^\\.']],
         },
       ],
+      'vue/enforce-style-attribute': ['error', { allow: ['scoped'] }],
       'vue/multi-word-component-names': 'off',
       'vue/no-v-html': 'error',
     },
