@@ -40,6 +40,7 @@ def create_app(paths: AppPaths | None = None, control: AppControl | None = None)
         docs_url="/api/docs",
         openapi_url="/api/openapi.json",
     )
+    application.state.control = app_control
     application.add_middleware(
         CORSMiddleware,
         allow_origins=["http://127.0.0.1:5173", "http://localhost:5173"],

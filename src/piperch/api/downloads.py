@@ -18,6 +18,7 @@ from piperch.api.models import (
     DownloadJobPage,
 )
 from piperch.application.container import AppContainer
+from piperch.application.control import AppControl
 
 router = APIRouter(prefix="/download-jobs", tags=["downloads"])
 events_router = APIRouter(prefix="/events", tags=["downloads"])
@@ -84,15 +85,22 @@ async def retry_job(
 
 async def _event_stream(request: Request, container: AppContainer) -> AsyncIterator[str]:
     yield "retry: 2000\n\n"
+    control: AppControl = request.app.state.control
+    loop = asyncio.get_running_loop()
+    last_activity = loop.time()
     async with container.events.subscribe() as queue:
-        while not await request.is_disconnected():
+        while not control.is_stopping() and not await request.is_disconnected():
             try:
-                event = await asyncio.wait_for(queue.get(), timeout=15)
+                # 短间隔检查退出状态，空闲心跳仍保持 15 秒间隔。
+                event = await asyncio.wait_for(queue.get(), timeout=0.5)
             except TimeoutError:
-                yield ": heartbeat\n\n"
+                if loop.time() - last_activity >= 15:
+                    yield ": heartbeat\n\n"
+                    last_activity = loop.time()
                 continue
             data = json.dumps(event.data)
             yield f"event: {event.name}\ndata: {data}\n\n"
+            last_activity = loop.time()
 
 
 @events_router.get("/downloads", response_class=StreamingResponse)

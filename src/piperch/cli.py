@@ -175,7 +175,11 @@ def run_server(
     hosts = tuple(dict.fromkeys((_LOOPBACK_HOST, *additional_hosts)))
     watcher_started = False
     while True:
-        control = AppControl(instance_id=str(uuid4()), request_restart=lifecycle.request_restart)
+        control = AppControl(
+            instance_id=str(uuid4()),
+            request_restart=lifecycle.request_restart,
+            is_stopping=lambda: lifecycle.should_exit,
+        )
         config = uvicorn.Config(
             create_app(paths, control),
             host=_LOOPBACK_HOST,

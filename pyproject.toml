@@ -98,6 +98,7 @@ line-ending = "lf"
 docstring-code-format = true
 
 [tool.pyright]
+stubPath = "typings"
 include = ["src", "tests"]
 exclude = ["frontend", "src/piperch/database/migrations"]
 pythonVersion = "3.12"
