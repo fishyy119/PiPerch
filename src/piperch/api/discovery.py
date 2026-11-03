@@ -149,6 +149,23 @@ async def recommended_users(
 
 
 @router.get(
+    "/artworks/{artwork_id}/recommendations",
+    response_model=RecommendationsResponse,
+)
+async def artwork_recommendations(
+    artwork_id: int = Path(gt=0),
+    container: AppContainer = Depends(get_container),
+) -> RecommendationsResponse:
+    settings = await to_thread.run_sync(container.settings.get)
+    candidates = await container.pixiv.discover_artwork_recommendations(artwork_id, settings.pixiv_cookie)
+    existing_ids = await to_thread.run_sync(
+        container.artworks.find_existing_ids,
+        [item.artwork_id for item in candidates],
+    )
+    return RecommendationsResponse(items=_discovery_items(candidates, existing_ids))
+
+
+@router.get(
     "/artworks/{artwork_id}/preview",
     response_model=ArtworkPreviewResponse,
 )

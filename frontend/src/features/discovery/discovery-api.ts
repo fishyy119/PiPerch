@@ -82,6 +82,11 @@ export async function listRecommendations() {
   ).items
 }
 
+export async function listArtworkRecommendations(artworkId: number) {
+  const path = `/api/discovery/artworks/${encodeURIComponent(String(artworkId))}/recommendations`
+  return recommendationsResponseSchema.parse(await api.get<unknown>(path)).items
+}
+
 export async function listRecommendedUsers() {
   return recommendedUsersResponseSchema.parse(
     await api.get<unknown>('/api/discovery/recommended-users'),

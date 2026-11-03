@@ -8,12 +8,14 @@ import { Button } from '@ui/button'
 import { cn } from '@ui/cn'
 import { toast } from '@ui/toast'
 
+const props = defineProps<{ sourceLabel: string }>()
+
 const selection = useDownloadSelection()
 const submission = useDownloadSubmissionStore()
 
 async function submitSelection() {
   try {
-    const result = await submission.submit('发现')
+    const result = await submission.submit(props.sourceLabel)
     if (result.failedError !== null) {
       toast.error('部分下载任务提交失败', {
         description: `已提交 ${String(result.createdJobCount)} 个下载任务，仍有 ${String(result.remainingCount)} 项未提交：${errorMessage(result.failedError)}`,

@@ -191,6 +191,31 @@ class PixivClient:
                 ordered.setdefault(artwork_id, candidate)
         return list(ordered.values())
 
+    async def discover_artwork_recommendations(
+        self,
+        artwork_id: int,
+        cookie: str | None,
+    ) -> list[DiscoveryCandidate]:
+        """读取指定作品的 Pixiv 推荐，保留推荐顺序并排除当前作品。"""
+        self._require_current_user_id(cookie)
+        body = _mapping(
+            await self._transport.get_body(
+                f"/ajax/illust/{artwork_id}/recommend/init",
+                cookie=cookie,
+                params={"limit": 18, "lang": "zh"},
+            )
+        )
+        if not isinstance(body.get("illusts"), list):
+            raise UpstreamError("invalid_pixiv_response", "Pixiv 返回的作品推荐结构无效。")
+        candidates: dict[int, DiscoveryCandidate] = {}
+        for raw_item in _sequence(body.get("illusts")):
+            item = _mapping(raw_item)
+            recommended_id = _integer(item.get("id"))
+            if recommended_id <= 0 or recommended_id == artwork_id or item.get("isAdContainer") is True:
+                continue
+            candidates.setdefault(recommended_id, candidate_from_mapping(item))
+        return list(candidates.values())
+
     async def discover_follow_updates(
         self,
         page: int,

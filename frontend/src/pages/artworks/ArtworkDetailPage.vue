@@ -13,6 +13,7 @@ import { artworkQueryKeys } from '@/features/library/library-query-cache'
 import ArtworkDescriptionSection from '@/pages/artworks/ArtworkDescriptionSection.vue'
 import ArtworkInfoSidebar from '@/pages/artworks/ArtworkInfoSidebar.vue'
 import ArtworkMediaSection from '@/pages/artworks/ArtworkMediaSection.vue'
+import RecommendedArtworksSection from '@/pages/artworks/RecommendedArtworksSection.vue'
 import RelatedArtworksSection from '@/pages/artworks/RelatedArtworksSection.vue'
 import { usePageKeyboardShortcuts } from '@/shared/lib/usePageKeyboardShortcuts'
 
@@ -103,6 +104,7 @@ usePageKeyboardShortcuts(
         <template v-if="artworkQuery.data.value">
           <ArtworkDescriptionSection :artwork="artworkQuery.data.value" />
           <RelatedArtworksSection :artwork-id="artworkId" />
+          <RecommendedArtworksSection :artwork-id="artworkId" />
         </template>
       </div>
 

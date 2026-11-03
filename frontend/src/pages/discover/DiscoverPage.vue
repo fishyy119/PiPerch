@@ -11,8 +11,8 @@ import {
 } from '@/features/discovery/discovery-api'
 import { useDownloadSelection } from '@/features/downloads/download-selection'
 import DiscoverAuthorCard from '@/pages/discover/DiscoverAuthorCard.vue'
-import DiscoverDownloadButton from '@/pages/discover/DiscoverDownloadButton.vue'
 import DiscoveryArtworkCard from '@/shared/components/discovery/DiscoveryArtworkCard.vue'
+import DownloadSelectionButton from '@/shared/components/downloads/DownloadSelectionButton.vue'
 import { errorMessage } from '@/shared/errors'
 import { useMarqueeSelection } from '@/shared/lib/useMarqueeSelection'
 import { Button } from '@ui/button'
@@ -226,5 +226,5 @@ function updateAuthorFollowState(userId: number, followed: boolean) {
       </template>
     </Tabs>
   </div>
-  <DiscoverDownloadButton />
+  <DownloadSelectionButton source-label="发现" />
 </template>
