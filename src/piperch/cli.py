@@ -9,9 +9,10 @@ import threading
 import webbrowser
 from contextlib import ExitStack
 from copy import deepcopy
+from dataclasses import dataclass, field
 from ipaddress import AddressValueError, IPv4Address
 from pathlib import Path
-from typing import TYPE_CHECKING, NoReturn, Protocol
+from typing import TYPE_CHECKING, Literal, NoReturn, Protocol
 from uuid import uuid4
 
 import uvicorn
@@ -34,6 +35,74 @@ _PIPERCH_LOGGING_CONFIG["loggers"]["piperch"] = {
 if TYPE_CHECKING:
     from collections.abc import Callable, Sequence
     from typing import Any
+
+
+@dataclass(slots=True)
+class Args:
+    """声明并校验命令行参数，向程序提供类型明确的配置。"""
+
+    command: Literal["serve", "db"]
+    data_dir: Path | None = None
+    port: int = 9303
+    hosts: list[str] = field(default_factory=list[str])
+    verbose: bool = False
+    action: Literal["upgrade"] | None = None
+
+    @staticmethod
+    def add_arguments(parser: argparse.ArgumentParser) -> None:
+        commands = parser.add_subparsers(dest="command", required=True)
+
+        serve = commands.add_parser("serve", help="迁移数据库并启动本地服务", argument_default=argparse.SUPPRESS)
+        serve.add_argument("--port")
+        serve.add_argument(
+            "--host",
+            dest="hosts",
+            action="append",
+            metavar="IP",
+            help="追加监听的本机 IPv4 地址，可重复传入，始终监听 127.0.0.1",
+        )
+        serve.add_argument("--data-dir")
+        serve.add_argument("--verbose", action="store_true", help="输出每个 HTTP 请求的访问日志")
+
+        database = commands.add_parser("db", help="数据库管理", argument_default=argparse.SUPPRESS)
+        database.add_argument("action", choices=["upgrade"])
+        database.add_argument("--data-dir")
+
+    @classmethod
+    def from_ns(cls, namespace: argparse.Namespace) -> Args:
+        return cls(**vars(namespace))
+
+    def __post_init__(self) -> None:
+        if self.data_dir is not None:
+            self.data_dir = Path(self.data_dir)
+
+        try:
+            self.port = int(self.port)
+        except ValueError as error:
+            raise ValueError("端口必须是整数。") from error
+        if not 1 <= self.port <= 65535:
+            raise ValueError("端口必须位于 1 到 65535 之间。")
+
+        hosts: list[str] = []
+        for value in self.hosts:
+            try:
+                address = IPv4Address(value)
+            except AddressValueError as error:
+                raise ValueError("监听地址必须是有效的 IPv4 地址。") from error
+            if address.is_unspecified:
+                raise ValueError("请指定具体的 IPv4 地址，不能使用 0.0.0.0。")
+            hosts.append(str(address))
+        self.hosts = hosts
+
+    @classmethod
+    def parse(cls) -> Args:
+        parser = argparse.ArgumentParser(prog="piperch", description="PiPerch 本地 Pixiv 管理器")
+        cls.add_arguments(parser)
+        namespace = parser.parse_args()
+        try:
+            return cls.from_ns(namespace)
+        except ValueError as error:
+            parser.error(str(error))
 
 
 class _NonSuccessAccessFilter(logging.Filter):
@@ -139,17 +208,6 @@ def _start_terminal_interrupt_watcher(server: _ServerLifecycle) -> None:
     ).start()
 
 
-# TODO: 整理参数解析
-def _parse_host(value: str) -> str:
-    try:
-        address = IPv4Address(value)
-    except AddressValueError as error:
-        raise argparse.ArgumentTypeError("监听地址必须是有效的 IPv4 地址。") from error
-    if address.is_unspecified:
-        raise argparse.ArgumentTypeError("请指定具体的 IPv4 地址，不能使用 0.0.0.0。")
-    return str(address)
-
-
 def _bind_sockets(hosts: Sequence[str], port: int) -> list[socket.socket]:
     sockets: list[socket.socket] = []
     with ExitStack() as cleanup:
@@ -224,42 +282,17 @@ def run_server(
             return
 
 
-def _parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="piperch", description="PiPerch 本地 Pixiv 管理器")
-    commands = parser.add_subparsers(dest="command", required=True)
-
-    serve = commands.add_parser("serve", help="迁移数据库并启动本地服务")
-    serve.add_argument("--port", type=int, default=9303)
-    serve.add_argument(
-        "--host",
-        action="append",
-        default=[],
-        type=_parse_host,
-        metavar="IP",
-        help="追加监听的本机 IPv4 地址，可重复传入，始终监听 127.0.0.1",
-    )
-    serve.add_argument("--data-dir", type=Path)
-    serve.add_argument("--verbose", action="store_true", help="输出每个 HTTP 请求的访问日志")
-
-    database = commands.add_parser("db", help="数据库管理")
-    database.add_argument("action", choices=["upgrade"])
-    database.add_argument("--data-dir", type=Path)
-    return parser
-
-
 def main() -> NoReturn:
-    arguments = _parser().parse_args()
+    arguments = Args.parse()
     paths = AppPaths.from_data_dir(arguments.data_dir)
     if arguments.command == "db":
         paths.ensure_directories()
         run_migrations(paths)
         raise SystemExit(0)
-    if not 1 <= arguments.port <= 65535:
-        _parser().error("端口必须位于 1 到 65535 之间。")
     run_server(
         paths,
         arguments.port,
-        additional_hosts=arguments.host,
+        additional_hosts=arguments.hosts,
         open_browser=True,
         verbose=arguments.verbose,
     )
