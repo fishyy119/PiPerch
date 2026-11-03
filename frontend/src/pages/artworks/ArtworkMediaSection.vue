@@ -129,7 +129,7 @@ const pageIndexes = computed(() =>
 const currentPage = computed(() => selectedPage.value ?? pageIndexes.value[0] ?? null)
 const previewUrl = computed(() => {
   if (props.artwork.artworkType === 'ugoira') {
-    return `/api/artworks/${String(props.artwork.artworkId)}/cover`
+    return `/api/artworks/${String(props.artwork.artworkId)}/ugoira`
   }
   return currentPage.value === null ? '' : mediaUrl(currentPage.value)
 })
@@ -324,7 +324,7 @@ usePageKeyboardShortcuts(
       <div class="flex items-center gap-2 text-sm text-muted-foreground">
         <Images :size="17" />
         <span v-if="artwork.artworkType === 'ugoira'">
-          {{ artwork.ugoiraFrames.length }} 帧 · 首版暂不支持播放
+          {{ artwork.ugoiraFrames.length }} 帧 · 自动循环播放
         </span>
         <span v-else>
           第 {{ (currentPage ?? 0) + 1 }} / {{ artwork.pageCount }} 页 ·

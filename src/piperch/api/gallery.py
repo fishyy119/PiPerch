@@ -157,11 +157,19 @@ def get_ugoira(
     container: AppContainer = Depends(get_container),
 ) -> FileResponse:
     media = container.artworks.get_media(artwork_id, "ugoiraZip", None)
-    root = container.settings.get().library_root
+    detail = container.artworks.get_detail(artwork_id)
+    settings = container.settings.get()
+    animation = container.animations.ensure_animation(
+        artwork_id,
+        _safe_media_path(settings.library_root, media.relative_path),
+        detail.ugoira_frames,
+        settings.webp_quality,
+    )
     return FileResponse(
-        _safe_media_path(root, media.relative_path),
-        media_type="application/zip",
-        filename=Path(media.relative_path).name,
+        animation,
+        media_type="image/webp",
+        filename=f"{artwork_id}_ugoira.webp",
+        content_disposition_type="inline",
     )
 
 

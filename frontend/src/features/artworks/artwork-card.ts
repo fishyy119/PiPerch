@@ -15,6 +15,6 @@ export function localArtworkPreviewUrl(
   pageIndex: number,
 ) {
   return artworkType === 'ugoira'
-    ? `/api/artworks/${String(artworkId)}/cover`
+    ? `/api/artworks/${String(artworkId)}/ugoira`
     : `/api/artworks/${String(artworkId)}/pages/${String(pageIndex)}`
 }

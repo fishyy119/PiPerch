@@ -19,6 +19,7 @@ from piperch.services.library_files import LibraryFileOperations
 from piperch.services.storage import StorageMigrationService
 from piperch.services.tag_search import TagSearchIndex
 from piperch.services.thumbnails import ArtworkThumbnailCache
+from piperch.services.ugoira import UgoiraAnimationCache
 from piperch.settings import SettingsManager
 
 if TYPE_CHECKING:
@@ -88,6 +89,7 @@ async def lifespan(app: FastAPI, *, paths: AppPaths, control: AppControl) -> Asy
     download_repository = DownloadRepository(database)
     events = AppEventBroker()
     thumbnail_cache = ArtworkThumbnailCache(paths)
+    animation_cache = UgoiraAnimationCache(paths)
     library_files = LibraryFileOperations()
     library_commits = LibraryCommitCoordinator(events)
     download_commit_service = ArtworkDownloadCommitService(
@@ -118,6 +120,7 @@ async def lifespan(app: FastAPI, *, paths: AppPaths, control: AppControl) -> Asy
         mutation_lock,
         library_files,
         library_commits=library_commits,
+        animations=animation_cache,
     )
     storage_service = StorageMigrationService(
         paths,
@@ -145,6 +148,7 @@ async def lifespan(app: FastAPI, *, paths: AppPaths, control: AppControl) -> Asy
         events=events,
         library=library_service,
         thumbnails=thumbnail_cache,
+        animations=animation_cache,
         storage=storage_service,
         instance_id=control.instance_id,
     )

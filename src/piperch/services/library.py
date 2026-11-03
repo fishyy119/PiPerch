@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 from piperch.errors import AppError, NotFoundError
 from piperch.services.library_files import LibraryFileOperations
 from piperch.services.thumbnails import ArtworkThumbnailCache
+from piperch.services.ugoira import UgoiraAnimationCache
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -36,11 +37,13 @@ class LibraryService:
         files: LibraryFileOperations | None = None,
         *,
         library_commits: LibraryCommitCoordinator,
+        animations: UgoiraAnimationCache | None = None,
     ) -> None:
         self._paths = paths
         self._settings = settings
         self._artworks = artworks
         self._thumbnails = thumbnails or ArtworkThumbnailCache(paths)
+        self._animations = animations or UgoiraAnimationCache(paths)
         self._mutation_lock = mutation_lock or Lock()
         self._files = files or LibraryFileOperations()
         self._library_commits = library_commits
@@ -96,6 +99,7 @@ class LibraryService:
                 target.replace(source)
         for artwork_id in deleted_ids:
             self._thumbnails.delete_artwork(artwork_id)
+            self._animations.delete_artwork(artwork_id)
         self._files.cleanup_delete_root(root)
         return ArtworkDeleteResult(
             deleted=len(deleted_ids),

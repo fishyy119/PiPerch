@@ -17,6 +17,7 @@ if TYPE_CHECKING:
     from piperch.services.library import LibraryService
     from piperch.services.storage import StorageMigrationService
     from piperch.services.thumbnails import ArtworkThumbnailCache
+    from piperch.services.ugoira import UgoiraAnimationCache
     from piperch.settings import SettingsManager
 
 
@@ -36,5 +37,6 @@ class AppContainer:
     events: AppEventBroker
     library: LibraryService
     thumbnails: ArtworkThumbnailCache
+    animations: UgoiraAnimationCache
     storage: StorageMigrationService
     instance_id: str
