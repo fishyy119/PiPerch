@@ -10,7 +10,7 @@ import {
   Trash2,
 } from '@lucide/vue'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query'
-import { computed, nextTick, ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 
@@ -62,8 +62,7 @@ const deleteMutation = useMutation({
   onSuccess: async () => {
     const artworkId = props.artwork.artworkId
     deleteOpen.value = false
-    await router.replace('/gallery')
-    await nextTick()
+    router.back()
     removeArtworkData(queryClient, artworkId)
     await invalidateArtworkGroupData(queryClient)
   },
