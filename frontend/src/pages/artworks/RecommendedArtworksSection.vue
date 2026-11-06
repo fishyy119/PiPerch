@@ -23,10 +23,7 @@ const cardWidth = usePreference('artworkDetail.relatedCardWidth')
 const recommendationsQuery = useQuery({
   queryKey: computed(() => ['artwork-recommendations', props.artworkId]),
   queryFn: () => listArtworkRecommendations(props.artworkId),
-  staleTime: Number.POSITIVE_INFINITY,
-  refetchOnMount: false,
-  refetchOnWindowFocus: false,
-  refetchOnReconnect: false,
+  enabled: false,
   retry: false,
 })
 const selectionRoot = ref<HTMLElement | null>(null)
@@ -84,7 +81,7 @@ async function refreshRecommendations() {
         </SettingsPopover>
       </div>
     </div>
-    <p v-if="recommendationsQuery.isPending.value" class="py-8 text-sm text-muted-foreground">
+    <p v-if="recommendationsQuery.isLoading.value" class="py-8 text-sm text-muted-foreground">
       正在读取 Pixiv 推荐…
     </p>
     <div
@@ -109,6 +106,12 @@ async function refreshRecommendations() {
         @toggle="selection.toggle"
       />
     </div>
+    <p
+      v-else-if="recommendationsQuery.data.value === undefined"
+      class="py-8 text-sm text-muted-foreground"
+    >
+      点击刷新获取当前作品的 Pixiv 推荐。
+    </p>
     <p v-else class="py-8 text-sm text-muted-foreground">当前没有可展示的 Pixiv 推荐。</p>
   </Card>
   <DownloadSelectionButton source-label="作品推荐" />
