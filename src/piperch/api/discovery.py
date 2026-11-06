@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 
 from anyio import to_thread
-from fastapi import APIRouter, Depends, Path
+from fastapi import APIRouter, Depends, Path, Request
 
 from piperch.api.dependencies import get_container
 from piperch.api.models import (
@@ -26,6 +26,7 @@ from piperch.api.models import (
     UserDiscoveryRequest,
 )
 from piperch.api.pixiv_images import proxied_image_url
+from piperch.api.request_tasks import run_until_disconnect
 from piperch.application.container import AppContainer
 from piperch.domain.bookmarks import BookmarkFolderReference
 from piperch.domain.discovery import DiscoveryCandidate
@@ -153,11 +154,14 @@ async def recommended_users(
     response_model=RecommendationsResponse,
 )
 async def artwork_recommendations(
+    request: Request,
     artwork_id: int = Path(gt=0),
     container: AppContainer = Depends(get_container),
 ) -> RecommendationsResponse:
     settings = await to_thread.run_sync(container.settings.get)
-    candidates = await container.pixiv.discover_artwork_recommendations(artwork_id, settings.pixiv_cookie)
+    candidates = await run_until_disconnect(
+        request, container.pixiv.discover_artwork_recommendations(artwork_id, settings.pixiv_cookie)
+    )
     existing_ids = await to_thread.run_sync(
         container.artworks.find_existing_ids,
         [item.artwork_id for item in candidates],

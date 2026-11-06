@@ -1,7 +1,7 @@
 import { z } from 'zod'
 
 import { artworkTypeSchema } from '@/features/artworks/artwork'
-import { api } from '@/shared/api/http'
+import { api, type ApiRequestOptions } from '@/shared/api/http'
 
 export const discoveryItemSchema = z.object({
   artworkId: z.number().int().positive(),
@@ -82,9 +82,9 @@ export async function listRecommendations() {
   ).items
 }
 
-export async function listArtworkRecommendations(artworkId: number) {
+export async function listArtworkRecommendations(artworkId: number, options?: ApiRequestOptions) {
   const path = `/api/discovery/artworks/${encodeURIComponent(String(artworkId))}/recommendations`
-  return recommendationsResponseSchema.parse(await api.get<unknown>(path)).items
+  return recommendationsResponseSchema.parse(await api.get<unknown>(path, options)).items
 }
 
 export async function listRecommendedUsers() {
