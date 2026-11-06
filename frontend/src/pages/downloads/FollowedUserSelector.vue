@@ -3,6 +3,7 @@ import { UserRound } from '@lucide/vue'
 import { ref } from 'vue'
 
 import type { FollowedUser } from '@/features/authors/author-api'
+import { ManagedImage } from '@ui/image'
 
 defineProps<{
   users: readonly FollowedUser[]
@@ -36,7 +37,7 @@ function markAvatarUnavailable(userId: number) {
       <span
         class="grid size-11 shrink-0 place-items-center overflow-hidden rounded-full bg-muted text-muted-foreground"
       >
-        <img
+        <ManagedImage
           v-if="user.avatarUrl && !failedAvatars.has(user.userId)"
           class="size-full object-cover"
           :src="user.avatarUrl"

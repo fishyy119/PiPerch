@@ -28,14 +28,11 @@ const recommendationsQuery = useQuery({
   refetchOnWindowFocus: false,
   refetchOnReconnect: false,
   retry: false,
-  // 保留上一份数据以避免中间加载态高度坍缩；遮罩层负责阻止旧内容被操作。
-  placeholderData: (previousData) => previousData,
 })
 const selectionRoot = ref<HTMLElement | null>(null)
 const marquee = useMarqueeSelection(selectionRoot, {
   selectedIds: () => selection.selectedIds,
   setSelectedIds: selection.setSelected,
-  enabled: () => !recommendationsQuery.isPlaceholderData.value,
   canStart: (event) =>
     !event.ctrlKey || !(event.target instanceof Element) || !event.target.closest('a'),
 })
@@ -59,10 +56,6 @@ async function refreshRecommendations() {
 
 <template>
   <Card as="section" class="relative p-5 sm:p-6">
-    <div
-      v-if="recommendationsQuery.isPlaceholderData.value"
-      class="absolute inset-0 z-10 cursor-progress"
-    />
     <div class="mb-4 flex flex-wrap items-start justify-between gap-3">
       <div>
         <h2 class="font-semibold">Pixiv 推荐</h2>

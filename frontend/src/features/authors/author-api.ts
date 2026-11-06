@@ -17,7 +17,7 @@ const followedUserSchema = z.object({
 
 export type FollowedUser = z.infer<typeof followedUserSchema>
 
-export function userProfileKey(userId: number) {
+export function userProfileKey(userId: number | undefined) {
   return ['user-profile', userId] as const
 }
 

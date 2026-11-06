@@ -7,9 +7,9 @@ import { usePreference } from '@/app/usePreference'
 import { listRelatedArtworks } from '@/features/artworks/artworks-api'
 import { artworkQueryKeys } from '@/features/library/library-query-cache'
 import { Card } from '@ui/card'
+import { SmartCropImage } from '@ui/image'
 import { SettingsPopover } from '@ui/settings-popover'
 import { Slider } from '@ui/slider'
-import { SmartCropImage } from '@ui/smart-crop-image'
 
 const props = defineProps<{ artworkId: number }>()
 

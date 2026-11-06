@@ -3,7 +3,7 @@ import { onBeforeUnmount, ref, watch } from 'vue'
 
 import { analyzeSmartCrop } from '@/shared/lib/smart-crop'
 
-defineOptions({ inheritAttrs: false })
+import ManagedImage from './ManagedImage.vue'
 
 const props = withDefaults(
   defineProps<{
@@ -72,8 +72,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <img
-    v-bind="$attrs"
+  <ManagedImage
     :src="src"
     :alt="alt"
     :style="{ objectPosition }"

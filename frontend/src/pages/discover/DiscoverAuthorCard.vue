@@ -7,6 +7,7 @@ import AuthorFollowButton from '@/shared/components/authors/AuthorFollowButton.v
 import AuthorIdButton from '@/shared/components/authors/AuthorIdButton.vue'
 import DiscoveryArtworkCard from '@/shared/components/discovery/DiscoveryArtworkCard.vue'
 import { Card } from '@ui/card'
+import { ManagedImage } from '@ui/image'
 
 defineProps<{
   author: RecommendedUser
@@ -32,7 +33,7 @@ function pixivUserUrl(userId: number) {
         <div
           class="grid size-14 shrink-0 place-items-center overflow-hidden rounded-full bg-muted text-muted-foreground"
         >
-          <img
+          <ManagedImage
             v-if="author.avatarUrl && !avatarFailed"
             class="size-full object-cover"
             :src="author.avatarUrl"

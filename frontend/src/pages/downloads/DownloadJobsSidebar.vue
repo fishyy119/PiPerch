@@ -19,6 +19,7 @@ import { Button } from '@ui/button'
 import { Card } from '@ui/card'
 import { cn } from '@ui/cn'
 import { Dialog } from '@ui/dialog'
+import { ManagedImage } from '@ui/image'
 
 const { sourceLabel } = useDownloadWorkspaceState()
 const queryClient = useQueryClient()
@@ -224,7 +225,7 @@ async function submitSelection() {
             />
             <template v-else>
               <ImageOff class="absolute inset-0 m-auto text-muted-foreground" :size="20" />
-              <img
+              <ManagedImage
                 v-if="entry.item?.thumbnailUrl"
                 class="relative size-full bg-muted object-cover"
                 :src="entry.item.thumbnailUrl"

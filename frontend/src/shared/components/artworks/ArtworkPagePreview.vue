@@ -5,6 +5,7 @@ import { nextTick, ref, watch } from 'vue'
 import type { ArtworkPreviewUrlResolver } from '@/features/artworks/artwork-card'
 import { cn } from '@ui/cn'
 import { HoverCard } from '@ui/hover-card'
+import { ManagedImage } from '@ui/image'
 
 const props = defineProps<{
   title: string
@@ -148,7 +149,7 @@ function hidePreviewOnFocusOut(event: FocusEvent) {
 
     <div class="relative p-1" @click.left.stop="previewOpen = false">
       <div class="relative grid min-h-40 min-w-72 place-items-center rounded-lg bg-muted">
-        <img
+        <ManagedImage
           v-if="previewUrl && !previewImageFailed"
           :key="previewUrl"
           :class="

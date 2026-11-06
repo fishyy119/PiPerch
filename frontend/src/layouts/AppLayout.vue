@@ -1,14 +1,46 @@
 <script setup lang="ts">
 import { Compass, Download, Folders, Images, Menu, Settings, X } from '@lucide/vue'
-import { computed, ref } from 'vue'
-import { RouterLink, RouterView, useRoute } from 'vue-router'
+import { useQueryClient } from '@tanstack/vue-query'
+import { computed, nextTick, onScopeDispose, ref } from 'vue'
+import {
+  isNavigationFailure,
+  NavigationFailureType,
+  RouterLink,
+  RouterView,
+  useRoute,
+  useRouter,
+} from 'vue-router'
 
 import { useAppEvents } from '@/app/useAppEvents'
+import { imageRequests } from '@/shared/lib/image-loading'
 import { cn } from '@ui/cn'
 
 useAppEvents()
 
 const route = useRoute()
+const router = useRouter()
+const queryClient = useQueryClient()
+
+function retryUnfinishedImages() {
+  // 视图更新后，只恢复仍被使用的未完成图片，保留已加载的结果。
+  void nextTick(() => {
+    void imageRequests.retryUnfinished(queryClient)
+  })
+}
+
+onScopeDispose(
+  router.beforeEach(() => {
+    void imageRequests.cancel(queryClient)
+  }),
+)
+onScopeDispose(
+  router.afterEach((_to, _from, failure) => {
+    // 被下一次导航取代时，由后续页面决定需要加载的图片。
+    if (!isNavigationFailure(failure, NavigationFailureType.cancelled)) retryUnfinishedImages()
+  }),
+)
+onScopeDispose(router.onError(retryUnfinishedImages))
+
 const mobileOpen = ref(false)
 const pageTitle = computed(() =>
   typeof route.meta.title === 'string' ? route.meta.title : 'PiPerch',
