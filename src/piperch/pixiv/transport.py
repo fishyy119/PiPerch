@@ -155,13 +155,16 @@ class PixivTransport:
             remaining = self._request_interval - (time.monotonic() - self._last_metadata_request)
             if remaining > 0:
                 await asyncio.sleep(remaining)
-            response = await self._request(
-                "GET",
-                f"https://{_PIXIV_API_HOST}{path}",
-                cookie=cookie,
-                params=params,
-            )
-            self._last_metadata_request = time.monotonic()
+            try:
+                response = await self._request(
+                    "GET",
+                    f"https://{_PIXIV_API_HOST}{path}",
+                    cookie=cookie,
+                    params=params,
+                )
+            finally:
+                # 请求取消后仍保留间隔，避免连续切换绕过 Pixiv 访问限速。
+                self._last_metadata_request = time.monotonic()
         payload = cast("object", response.json())
         root = as_mapping(payload)
         if root.get("error") is True:

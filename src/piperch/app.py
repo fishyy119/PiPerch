@@ -15,6 +15,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
 from sqlalchemy import text
 from starlette.exceptions import HTTPException
+from starlette.requests import ClientDisconnect
 
 from piperch import __version__
 from piperch.api import authors, discovery, downloads, favorites, gallery, groups, pixiv_images, settings
@@ -56,6 +57,10 @@ def create_app(paths: AppPaths | None = None, control: AppControl | None = None)
             status_code=error.status_code,
             content=response.model_dump(by_alias=True, exclude_none=True),
         )
+
+    @application.exception_handler(ClientDisconnect)
+    async def client_disconnect_handler(_request: Request, _error: ClientDisconnect) -> Response:
+        return Response(status_code=499)
 
     @application.exception_handler(RequestValidationError)
     async def validation_error_handler(

@@ -20,6 +20,8 @@ interface RequestOptions extends Omit<RequestInit, 'body'> {
   body?: unknown
 }
 
+export type ApiRequestOptions = Omit<RequestInit, 'body' | 'method'>
+
 async function request<T>(url: string, options: RequestOptions = {}): Promise<T> {
   const { body, ...init } = options
   const headers = new Headers(init.headers)
@@ -45,8 +47,8 @@ async function request<T>(url: string, options: RequestOptions = {}): Promise<T>
 }
 
 export const api = {
-  get<T>(url: string): Promise<T> {
-    return request<T>(url)
+  get<T>(url: string, options?: ApiRequestOptions): Promise<T> {
+    return request<T>(url, options)
   },
   post<T>(url: string, body?: unknown): Promise<T> {
     return request<T>(url, { method: 'POST', body })

@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-import { api } from '@/shared/api/http'
+import { api, type ApiRequestOptions } from '@/shared/api/http'
 
 const userProfileSchema = z.object({
   avatarUrl: z.string().startsWith('/api/pixiv-images?url=').nullable(),
@@ -25,9 +25,9 @@ function userFollowPath(userId: number) {
   return `/api/authors/${encodeURIComponent(String(userId))}/follow`
 }
 
-export async function getUserProfile(userId: number) {
+export async function getUserProfile(userId: number, options?: ApiRequestOptions) {
   const path = `/api/authors/${encodeURIComponent(String(userId))}/profile`
-  return userProfileSchema.parse(await api.get<unknown>(path))
+  return userProfileSchema.parse(await api.get<unknown>(path, options))
 }
 
 export async function listFollowedUsers(refresh = false) {

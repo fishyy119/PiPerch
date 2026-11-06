@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 from pathlib import PurePosixPath
 from urllib.parse import quote, unquote, urlsplit
 
@@ -8,6 +7,7 @@ from anyio import to_thread
 from fastapi import APIRouter, Depends, Request, Response
 
 from piperch.api.dependencies import get_container
+from piperch.api.request_tasks import run_until_disconnect
 from piperch.application.container import AppContainer
 
 router = APIRouter(prefix="/pixiv-images", tags=["pixiv"])
@@ -25,19 +25,7 @@ async def get_pixiv_image(
     request: Request,
     container: AppContainer = Depends(get_container),
 ) -> Response:
-    download = asyncio.create_task(_fetch_image(url, container))
-    disconnect = asyncio.create_task(_wait_for_disconnect(request))
-    try:
-        done, _pending = await asyncio.wait((download, disconnect), return_when=asyncio.FIRST_COMPLETED)
-        if disconnect in done:
-            await disconnect
-            return Response(status_code=499)
-        content, media_type = await download
-    finally:
-        # 普通响应不会自动中止断连前的上游请求，显式清理下载和断连监听任务。
-        download.cancel()
-        disconnect.cancel()
-        await asyncio.gather(download, disconnect, return_exceptions=True)
+    content, media_type = await run_until_disconnect(request, _fetch_image(url, container))
 
     filename = PurePosixPath(unquote(urlsplit(url).path).replace("\\", "/")).name or "image"
     return Response(
@@ -49,13 +37,6 @@ async def get_pixiv_image(
             "X-Content-Type-Options": "nosniff",
         },
     )
-
-
-async def _wait_for_disconnect(request: Request) -> None:
-    while True:
-        message = await request.receive()
-        if message["type"] == "http.disconnect":
-            return
 
 
 async def _fetch_image(url: str, container: AppContainer) -> tuple[bytes, str]:

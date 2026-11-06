@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from anyio import to_thread
-from fastapi import APIRouter, Depends, Path, Query, Response, status
+from fastapi import APIRouter, Depends, Path, Query, Request, Response, status
 
 from piperch.api.dependencies import get_container
 from piperch.api.models import (
@@ -10,6 +10,7 @@ from piperch.api.models import (
     UserProfileResponse,
 )
 from piperch.api.pixiv_images import proxied_image_url
+from piperch.api.request_tasks import run_until_disconnect
 from piperch.application.container import AppContainer
 
 router = APIRouter(prefix="/authors", tags=["authors"])
@@ -36,11 +37,12 @@ async def followed_authors(
 
 @router.get("/{author_id}/profile", response_model=UserProfileResponse)
 async def author_profile(
+    request: Request,
     author_id: int = Path(gt=0),
     container: AppContainer = Depends(get_container),
 ) -> UserProfileResponse:
     settings = await to_thread.run_sync(container.settings.get)
-    profile = await container.pixiv.get_user_profile(author_id, settings.pixiv_cookie)
+    profile = await run_until_disconnect(request, container.pixiv.get_user_profile(author_id, settings.pixiv_cookie))
     return UserProfileResponse(
         avatar_url=proxied_image_url(profile.avatar_url),
         is_followed=profile.is_followed,

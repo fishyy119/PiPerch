@@ -55,10 +55,10 @@ watch(
 
 const authorProfileQuery = useQuery({
   queryKey: computed(() => userProfileKey(currentArtwork.value?.authorId)),
-  queryFn: ({ queryKey }) => {
+  queryFn: ({ queryKey, signal }) => {
     const authorId = queryKey[1]
     if (authorId === undefined) throw new Error('当前作品的作者尚未就绪。')
-    return getUserProfile(authorId)
+    return getUserProfile(authorId, { signal })
   },
   enabled: computed(() => currentArtwork.value !== undefined),
   placeholderData: keepPreviousData,
