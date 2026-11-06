@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import { ExternalLink, Search, UserRound } from '@lucide/vue'
-import { useQueryClient } from '@tanstack/vue-query'
-import { ref, watch } from 'vue'
+import { useQuery, useQueryClient } from '@tanstack/vue-query'
+import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
 import { artworkTypeLabel } from '@/features/artworks/artwork'
 import type { ArtworkDetail } from '@/features/artworks/artworks-api'
-import { type UserProfile, userProfileKey } from '@/features/authors/author-api'
+import { getUserProfile, type UserProfile, userProfileKey } from '@/features/authors/author-api'
 import { useDownloadWorkspaceStore } from '@/features/downloads/download-workspace'
 import AuthorFollowButton from '@/shared/components/authors/AuthorFollowButton.vue'
 import AuthorIdButton from '@/shared/components/authors/AuthorIdButton.vue'
@@ -16,19 +16,16 @@ import { Card } from '@ui/card'
 import { cn } from '@ui/cn'
 import { ManagedImage } from '@ui/image'
 
-const props = defineProps<{
-  artwork: ArtworkDetail
-  authorProfile: {
-    current: UserProfile | undefined
-    displayed: UserProfile | undefined
-    status: 'pending' | 'error' | 'success'
-  }
-}>()
+const props = defineProps<{ artwork: ArtworkDetail }>()
 
 const router = useRouter()
 const queryClient = useQueryClient()
 const { requestPreview } = useDownloadWorkspaceStore()
 const authorAvatarFailed = ref(false)
+const authorProfileQuery = useQuery({
+  queryKey: computed(() => userProfileKey(props.artwork.authorId)),
+  queryFn: ({ queryKey, signal }) => getUserProfile(queryKey[1], { signal }),
+})
 
 watch(
   () => props.artwork.artworkId,
@@ -79,17 +76,17 @@ function formatDate(value: string | null) {
     <Card as="section" class="p-5">
       <div class="flex items-center justify-between gap-3">
         <h3 class="text-sm font-semibold text-muted-foreground">画师</h3>
-        <span v-if="authorProfile.status === 'pending'" class="text-xs text-muted-foreground">
+        <span v-if="authorProfileQuery.isPending.value" class="text-xs text-muted-foreground">
           查询中…
         </span>
-        <span v-else-if="authorProfile.status === 'error'" class="text-xs text-muted-foreground">
+        <span v-else-if="authorProfileQuery.error.value" class="text-xs text-muted-foreground">
           状态未知
         </span>
         <AuthorFollowButton
-          v-else-if="authorProfile.current"
+          v-else-if="authorProfileQuery.data.value"
           size="small"
           :user-id="artwork.authorId"
-          :followed="authorProfile.current.isFollowed"
+          :followed="authorProfileQuery.data.value.isFollowed"
           @change="updateAuthorFollowState"
         />
       </div>
@@ -108,11 +105,10 @@ function formatDate(value: string | null) {
           <span
             class="grid size-12 shrink-0 place-items-center overflow-hidden rounded-full bg-primary text-primary-foreground shadow-sm"
           >
-            <!-- 旧资料只维持头像占位，图片请求来源由当前作者资料决定。 -->
             <ManagedImage
-              v-if="authorProfile.displayed?.avatarUrl && !authorAvatarFailed"
+              v-if="authorProfileQuery.data.value?.avatarUrl && !authorAvatarFailed"
               class="size-full object-cover"
-              :src="authorProfile.current?.avatarUrl"
+              :src="authorProfileQuery.data.value.avatarUrl"
               alt=""
               loading="lazy"
               @error="authorAvatarFailed = true"

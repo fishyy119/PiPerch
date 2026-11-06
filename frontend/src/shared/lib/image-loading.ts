@@ -1,4 +1,4 @@
-import { keepPreviousData, type QueryClient, useQuery } from '@tanstack/vue-query'
+import { type QueryClient, useQuery } from '@tanstack/vue-query'
 import { useIntersectionObserver, useObjectUrl } from '@vueuse/core'
 import { computed, type MaybeRefOrGetter, type Ref, shallowRef, toValue, watch } from 'vue'
 
@@ -20,15 +20,12 @@ export const imageRequests = {
 
 export function useImageSource(
   image: Readonly<Ref<HTMLImageElement | null>>,
-  src: MaybeRefOrGetter<string | null | undefined>,
+  src: MaybeRefOrGetter<string>,
   loading: MaybeRefOrGetter<'eager' | 'lazy' | undefined>,
 ) {
-  const source = computed(() => {
-    const value = toValue(src) ?? null
-    return value === '' ? null : value
-  })
+  const source = computed(() => toValue(src))
   const managed = computed(() => {
-    if (source.value === null) return false
+    if (source.value === '') return false
     const url = new URL(source.value, window.location.href)
     return url.origin === window.location.origin && url.pathname === '/api/pixiv-images'
   })
@@ -47,9 +44,7 @@ export function useImageSource(
   const query = useQuery({
     queryKey: computed(() => [...imageQueryKey, source.value] as const),
     queryFn: async ({ queryKey, signal }) => {
-      const url = queryKey[1]
-      if (url === null) throw new Error('图片来源尚未就绪。')
-      const response = await fetch(url, { signal })
+      const response = await fetch(queryKey[1], { signal })
       if (!response.ok) throw new Error(`图片加载失败：HTTP ${String(response.status)}`)
       return response.blob()
     },
@@ -58,9 +53,8 @@ export function useImageSource(
         managed.value &&
         (toValue(loading) !== 'lazy' || visible.value || !('IntersectionObserver' in window)),
     ),
-    placeholderData: keepPreviousData,
     staleTime: Number.POSITIVE_INFINITY,
-    // 暂时没有新来源时保留已加载图片，短时间复用同地址响应，一分钟后回收闲置 Blob。
+    // 短时间复用同地址响应，一分钟后回收闲置 Blob。
     gcTime: 60_000,
     retry: false,
     refetchOnWindowFocus: false,
@@ -74,5 +68,8 @@ export function useImageSource(
     },
     { flush: 'post' },
   )
-  return computed(() => (source.value === null || managed.value ? objectUrl.value : source.value))
+  return computed(() => {
+    const url = managed.value ? objectUrl.value : source.value
+    return url === '' ? undefined : url
+  })
 }

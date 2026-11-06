@@ -4,7 +4,7 @@ import { useTemplateRef } from 'vue'
 import { useImageSource } from '@/shared/lib/image-loading'
 
 const props = defineProps<{
-  src?: string | null | undefined
+  src: string
   alt?: string
   loading?: 'eager' | 'lazy'
 }>()

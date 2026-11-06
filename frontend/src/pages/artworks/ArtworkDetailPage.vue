@@ -4,7 +4,6 @@ import { computed, ref, shallowRef, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import { type ArtworkDetail, getArtwork } from '@/features/artworks/artworks-api'
-import { getUserProfile, userProfileKey } from '@/features/authors/author-api'
 import {
   galleryNavigationRouteState,
   type GalleryNavigationState,
@@ -31,7 +30,7 @@ const artworkQuery = useQuery({
   // 保留上一份数据以避免中间加载态高度坍缩；遮罩层负责阻止旧内容被操作。
   placeholderData: keepPreviousData,
 })
-// 旧作品只用于显示，依赖查询始终以当前作品的真实数据作为来源。
+// 侧栏只接收当前作品的数据，切换时卸载旧侧栏及其作者资料查询。
 const currentArtwork = computed(() =>
   !artworkQuery.isPlaceholderData.value && artworkQuery.data.value?.artworkId === artworkId.value
     ? artworkQuery.data.value
@@ -52,25 +51,6 @@ watch(
     if (error !== null) displayedArtwork.value = null
   },
 )
-
-const authorProfileQuery = useQuery({
-  queryKey: computed(() => userProfileKey(currentArtwork.value?.authorId)),
-  queryFn: ({ queryKey, signal }) => {
-    const authorId = queryKey[1]
-    if (authorId === undefined) throw new Error('当前作品的作者尚未就绪。')
-    return getUserProfile(authorId, { signal })
-  },
-  enabled: computed(() => currentArtwork.value !== undefined),
-  placeholderData: keepPreviousData,
-})
-const authorProfile = computed(() => {
-  const pending = currentArtwork.value === undefined || authorProfileQuery.isPlaceholderData.value
-  return {
-    current: pending ? undefined : authorProfileQuery.data.value,
-    displayed: authorProfileQuery.data.value,
-    status: pending ? 'pending' : authorProfileQuery.status.value,
-  } as const
-})
 
 watch(artworkId, (currentArtworkId) => {
   const navigation = parseGalleryNavigationState(router.options.history.state)
@@ -133,11 +113,7 @@ usePageKeyboardShortcuts(
         </template>
       </div>
 
-      <ArtworkInfoSidebar
-        v-if="artworkQuery.data.value"
-        :artwork="artworkQuery.data.value"
-        :author-profile="authorProfile"
-      />
+      <ArtworkInfoSidebar v-if="currentArtwork" :artwork="currentArtwork" />
     </div>
   </article>
 </template>
