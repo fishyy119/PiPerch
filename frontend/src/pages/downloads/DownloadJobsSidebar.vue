@@ -3,7 +3,6 @@ import { ChevronDown, ChevronUp, Download, ImageOff, LoaderCircle, RefreshCw, X 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query'
 import { computed, ref, watch } from 'vue'
 
-import { discover } from '@/features/discovery/discovery-api'
 import {
   cancelDownloadJob,
   type DownloadJob,
@@ -11,6 +10,7 @@ import {
   listDownloadJobs,
   retryDownloadJob,
 } from '@/features/downloads/download-api'
+import { loadDownloadPreviews } from '@/features/downloads/download-preview'
 import { useDownloadSelection } from '@/features/downloads/download-selection'
 import { useDownloadSubmissionStore } from '@/features/downloads/download-submission'
 import { useDownloadWorkspaceState } from '@/features/downloads/download-workspace'
@@ -36,10 +36,12 @@ const PREVIEW_ROW_COUNT = 4
 const previewLimit = ref(0)
 const previewEntries = computed(() => selection.selectedEntries.slice(0, previewLimit.value))
 const hiddenPreviewCount = computed(() =>
-  previewLimit.value === 0 ? 0 : Math.max(selection.selectedIds.length - previewLimit.value, 0),
+  previewLimit.value === 0
+    ? 0
+    : Math.max(selection.selectedReferences.length - previewLimit.value, 0),
 )
 const missingPreviewIds = computed(() =>
-  previewEntries.value.filter((entry) => entry.item === null).map((entry) => entry.artworkId),
+  previewEntries.value.filter((entry) => entry.preview === null).map((entry) => entry.remoteId),
 )
 
 watch(
@@ -68,15 +70,18 @@ watch(
 )
 
 const previewQuery = useQuery({
-  queryKey: computed(() => ['download-selection-preview', missingPreviewIds.value]),
-  queryFn: async () => {
-    const result = await discover({
-      sourceType: 'artwork',
-      inputs: missingPreviewIds.value.map(String),
-      page: 0,
-    })
-    return result.items
-  },
+  queryKey: computed(() => [
+    'download-selection-preview',
+    previewEntries.value
+      .filter((entry) => entry.preview === null)
+      .map((entry) =>
+        entry.source === 'fanbox'
+          ? [entry.source, entry.remoteId, entry.authorId]
+          : [entry.source, entry.remoteId],
+      ),
+  ]),
+  queryFn: () =>
+    loadDownloadPreviews(previewEntries.value.filter((entry) => entry.preview === null)),
   enabled: computed(() => previewExpanded.value && missingPreviewIds.value.length > 0),
   retry: false,
 })
@@ -84,12 +89,12 @@ const previewQuery = useQuery({
 watch(
   () => previewQuery.data.value,
   (items) => {
-    if (items !== undefined) selection.cacheItems(items)
+    if (items !== undefined) selection.cachePreviews(items)
   },
 )
 
 watch(
-  () => selection.selectedIds.length,
+  () => selection.selectedReferences.length,
   (count) => {
     if (count !== 0) return
     previewExpanded.value = false
@@ -117,11 +122,11 @@ const failureGroups = computed(() => {
   for (const item of failureDetailsQuery.data.value?.items ?? []) {
     if (item.state !== 'failed') continue
     const reason = item.error ?? '下载失败。'
-    const artworkIds = groups.get(reason) ?? []
-    artworkIds.push(item.artworkId)
-    groups.set(reason, artworkIds)
+    const remoteIds = groups.get(reason) ?? []
+    remoteIds.push(item.remoteId)
+    groups.set(reason, remoteIds)
   }
-  return [...groups].map(([reason, artworkIds]) => ({ reason, artworkIds }))
+  return [...groups].map(([reason, remoteIds]) => ({ reason, remoteIds }))
 })
 
 const submission = useDownloadSubmissionStore()
@@ -188,16 +193,18 @@ async function submitSelection() {
         <h2 class="font-semibold">提交下载</h2>
         <Button
           variant="ghost"
-          :disabled="selection.selectedIds.length === 0"
+          :disabled="selection.selectedReferences.length === 0"
           @click="selection.clear"
         >
           <X :size="17" />清空
         </Button>
       </div>
       <div class="mt-1 flex items-center justify-between gap-3">
-        <p class="text-sm text-muted-foreground">已选择 {{ selection.selectedIds.length }} 项</p>
+        <p class="text-sm text-muted-foreground">
+          已选择 {{ selection.selectedReferences.length }} 项
+        </p>
         <button
-          v-if="selection.selectedIds.length"
+          v-if="selection.selectedReferences.length"
           type="button"
           class="inline-flex cursor-pointer items-center gap-1 text-xs text-muted-foreground transition hover:text-foreground"
           @click="previewExpanded = !previewExpanded"
@@ -207,28 +214,28 @@ async function submitSelection() {
           <ChevronDown v-else :size="14" />
         </button>
       </div>
-      <div v-if="previewExpanded && selection.selectedIds.length" class="mt-4">
+      <div v-if="previewExpanded && selection.selectedReferences.length" class="mt-4">
         <div
           ref="previewGrid"
           class="grid grid-cols-[repeat(auto-fill,79.5px)] justify-between gap-2"
         >
           <div
             v-for="entry in previewEntries"
-            :key="entry.artworkId"
+            :key="`${entry.source}:${entry.remoteId}`"
             class="relative aspect-square overflow-hidden rounded-lg bg-muted"
-            :title="entry.item?.title ?? `作品 ${String(entry.artworkId)}`"
+            :title="entry.preview?.title ?? `作品 ${String(entry.remoteId)}`"
           >
             <LoaderCircle
-              v-if="entry.item === null && previewQuery.isFetching.value"
+              v-if="entry.preview === null && previewQuery.isFetching.value"
               class="absolute inset-0 m-auto animate-spin text-muted-foreground"
               :size="20"
             />
             <template v-else>
               <ImageOff class="absolute inset-0 m-auto text-muted-foreground" :size="20" />
               <ManagedImage
-                v-if="entry.item?.thumbnailUrl"
+                v-if="entry.preview?.thumbnailUrl"
                 class="relative size-full bg-muted object-cover"
-                :src="entry.item.thumbnailUrl"
+                :src="entry.preview.thumbnailUrl"
                 alt=""
                 loading="lazy"
                 @error="($event.currentTarget as HTMLImageElement).remove()"
@@ -243,8 +250,8 @@ async function submitSelection() {
                   'hover:bg-destructive hover:text-destructive-foreground',
                 )
               "
-              :title="`从队列移除作品 ${String(entry.artworkId)}`"
-              @click="selection.removeIds([entry.artworkId])"
+              :title="`从队列移除作品 ${String(entry.remoteId)}`"
+              @click="selection.remove([entry])"
             >
               <X :size="14" />
             </button>
@@ -268,7 +275,7 @@ async function submitSelection() {
       </div>
       <Button
         class="mt-4 w-full"
-        :disabled="selection.selectedIds.length === 0 || submission.isPending"
+        :disabled="selection.selectedReferences.length === 0 || submission.isPending"
         @click="submitSelection"
       >
         <Download :size="18" />
@@ -379,11 +386,11 @@ async function submitSelection() {
                 {{ group.reason }}
               </p>
               <span class="shrink-0 rounded-lg bg-muted px-2 py-1 text-xs text-muted-foreground">
-                {{ group.artworkIds.length }} 项
+                {{ group.remoteIds.length }} 项
               </span>
             </div>
             <p class="mt-2 text-xs leading-5 wrap-break-word text-muted-foreground">
-              作品 ID：{{ group.artworkIds.join('、') }}
+              作品 ID：{{ group.remoteIds.join('、') }}
             </p>
           </section>
         </div>

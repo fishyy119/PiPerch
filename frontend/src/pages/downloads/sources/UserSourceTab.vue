@@ -3,13 +3,13 @@ import { Check, Search, UsersRound } from '@lucide/vue'
 import { useMutation } from '@tanstack/vue-query'
 import { computed, ref } from 'vue'
 
-import { type FollowedUser, listFollowedUsers } from '@/features/authors/author-api'
+import { type AuthorSummary, listFollowedUsers } from '@/features/authors/author-api'
 import { listSelectableUserArtworkIds } from '@/features/discovery/discovery-api'
 import { useDownloadSelection } from '@/features/downloads/download-selection'
 import { useDownloadWorkspaceStore } from '@/features/downloads/download-workspace'
 import { useLibraryMembershipStore } from '@/features/library/library-membership'
+import AuthorSelector from '@/pages/downloads/AuthorSelector.vue'
 import DiscoverySourceLayout from '@/pages/downloads/DiscoverySourceLayout.vue'
-import FollowedUserSelector from '@/pages/downloads/FollowedUserSelector.vue'
 import { errorMessage } from '@/shared/errors'
 import { Button } from '@ui/button'
 import { Input } from '@ui/input'
@@ -20,9 +20,9 @@ const { takePreviewRequest } = useDownloadWorkspaceStore()
 const selection = useDownloadSelection()
 const library = useLibraryMembershipStore()
 const sourceInput = ref('')
-const followedUsers = ref<FollowedUser[]>([])
+const followedUsers = ref<AuthorSummary[]>([])
 const showFollowedUsers = ref(false)
-const loadedAuthorSelection = ref<{ userId: number; artworkIds: number[] } | null>(null)
+const loadedAuthorSelection = ref<{ userId: number; remoteIds: number[] } | null>(null)
 const selectionNotice = ref('')
 
 const currentUserId = computed(() => {
@@ -37,7 +37,7 @@ const { candidates, page, nextPage, totalPages, emptyMessage, mutation, loadPage
   })
 
 const selectableAuthorArtworkIds = computed(() =>
-  (loadedAuthorSelection.value?.artworkIds ?? []).filter((id) => !library.isInLibrary(id)),
+  (loadedAuthorSelection.value?.remoteIds ?? []).filter((id) => !library.isInLibrary(id)),
 )
 const allAuthorWorksSelected = computed(() => {
   const loaded = loadedAuthorSelection.value
@@ -45,7 +45,9 @@ const allAuthorWorksSelected = computed(() => {
     loaded !== null &&
     loaded.userId === currentUserId.value &&
     selectableAuthorArtworkIds.value.length > 0 &&
-    selectableAuthorArtworkIds.value.every((artworkId) => selection.selectedIds.includes(artworkId))
+    selectableAuthorArtworkIds.value.every((artworkId) =>
+      selection.isSelected({ source: 'pixiv', remoteId: artworkId }),
+    )
   )
 })
 
@@ -60,15 +62,17 @@ const followedUsersMutation = useMutation({
 const selectAllMutation = useMutation({
   mutationFn: async (userId: number) => {
     const loaded = loadedAuthorSelection.value
-    const artworkIds =
-      loaded?.userId === userId ? loaded.artworkIds : await listSelectableUserArtworkIds(userId)
-    return { userId, artworkIds }
+    const remoteIds =
+      loaded?.userId === userId ? loaded.remoteIds : await listSelectableUserArtworkIds(userId)
+    return { userId, remoteIds }
   },
   onSuccess: (result) => {
     loadedAuthorSelection.value = result
-    const artworkIds = selection.addIds(result.artworkIds)
-    selectionNotice.value = artworkIds.length
-      ? `已选择该作者的全部 ${String(artworkIds.length)} 个作品。`
+    const remoteIds = selection.add(
+      result.remoteIds.map((remoteId) => ({ source: 'pixiv', remoteId })),
+    )
+    selectionNotice.value = remoteIds.length
+      ? `已选择该作者的全部 ${String(remoteIds.length)} 个作品。`
       : '该作者没有可选择的插画或漫画。'
   },
 })
@@ -78,7 +82,7 @@ function fetchFollowedUsers() {
   followedUsersMutation.mutate()
 }
 
-function selectFollowedUser(user: FollowedUser) {
+function selectFollowedUser(user: AuthorSummary) {
   sourceInput.value = String(user.userId)
 }
 
@@ -93,7 +97,9 @@ function toggleAllWorks() {
   if (userId === null) return
   const loaded = loadedAuthorSelection.value
   if (loaded?.userId === userId && allAuthorWorksSelected.value) {
-    selection.removeIds(selectableAuthorArtworkIds.value)
+    selection.remove(
+      selectableAuthorArtworkIds.value.map((remoteId) => ({ source: 'pixiv', remoteId })),
+    )
     return
   }
   selectAllMutation.mutate(userId)
@@ -144,7 +150,7 @@ if (previewRequest?.sourceType === 'user') {
           <h2 class="text-sm font-semibold">已关注作者</h2>
           <span class="text-xs text-muted-foreground">共 {{ followedUsers.length }} 位</span>
         </div>
-        <FollowedUserSelector
+        <AuthorSelector
           :users="followedUsers"
           :selected-user-id="currentUserId"
           @select="selectFollowedUser"

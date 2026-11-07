@@ -4,7 +4,6 @@ import asyncio
 import json
 import mimetypes
 import time
-from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 from email.utils import parsedate_to_datetime
 from html.parser import HTMLParser
@@ -17,9 +16,10 @@ from anyio import to_thread
 
 from piperch.errors import UpstreamError
 from piperch.pixiv.parsing import as_mapping, as_text
+from piperch.utils.http_client import HttpClientLifecycle
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncGenerator, Mapping, Sequence
+    from collections.abc import Mapping, Sequence
     from pathlib import Path
 
 _PIXIV_API_HOST = "www.pixiv.net"
@@ -79,14 +79,9 @@ class PixivTransport:
     """集中处理 HTTPX 生命周期、限速、重试和下载主机校验。"""
 
     def __init__(self, *, proxy_url: str | None, request_interval_ms: int) -> None:
-        self._client = self._build_client(proxy_url)
-        self._proxy_url = proxy_url
+        self._http = HttpClientLifecycle(self._build_client, proxy_url)
         self._request_interval = request_interval_ms / 1000
         self._metadata_lock = asyncio.Lock()
-        self._reconfigure_lock = asyncio.Lock()
-        self._client_condition = asyncio.Condition()
-        self._active_requests = 0
-        self._reconfiguring = False
         self._last_metadata_request = 0.0
         self._csrf_cookie: str | None = None
         self._cached_csrf_token: str | None = None
@@ -106,43 +101,11 @@ class PixivTransport:
         )
 
     async def reconfigure(self, proxy_url: str | None, request_interval_ms: int) -> None:
-        async with self._reconfigure_lock:
-            self._request_interval = request_interval_ms / 1000
-            if proxy_url == self._proxy_url:
-                return
-            replacement = self._build_client(proxy_url)
-            async with self._client_condition:
-                self._reconfiguring = True
-                try:
-                    await self._client_condition.wait_for(lambda: self._active_requests == 0)
-                    previous = self._client
-                    self._client = replacement
-                    self._proxy_url = proxy_url
-                finally:
-                    self._reconfiguring = False
-                    self._client_condition.notify_all()
-            await previous.aclose()
+        self._request_interval = request_interval_ms / 1000
+        await self._http.reconfigure(proxy_url)
 
     async def close(self) -> None:
-        async with self._reconfigure_lock:
-            async with self._client_condition:
-                self._reconfiguring = True
-                await self._client_condition.wait_for(lambda: self._active_requests == 0)
-                client = self._client
-            await client.aclose()
-
-    @asynccontextmanager
-    async def _use_client(self) -> AsyncGenerator[httpx.AsyncClient]:
-        async with self._client_condition:
-            await self._client_condition.wait_for(lambda: not self._reconfiguring)
-            self._active_requests += 1
-            client = self._client
-        try:
-            yield client
-        finally:
-            async with self._client_condition:
-                self._active_requests -= 1
-                self._client_condition.notify_all()
+        await self._http.close()
 
     async def get_body(
         self,
@@ -294,7 +257,7 @@ class PixivTransport:
         for attempt in range(3):
             try:
                 async with (
-                    self._use_client() as client,
+                    self._http.use() as client,
                     client.stream("GET", url, headers=self._cookie_headers(cookie)) as response,
                 ):
                     await self._raise_for_status(response)
@@ -340,7 +303,7 @@ class PixivTransport:
         for attempt in range(3):
             try:
                 async with (
-                    self._use_client() as client,
+                    self._http.use() as client,
                     client.stream("GET", url) as response,
                 ):
                     await self._raise_for_status(response)
@@ -396,7 +359,7 @@ class PixivTransport:
                 request_headers = self._cookie_headers(cookie)
                 if headers is not None:
                     request_headers.update(headers)
-                async with self._use_client() as client:
+                async with self._http.use() as client:
                     response = await client.request(
                         method,
                         url,

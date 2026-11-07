@@ -9,10 +9,12 @@ export const artworkGroupSchema = z.object({
 })
 export type ArtworkGroup = z.infer<typeof artworkGroupSchema>
 
-const artworkGroupsSchema = z.object({
-  artworkId: z.number().int().positive(),
-  groupIds: z.array(z.number().int().positive()),
-})
+const artworkGroupsSchema = z
+  .object({
+    artworkId: z.number().int().positive(),
+    groupIds: z.array(z.number().int().positive()),
+  })
+  .transform(({ artworkId, ...item }) => ({ ...item, localArtworkId: artworkId }))
 
 export async function listGroups() {
   return z.array(artworkGroupSchema).parse(await api.get<unknown>('/api/groups'))

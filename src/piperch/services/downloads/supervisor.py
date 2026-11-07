@@ -132,9 +132,11 @@ class DownloadSupervisor:
                 state = ItemState.CANCELLED
             else:
                 state = await self._service.download_artwork(
-                    item.artwork_id,
+                    item.remote_id,
                     job_id,
                     cancellation,
+                    source=item.source,
+                    **({"author_id": item.author_id} if item.author_id is not None else {}),
                 )
             await to_thread.run_sync(
                 self._repository.complete_item,
@@ -157,7 +159,7 @@ class DownloadSupervisor:
                 error.message,
             )
         except Exception:
-            logger.exception("下载作品失败: artwork_id=%s", item.artwork_id)
+            logger.exception("下载作品失败: source=%s remote_id=%s", item.source, item.remote_id)
             await to_thread.run_sync(
                 self._repository.complete_item,
                 item.item_id,

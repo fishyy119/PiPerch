@@ -100,11 +100,11 @@ async function toggleFavorite() {
   actionPending.value = true
   try {
     const favoriteState = await replaceFavoriteState(
-      props.artwork.artworkId,
+      props.artwork.localArtworkId,
       !props.artwork.isFavorite,
     )
     await invalidateArtworkData(queryClient)
-    notifyFavoriteUpdate(favoriteState)
+    notifyFavoriteUpdate(favoriteState, props.artwork.source)
   } catch (error) {
     toast.error('更新收藏失败', { description: errorMessage(error) })
   } finally {
@@ -120,7 +120,7 @@ async function changeGroup(groupId: number, mode: 'add' | 'remove') {
       mode === 'add'
         ? [...new Set([...props.artwork.groupIds, groupId])]
         : props.artwork.groupIds.filter((currentGroupId) => currentGroupId !== groupId)
-    await replaceArtworkGroups(props.artwork.artworkId, groupIds)
+    await replaceArtworkGroups(props.artwork.localArtworkId, groupIds)
     await invalidateArtworkGroupData(queryClient)
     toast.success(mode === 'add' ? '已添加到本地分组' : '已从本地分组移除')
   } catch (error) {
@@ -135,7 +135,7 @@ async function createAndAddGroup(name: string) {
   actionPending.value = true
   try {
     await createGroupAndAddArtwork({
-      artworkId: props.artwork.artworkId,
+      localArtworkId: props.artwork.localArtworkId,
       name,
       groupIds: props.artwork.groupIds,
     })
@@ -152,15 +152,15 @@ async function createAndAddGroup(name: string) {
 
 async function deleteCurrentArtwork() {
   if (actionPending.value) return
-  const artworkId = props.artwork.artworkId
+  const localArtworkId = props.artwork.localArtworkId
   actionPending.value = true
   try {
-    await deleteArtworks({ mode: 'single', artworkId })
+    await deleteArtworks({ mode: 'single', localArtworkId })
     deleteOpen.value = false
     selection.setSelected(
-      selection.selectedIds.filter((selectedArtworkId) => selectedArtworkId !== artworkId),
+      selection.selectedIds.filter((selectedArtworkId) => selectedArtworkId !== localArtworkId),
     )
-    removeArtworkData(queryClient, artworkId)
+    removeArtworkData(queryClient, localArtworkId)
     await invalidateArtworkGroupData(queryClient)
     toast.success('作品已永久删除')
   } catch (error) {

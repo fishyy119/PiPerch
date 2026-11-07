@@ -18,7 +18,7 @@ from starlette.exceptions import HTTPException
 from starlette.requests import ClientDisconnect
 
 from piperch import __version__
-from piperch.api import authors, discovery, downloads, favorites, gallery, groups, pixiv_images, settings
+from piperch.api import authors, discovery, downloads, fanbox_images, favorites, gallery, groups, pixiv_images, settings
 from piperch.api.models import ErrorBody, ErrorResponse, HealthResponse
 from piperch.application.control import AppControl
 from piperch.application.lifecycle import lifespan
@@ -105,6 +105,7 @@ def create_app(paths: AppPaths | None = None, control: AppControl | None = None)
     application.include_router(authors.router, prefix="/api")
     application.include_router(discovery.router, prefix="/api")
     application.include_router(pixiv_images.router, prefix="/api")
+    application.include_router(fanbox_images.router, prefix="/api")
     application.include_router(downloads.router, prefix="/api")
     application.include_router(downloads.events_router, prefix="/api")
     application.include_router(favorites.router, prefix="/api")

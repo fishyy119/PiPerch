@@ -6,6 +6,8 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 from uuid import uuid4
 
+from piperch.domain.sources import ArtworkSource
+
 if TYPE_CHECKING:
     from pathlib import Path
 
@@ -37,8 +39,11 @@ class LibraryFileOperations:
     def workspace(library_root: Path) -> Path:
         return library_root.resolve() / LIBRARY_WORKSPACE_NAME
 
-    def download_stage(self, library_root: Path, job_id: str, artwork_id: int) -> Path:
-        return self.workspace(library_root) / "download" / job_id / str(artwork_id)
+    def download_stage(
+        self, library_root: Path, job_id: str, artwork_id: int, source: ArtworkSource = ArtworkSource.PIXIV
+    ) -> Path:
+        base = self.workspace(library_root) / "download" / job_id
+        return (base if source is ArtworkSource.PIXIV else base / source.value) / str(artwork_id)
 
     def delete_root(self, library_root: Path) -> Path:
         return self.workspace(library_root) / "delete"

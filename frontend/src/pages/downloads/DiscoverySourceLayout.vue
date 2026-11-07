@@ -37,14 +37,13 @@ const pageLabel = computed(() =>
     : `${String(props.page + 1)} / ${String(Math.max(1, props.totalPages))}`,
 )
 const selectableCandidates = computed(() =>
-  props.candidates.filter((item) => !library.isInLibrary(item.artworkId, item.inLibrary)),
+  props.candidates.filter(
+    (item) => !library.isInLibrary(item.remoteId, item.inLibrary, item.source),
+  ),
 )
 const pageFullySelected = computed(() => {
   const selectable = selectableCandidates.value
-  return (
-    selectable.length > 0 &&
-    selectable.every((item) => selection.selectedIds.includes(item.artworkId))
-  )
+  return selectable.length > 0 && selectable.every((item) => selection.isSelected(item))
 })
 
 function togglePage() {
@@ -109,10 +108,7 @@ function togglePage() {
       <DiscoveryCandidateResults
         v-if="candidates.length"
         :candidates="candidates"
-        :selected-ids="selection.selectedIds"
         :card-width="cardWidth"
-        @set-selection="selection.setSelected"
-        @toggle="selection.toggle"
       />
       <p v-else class="p-10 text-center text-muted-foreground">{{ emptyMessage }}</p>
 

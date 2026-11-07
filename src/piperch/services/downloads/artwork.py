@@ -14,6 +14,7 @@ from PIL import Image, ImageOps
 from piperch.domain.artworks import ArtworkType, MediaRecord, RemoteArtwork
 from piperch.domain.downloads import ItemState
 from piperch.domain.groups import validate_imported_group_names
+from piperch.domain.sources import ArtworkSource, artwork_directory
 from piperch.errors import AppError, UpstreamError
 from piperch.services.library_files import LibraryFileOperations
 from piperch.services.thumbnails import ArtworkThumbnailCache
@@ -21,6 +22,7 @@ from piperch.services.thumbnails import ArtworkThumbnailCache
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
+    from piperch.fanbox import FanboxClient
     from piperch.paths import AppPaths
     from piperch.pixiv import PixivClient
     from piperch.repositories import ArtworkRepository, FavoriteRepository
@@ -28,7 +30,7 @@ if TYPE_CHECKING:
     from piperch.services.downloads.commit import ArtworkDownloadCommitService
     from piperch.settings import SettingsManager
 
-_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp"}
+_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp", ".avif", ".tif", ".tiff"}
 logger = logging.getLogger(__name__)
 
 
@@ -43,10 +45,13 @@ class ArtworkDownloadService:
         favorites: FavoriteRepository,
         thumbnails: ArtworkThumbnailCache | None = None,
         files: LibraryFileOperations | None = None,
+        *,
+        fanbox: FanboxClient | None = None,
     ) -> None:
         self._settings = settings
         self._artworks = artworks
         self._pixiv = pixiv
+        self._fanbox = fanbox
         self._commits = commits
         self._favorites = favorites
         self._thumbnails = thumbnails or ArtworkThumbnailCache(paths)
@@ -57,23 +62,36 @@ class ArtworkDownloadService:
         artwork_id: int,
         job_id: str,
         cancellation: DownloadCancellation,
+        *,
+        source: ArtworkSource = ArtworkSource.PIXIV,
+        author_id: int | None = None,
     ) -> ItemState:
         settings = await to_thread.run_sync(self._settings.get)
-        if await to_thread.run_sync(
+        local_ids = await to_thread.run_sync(lambda: self._artworks.find_local_ids((artwork_id,), source))
+        local_id = local_ids.get(artwork_id)
+        if local_id is not None and await to_thread.run_sync(
             self._artworks.is_complete,
-            artwork_id,
+            local_id,
             settings.library_root,
         ):
             return ItemState.SKIPPED
         cancellation.raise_if_requested()
 
-        is_new_artwork = not await to_thread.run_sync(
-            lambda: artwork_id in self._artworks.find_existing_ids((artwork_id,))
-        )
-        artwork = await self._pixiv.get_artwork(artwork_id, settings.pixiv_cookie)
+        is_new_artwork = local_id is None
+        if source is ArtworkSource.FANBOX:
+            if self._fanbox is None or author_id is None:
+                raise AppError("fanbox_author_required", "FANBOX 下载缺少作者信息，请从作者页面重新提交。", 400)
+            artwork = await self._fanbox.get_artwork(author_id, artwork_id)
+        else:
+            artwork = await self._pixiv.get_artwork(artwork_id, settings.pixiv_cookie)
         cancellation.raise_if_requested()
         bookmark_tags: tuple[str, ...] | None = None
-        if is_new_artwork and artwork.bookmark_data is not None and not artwork.bookmark_data.private:
+        if (
+            source is ArtworkSource.PIXIV
+            and is_new_artwork
+            and artwork.bookmark_data is not None
+            and not artwork.bookmark_data.private
+        ):
             try:
                 bookmark = await self._pixiv.get_public_bookmark(
                     artwork_id,
@@ -88,8 +106,8 @@ class ArtworkDownloadService:
                     error.message,
                 )
         cancellation.raise_if_requested()
-        existing_media = await to_thread.run_sync(self._artworks.list_media, artwork_id)
-        stage = self._files.download_stage(settings.library_root, job_id, artwork_id)
+        existing_media = await to_thread.run_sync(self._artworks.list_media, local_id) if local_id is not None else ()
+        stage = self._files.download_stage(settings.library_root, job_id, artwork_id, source)
         try:
             await to_thread.run_sync(self._prepare_stage, stage)
             cancellation.raise_if_requested()
@@ -105,7 +123,7 @@ class ArtworkDownloadService:
             cancellation.raise_if_requested()
             await to_thread.run_sync(self._validate_stage, artwork, stage)
             cancellation.raise_if_requested()
-            final_dir = settings.library_root / str(artwork.author_id) / str(artwork_id)
+            final_dir = artwork_directory(settings.library_root, artwork.source, artwork.author_id, artwork.remote_id)
             final_media = tuple(
                 MediaRecord(
                     role=item.role,
@@ -122,9 +140,9 @@ class ArtworkDownloadService:
             published = await to_thread.run_sync(self._files.publish, stage, final_dir)
             try:
                 if bookmark_tags is None:
-                    await to_thread.run_sync(self._commits.commit, artwork, final_media)
+                    local_id = await to_thread.run_sync(self._commits.commit, artwork, final_media)
                 else:
-                    await to_thread.run_sync(
+                    local_id = await to_thread.run_sync(
                         self._commits.commit,
                         artwork,
                         final_media,
@@ -135,16 +153,16 @@ class ArtworkDownloadService:
                 raise
             await to_thread.run_sync(published.finalize)
             try:
-                await to_thread.run_sync(self._create_thumbnails, artwork_id, final_dir, final_media)
+                await to_thread.run_sync(self._create_thumbnails, local_id, final_dir, final_media)
             except Exception:
                 logger.exception("作品 %d 缩略图缓存生成失败，将在访问时重试。", artwork_id)
-            if is_new_artwork and settings.auto_bookmark_on_download:
-                await self._auto_bookmark(artwork_id, settings.pixiv_cookie)
+            if source is ArtworkSource.PIXIV and is_new_artwork and settings.auto_bookmark_on_download:
+                await self._auto_bookmark(artwork_id, local_id, settings.pixiv_cookie)
             return ItemState.SUCCEEDED
         finally:
             await to_thread.run_sync(self._files.cleanup_download_stage, settings.library_root, stage)
 
-    async def _auto_bookmark(self, artwork_id: int, cookie: str | None) -> None:
+    async def _auto_bookmark(self, artwork_id: int, local_id: int, cookie: str | None) -> None:
         """入库成功后尝试收藏，收藏失败不影响已提交的下载结果。"""
         try:
             await self._pixiv.sync_bookmark_state(artwork_id, True, cookie)
@@ -156,7 +174,7 @@ class ArtworkDownloadService:
             return
 
         try:
-            await to_thread.run_sync(lambda: self._favorites.replace_state(artwork_id, is_favorite=True))
+            await to_thread.run_sync(lambda: self._favorites.replace_state(local_id, is_favorite=True))
         except Exception:
             logger.exception("作品 %d 已收藏到 Pixiv，但本地收藏更新失败，下载已完成。", artwork_id)
 
@@ -201,7 +219,7 @@ class ArtworkDownloadService:
                         )
                     )
             if reused_cover is None:
-                cover = stage / (f"{artwork.artwork_id}_cover{self._extension(cover_url, '.jpg')}")
+                cover = stage / (f"{artwork.remote_id}_cover{self._extension(cover_url, '.jpg')}")
                 cancellation.raise_if_requested()
                 mime, size = await self._pixiv.download(cover_url, cover)
                 cancellation.raise_if_requested()
@@ -218,7 +236,7 @@ class ArtworkDownloadService:
                     )
                 )
             cancellation.raise_if_requested()
-            archive = stage / f"{artwork.artwork_id}_ugoira.zip"
+            archive = stage / f"{artwork.remote_id}_ugoira.zip"
             reused_archive = await to_thread.run_sync(
                 self._reuse_media,
                 existing_media,
@@ -242,7 +260,7 @@ class ArtworkDownloadService:
             cancellation.raise_if_requested()
             metadata_path = stage / "ugoira.json"
             payload = {
-                "artworkId": artwork.artwork_id,
+                "artworkId": artwork.remote_id,
                 "frames": [{"file": frame.file_name, "delay": frame.delay_ms} for frame in artwork.ugoira_frames],
             }
             await to_thread.run_sync(
@@ -261,11 +279,11 @@ class ArtworkDownloadService:
             return tuple(records)
 
         if not artwork.original_urls:
-            raise UpstreamError("missing_image_urls", "Pixiv 没有返回作品原图地址。")
+            raise UpstreamError("missing_image_urls", "来源没有返回作品原图地址。")
         if len(artwork.original_urls) != artwork.page_count:
             raise UpstreamError(
                 "incomplete_page_urls",
-                f"Pixiv 返回了 {len(artwork.original_urls)}/{artwork.page_count} 个作品原图地址。",
+                f"来源返回了 {len(artwork.original_urls)}/{artwork.page_count} 个作品原图地址。",
             )
 
         async def download_page(page_index: int, url: str) -> MediaRecord:
@@ -294,8 +312,13 @@ class ArtworkDownloadService:
                     cancellation.raise_if_requested()
                     return finalized
             cancellation.raise_if_requested()
-            target = stage / (f"{artwork.artwork_id}_p{page_index}{self._extension(url, '.jpg')}")
-            mime, size = await self._pixiv.download(url, target)
+            target = stage / (f"{artwork.remote_id}_p{page_index}{self._extension(url, '.jpg')}")
+            if artwork.source is ArtworkSource.FANBOX:
+                if self._fanbox is None:
+                    raise AppError("source_unavailable", "FANBOX 下载服务尚未初始化。", 400)
+                mime, size = await self._fanbox.download(url, target)
+            else:
+                mime, size = await self._pixiv.download(url, target)
             cancellation.raise_if_requested()
             self._require_media_type(mime, "image/", "作品原图")
             finalized = await self._finalize_image(
@@ -418,7 +441,7 @@ class ArtworkDownloadService:
     def _validate_stage(artwork: RemoteArtwork, stage: Path) -> None:
         files = [path for path in stage.iterdir() if path.is_file()]
         if not files or any(path.stat().st_size <= 0 for path in files):
-            raise UpstreamError("incomplete_stage", f"作品 {artwork.artwork_id} 的临时文件不完整。")
+            raise UpstreamError("incomplete_stage", f"作品 {artwork.remote_id} 的临时文件不完整。")
 
     def _create_thumbnails(
         self,

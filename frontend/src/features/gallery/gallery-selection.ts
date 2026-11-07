@@ -7,14 +7,14 @@ export const useGallerySelectionStore = defineStore('gallery-selection', () => {
   const selectedIds = computed(() => [...ids.value])
   const selectedCount = computed(() => ids.value.size)
 
-  function isSelected(artworkId: number) {
-    return ids.value.has(artworkId)
+  function isSelected(localArtworkId: number) {
+    return ids.value.has(localArtworkId)
   }
 
-  function toggleArtwork(artworkId: number) {
+  function toggleArtwork(localArtworkId: number) {
     const next = new Set(ids.value)
-    if (next.has(artworkId)) next.delete(artworkId)
-    else next.add(artworkId)
+    if (next.has(localArtworkId)) next.delete(localArtworkId)
+    else next.add(localArtworkId)
     ids.value = next
   }
 
@@ -22,8 +22,8 @@ export const useGallerySelectionStore = defineStore('gallery-selection', () => {
     ids.value = new Set()
   }
 
-  function setSelected(artworkIds: readonly number[]) {
-    ids.value = new Set(artworkIds)
+  function setSelected(localArtworkIds: readonly number[]) {
+    ids.value = new Set(localArtworkIds)
   }
 
   function toggleMode() {
@@ -31,13 +31,14 @@ export const useGallerySelectionStore = defineStore('gallery-selection', () => {
     if (!enabled.value) clear()
   }
 
-  function toggleVisible(artworkIds: readonly number[]) {
+  function toggleVisible(localArtworkIds: readonly number[]) {
     const allSelected =
-      artworkIds.length > 0 && artworkIds.every((artworkId) => ids.value.has(artworkId))
+      localArtworkIds.length > 0 &&
+      localArtworkIds.every((localArtworkId) => ids.value.has(localArtworkId))
     const next = new Set(ids.value)
-    artworkIds.forEach((artworkId) => {
-      if (allSelected) next.delete(artworkId)
-      else next.add(artworkId)
+    localArtworkIds.forEach((localArtworkId) => {
+      if (allSelected) next.delete(localArtworkId)
+      else next.add(localArtworkId)
     })
     ids.value = next
   }

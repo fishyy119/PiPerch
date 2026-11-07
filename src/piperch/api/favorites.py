@@ -15,6 +15,7 @@ from piperch.api.models import (
 )
 from piperch.application.container import AppContainer
 from piperch.domain.bookmarks import BookmarkFolderReference, BookmarkVisibility
+from piperch.domain.sources import ArtworkSource
 from piperch.errors import UpstreamError
 
 router = APIRouter(tags=["favorites"])
@@ -65,19 +66,20 @@ async def replace_favorite_state(
     artwork_id: int = PathParameter(gt=0),
     container: AppContainer = Depends(get_container),
 ) -> FavoriteStateResponse:
-    await to_thread.run_sync(container.favorites.get_state, artwork_id)
-    settings = await to_thread.run_sync(container.settings.get)
-    pixiv_synced = True
-    try:
-        await container.pixiv.sync_bookmark_state(
-            artwork_id,
-            request.is_favorite,
-            settings.pixiv_cookie,
-        )
-    except UpstreamError as error:
-        if error.code != "pixiv_artwork_not_found":
-            raise
-        pixiv_synced = False
+    detail = await to_thread.run_sync(container.artworks.get_detail, artwork_id)
+    pixiv_synced = False
+    if detail.summary.source is ArtworkSource.PIXIV:
+        settings = await to_thread.run_sync(container.settings.get)
+        try:
+            await container.pixiv.sync_bookmark_state(
+                detail.summary.remote_id,
+                request.is_favorite,
+                settings.pixiv_cookie,
+            )
+            pixiv_synced = True
+        except UpstreamError as error:
+            if error.code != "pixiv_artwork_not_found":
+                raise
     state = await to_thread.run_sync(
         lambda: container.favorites.replace_state(
             artwork_id,

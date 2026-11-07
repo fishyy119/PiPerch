@@ -48,7 +48,7 @@ class BlockingRepository:
             "job-id",
             DownloadItemRecord(
                 item_id=1,
-                artwork_id=123,
+                remote_id=123,
                 state=ItemState.RUNNING,
                 attempts=1,
                 error=None,
@@ -90,7 +90,7 @@ class ConcurrentRepository:
             "job-id",
             DownloadItemRecord(
                 item_id=item_id,
-                artwork_id=100 + item_id,
+                remote_id=100 + item_id,
                 state=ItemState.RUNNING,
                 attempts=1,
                 error=None,
@@ -116,6 +116,7 @@ class ConcurrentDownloadService:
         _artwork_id: int,
         _job_id: str,
         _is_cancel_requested: object,
+        **_kwargs: object,
     ) -> ItemState:
         self.active += 1
         self.maximum_active = max(self.maximum_active, self.active)
@@ -135,7 +136,7 @@ class QueuedRepository:
                 "first-job",
                 DownloadItemRecord(
                     item_id=1,
-                    artwork_id=101,
+                    remote_id=101,
                     state=ItemState.RUNNING,
                     attempts=1,
                     error=None,
@@ -145,7 +146,7 @@ class QueuedRepository:
                 "second-job",
                 DownloadItemRecord(
                     item_id=2,
-                    artwork_id=102,
+                    remote_id=102,
                     state=ItemState.RUNNING,
                     attempts=1,
                     error=None,
@@ -189,6 +190,7 @@ class QueuedDownloadService:
         artwork_id: int,
         _job_id: str,
         cancellation: DownloadCancellation,
+        **_kwargs: object,
     ) -> ItemState:
         if artwork_id == 101:
             self.first_started.set()

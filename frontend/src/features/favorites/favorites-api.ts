@@ -2,11 +2,13 @@ import { z } from 'zod'
 
 import { api } from '@/shared/api/http'
 
-const favoriteStateSchema = z.object({
-  artworkId: z.number().int().positive(),
-  isFavorite: z.boolean(),
-  pixivSynced: z.boolean(),
-})
+const favoriteStateSchema = z
+  .object({
+    artworkId: z.number().int().positive(),
+    isFavorite: z.boolean(),
+    pixivSynced: z.boolean(),
+  })
+  .transform(({ artworkId, ...item }) => ({ ...item, localArtworkId: artworkId }))
 export type FavoriteState = z.infer<typeof favoriteStateSchema>
 
 const favoriteSyncPlanSchema = z.object({

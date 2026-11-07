@@ -53,8 +53,8 @@ const failures = computed(() => mutation.data.value?.failures ?? [])
       <div class="p-4 text-sm">
         <p>以下 {{ failures.length }} 个作品未能加载：</p>
         <ul class="mt-2 space-y-1">
-          <li v-for="failure in failures" :key="failure.artworkId" class="wrap-break-word">
-            {{ failure.artworkId }}：<span class="text-destructive">{{ failure.message }}</span>
+          <li v-for="failure in failures" :key="failure.remoteId" class="wrap-break-word">
+            {{ failure.remoteId }}：<span class="text-destructive">{{ failure.message }}</span>
           </li>
         </ul>
       </div>

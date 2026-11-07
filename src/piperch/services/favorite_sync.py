@@ -41,9 +41,12 @@ class FavoriteSyncService:
 
     async def create_plan(self, remote_artwork_ids: Sequence[int], cookie: str | None) -> FavoriteSyncPlan:
         diff = await to_thread.run_sync(lambda: self._favorites.compare_with_remote(remote_artwork_ids))
+        remote_ids = await to_thread.run_sync(self._favorites.remote_ids_for_local, diff.remove_artwork_ids)
         # 仅复核拟取消的本地收藏，保留 Pixiv 详情已返回 404 的作品。
         removals = [
-            artwork_id for artwork_id in diff.remove_artwork_ids if await self._pixiv.artwork_exists(artwork_id, cookie)
+            artwork_id
+            for artwork_id in diff.remove_artwork_ids
+            if artwork_id in remote_ids and await self._pixiv.artwork_exists(remote_ids[artwork_id], cookie)
         ]
         plan = FavoriteSyncPlan(
             plan_id=uuid4(),

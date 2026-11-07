@@ -8,7 +8,10 @@ import {
 } from '@/features/discovery/discovery-api'
 import { useDownloadSelection } from '@/features/downloads/download-selection'
 
-export function useDiscoveryPagination(makeRequest: (page: number) => DiscoveryRequest) {
+export function useDiscoveryPagination(
+  makeRequest: (page: number) => DiscoveryRequest,
+  emptyResultsMessage = '这一页没有找到候选作品。',
+) {
   const selection = useDownloadSelection()
   const candidates = ref<DiscoveryItem[]>([])
   const page = ref(0)
@@ -24,7 +27,7 @@ export function useDiscoveryPagination(makeRequest: (page: number) => DiscoveryR
       page.value = result.page
       nextPage.value = result.nextPage
       totalPages.value = result.totalPages
-      emptyMessage.value = result.items.length === 0 ? '这一页没有找到候选作品。' : ''
+      emptyMessage.value = result.items.length === 0 ? emptyResultsMessage : ''
     },
   })
 

@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import StrEnum
 
+from piperch.domain.sources import ArtworkSource
+
 
 class JobState(StrEnum):
     QUEUED = "queued"
@@ -25,10 +27,12 @@ class ItemState(StrEnum):
 @dataclass(frozen=True, slots=True)
 class DownloadItemRecord:
     item_id: int
-    artwork_id: int
+    remote_id: int
     state: ItemState
     attempts: int
     error: str | None
+    source: ArtworkSource = ArtworkSource.PIXIV
+    author_id: int | None = None
 
 
 @dataclass(frozen=True, slots=True)

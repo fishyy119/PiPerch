@@ -1,61 +1,74 @@
 import { createPinia, setActivePinia } from 'pinia'
 
+import type { DownloadReference } from '@/features/artworks/artwork-source'
 import { useDownloadSelection } from '@/features/downloads/download-selection'
 import { useLibraryMembershipStore } from '@/features/library/library-membership'
 
 import { discoveryItem } from './fixtures'
 
-const first = discoveryItem(100, { title: '第一张图' })
-const second = discoveryItem(200, { title: '第二张图' })
-const third = discoveryItem(300, { title: '第三张图' })
-const fourth = discoveryItem(400, { title: '第四张图' })
+function pixivReferences(...ids: number[]): DownloadReference[] {
+  return ids.map((remoteId) => ({ source: 'pixiv', remoteId }))
+}
 
 describe('下载候选选择', () => {
   beforeEach(() => setActivePinia(createPinia()))
 
-  it('跨页添加并按作品 ID 去重', () => {
-    const store = useDownloadSelection()
-    store.addAll([first])
-    store.addAll([first, second])
-    store.cacheItems([third])
-    store.addIds([200, 300, 400])
-
-    expect(store.selectedIds).toEqual([100, 200, 300, 400])
-    expect(store.selectedEntries).toEqual([
-      { artworkId: 100, item: first },
-      { artworkId: 200, item: second },
-      { artworkId: 300, item: third },
-      { artworkId: 400, item: null },
+  it('跨页选择保留同号不同来源的作品，并按完整身份去重', () => {
+    const selection = useDownloadSelection()
+    const first = discoveryItem(100)
+    const second = discoveryItem(200)
+    const fanbox = discoveryItem(100, { source: 'fanbox', authorId: 42 })
+    selection.addAll([first, second])
+    selection.addAll([first, fanbox])
+    selection.setSelected([
+      ...selection.selectedReferences,
+      { source: 'fanbox', remoteId: 100, authorId: 42 },
     ])
 
-    store.cacheItems([fourth])
-    expect(store.selectedEntries[3]).toEqual({ artworkId: 400, item: fourth })
+    expect(selection.selectedReferences).toEqual([
+      ...pixivReferences(100, 200),
+      { source: 'fanbox', remoteId: 100, authorId: 42 },
+    ])
   })
 
-  it('已入库作品移出选择，删除后可重新选择且旧快照不覆盖事件', () => {
+  it('已入库作品不可重选，旧快照和预览不能覆盖馆藏事件', () => {
     const selection = useDownloadSelection()
     const library = useLibraryMembershipStore()
-    selection.addAll([first, second])
-
-    library.applyChange([100], true)
-    expect(selection.selectedIds).toEqual([200])
-
+    const first = discoveryItem(100)
+    selection.addAll([first, discoveryItem(200)])
+    library.applyReference({ source: 'pixiv', remoteId: 100, localArtworkId: 501 }, true)
     selection.toggle(first)
-    selection.addAll([first])
-    selection.addIds([100])
-    selection.setSelected([100, 200])
-    expect(selection.selectedIds).toEqual([200])
+    selection.setSelected(pixivReferences(100, 200))
+    expect(selection.selectedReferences).toEqual(pixivReferences(200))
 
-    const oldSnapshot = discoveryItem(100, { inLibrary: true })
-    library.applyChange([100], false)
+    library.applyReference({ source: 'pixiv', remoteId: 100, localArtworkId: 501 }, false)
+    const oldSnapshot = discoveryItem(100, { inLibrary: true, localArtworkId: 1 })
     selection.cacheItems([oldSnapshot])
-    expect(selection.selectedIds).toEqual([200])
     selection.toggle(oldSnapshot)
-    expect(selection.selectedIds).toEqual([200, 100])
+    expect(selection.selectedReferences).toEqual(pixivReferences(200, 100))
+    expect(library.localId(100)).toBe(501)
 
-    library.applyChange([300], true)
-    expect(selection.addIds([300, 400])).toEqual([400])
+    library.applyReference({ source: 'pixiv', remoteId: 300, localArtworkId: 300 }, true)
+    expect(selection.add(pixivReferences(300, 400))).toEqual(pixivReferences(400))
     selection.cacheItems([discoveryItem(400, { inLibrary: true })])
-    expect(selection.selectedIds).toEqual([200, 100])
+    expect(selection.selectedReferences).toEqual(pixivReferences(200, 100))
+
+    selection.cachePreviews([{ source: 'fanbox', remoteId: 900, thumbnailUrl: null }])
+    selection.cacheItems([
+      discoveryItem(900, {
+        source: 'fanbox',
+        authorId: 42,
+        inLibrary: true,
+        localArtworkId: 1234,
+      }),
+    ])
+    expect(library.isInLibrary(900, false, 'fanbox')).toBe(true)
+
+    selection.clear()
+    selection.add([...pixivReferences(100), { source: 'fanbox', remoteId: 100, authorId: 42 }])
+    library.applyReference({ source: 'pixiv', remoteId: 100, localArtworkId: 502 }, true)
+    expect(selection.selectedReferences).toEqual([
+      { source: 'fanbox', remoteId: 100, authorId: 42 },
+    ])
   })
 })

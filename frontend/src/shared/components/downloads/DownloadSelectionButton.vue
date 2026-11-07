@@ -43,11 +43,11 @@ async function submitSelection() {
     leave-to-class="translate-y-3 opacity-0"
   >
     <Button
-      v-if="selection.selectedIds.length"
+      v-if="selection.selectedReferences.length"
       size="icon"
       class="fixed right-4 bottom-4 z-20 size-14! rounded-full! shadow-xl md:right-6 md:bottom-6"
       :disabled="submission.isPending"
-      :title="`提交 ${String(selection.selectedIds.length)} 个候选作品`"
+      :title="`提交 ${String(selection.selectedReferences.length)} 个候选作品`"
       @click="submitSelection"
     >
       <LoaderCircle v-if="submission.isPending" class="animate-spin" :size="23" />
@@ -61,7 +61,7 @@ async function submitSelection() {
           )
         "
       >
-        {{ selection.selectedIds.length }}
+        {{ selection.selectedReferences.length }}
       </span>
     </Button>
   </Transition>

@@ -29,6 +29,7 @@ from piperch.domain.artworks import (
     TagSummary,
     UgoiraFrame,
 )
+from piperch.domain.sources import ArtworkSource
 from piperch.errors import NotFoundError
 from piperch.repositories._rows import (
     integer as _integer,
@@ -60,14 +61,14 @@ class ArtworkRepository:
         "downloadedAt": artworks.c.downloaded_at,
         "publishedAt": artworks.c.published_at,
         "title": artworks.c.title,
-        "id": artworks.c.id,
+        "id": artworks.c.remote_id,
     }
 
     def __init__(self, database: Database) -> None:
         self._database = database
 
-    def find_existing_ids(self, artwork_ids: Sequence[int]) -> set[int]:
-        """返回已经保存到本地图库的作品 ID。"""
+    def find_existing_ids(self, artwork_ids: Sequence[int], source: ArtworkSource = ArtworkSource.PIXIV) -> set[int]:
+        """返回指定来源已经入库的原始作品 ID，供远端预览与选择使用。"""
         unique_ids = tuple(dict.fromkeys(artwork_ids))
         if not unique_ids:
             return set()
@@ -75,9 +76,27 @@ class ArtworkRepository:
         with self._database.connect() as connection:
             for start in range(0, len(unique_ids), 900):
                 batch = unique_ids[start : start + 900]
-                rows = connection.scalars(select(artworks.c.id).where(artworks.c.id.in_(batch)))
+                rows = connection.scalars(
+                    select(artworks.c.remote_id).where(
+                        artworks.c.source == source.value, artworks.c.remote_id.in_(batch)
+                    )
+                )
                 existing_ids.update(int(artwork_id) for artwork_id in rows)
         return existing_ids
+
+    def find_local_ids(self, remote_ids: Sequence[int], source: ArtworkSource = ArtworkSource.PIXIV) -> dict[int, int]:
+        """将平台原始 ID 映射为馆藏主键，不能用原始 ID 直接查询本地关联。"""
+        output: dict[int, int] = {}
+        unique_ids = tuple(dict.fromkeys(remote_ids))
+        with self._database.connect() as connection:
+            for start in range(0, len(unique_ids), 900):
+                rows = connection.execute(
+                    select(artworks.c.remote_id, artworks.c.id).where(
+                        artworks.c.source == source.value, artworks.c.remote_id.in_(unique_ids[start : start + 900])
+                    )
+                )
+                output.update((int(remote_id), int(local_id)) for remote_id, local_id in rows)
+        return output
 
     def is_complete(self, artwork_id: int, library_root: Path) -> bool:
         with self._database.connect() as connection:
@@ -94,7 +113,7 @@ class ArtworkRepository:
             ).all()
         if artwork is None or not media:
             return False
-        artwork_type = ArtworkType(cast("str", artwork.artwork_type))
+        artwork_type = ArtworkType(artwork.artwork_type)
         if artwork_type is ArtworkType.UGOIRA:
             roles = {cast("str", row.role) for row in media}
             if not {"cover", "ugoiraZip", "ugoiraMetadata"} <= roles:
@@ -138,6 +157,8 @@ class ArtworkRepository:
         if exists is None:
             connection.execute(insert(authors).values(**values))
         else:
+            # 不用来源缺失的资料清空另一个平台已经保存的账号和头像。
+            values = {key: value for key, value in values.items() if value is not None}
             connection.execute(update(authors).where(authors.c.id == artwork.author_id).values(**values))
 
     @staticmethod
@@ -157,12 +178,15 @@ class ArtworkRepository:
             connection.execute(update(series).where(series.c.id == artwork.series_id).values(**values))
 
     @staticmethod
-    def upsert_artwork(connection: Connection, artwork: RemoteArtwork, now: str) -> bool:
-        existing_downloaded_at = connection.scalar(
-            select(artworks.c.downloaded_at).where(artworks.c.id == artwork.artwork_id)
-        )
+    def upsert_artwork(connection: Connection, artwork: RemoteArtwork, now: str) -> tuple[int, bool]:
+        existing = connection.execute(
+            select(artworks.c.id, artworks.c.downloaded_at).where(
+                artworks.c.source == artwork.source.value, artworks.c.remote_id == artwork.remote_id
+            )
+        ).first()
         values = {
-            "id": artwork.artwork_id,
+            "source": artwork.source.value,
+            "remote_id": artwork.remote_id,
             "artwork_type": artwork.artwork_type.value,
             "title": artwork.title,
             "description": artwork.description,
@@ -174,14 +198,16 @@ class ArtworkRepository:
             "x_restrict": artwork.x_restrict,
             "is_ai": artwork.is_ai,
             "published_at": artwork.published_at,
-            "downloaded_at": existing_downloaded_at or now,
+            "downloaded_at": existing.downloaded_at if existing is not None else now,
             "metadata_updated_at": now,
         }
-        if existing_downloaded_at is None:
-            connection.execute(insert(artworks).values(**values))
-            return True
-        connection.execute(update(artworks).where(artworks.c.id == artwork.artwork_id).values(**values))
-        return False
+        if existing is None:
+            local_id = connection.scalar(insert(artworks).values(**values).returning(artworks.c.id))
+            if local_id is None:
+                raise RuntimeError("写入作品后未能读取馆藏主键。")
+            return int(local_id), True
+        connection.execute(update(artworks).where(artworks.c.id == existing.id).values(**values))
+        return int(existing.id), False
 
     @staticmethod
     def replace_tags(
@@ -277,7 +303,7 @@ class ArtworkRepository:
                 authors.c.name.contains(search_value, autoescape=True),
             )
             conditions.append(
-                or_(artworks.c.id == int(search_value), text_match) if search_value.isdigit() else text_match
+                or_(artworks.c.remote_id == int(search_value), text_match) if search_value.isdigit() else text_match
             )
         if author_id == "followed":
             conditions.append(artworks.c.author_id.in_(followed_author_ids))
@@ -673,6 +699,8 @@ class ArtworkRepository:
     def _summary_from_row(row: RowMapping) -> ArtworkSummary:
         return ArtworkSummary(
             artwork_id=_integer(row["id"]),
+            source=ArtworkSource(_string(row["source"])),
+            remote_id=_integer(row["remote_id"]),
             title=_string(row["title"]),
             artwork_type=ArtworkType(_string(row["artwork_type"])),
             author_id=_integer(row["author_id"]),
@@ -680,8 +708,8 @@ class ArtworkRepository:
             series_id=_optional_integer(row["series_id"]),
             series_title=_optional_string(row["series_title"]),
             page_count=_integer(row["page_count"]),
-            x_restrict=_integer(row["x_restrict"]),
-            is_ai=bool(row["is_ai"]),
+            x_restrict=_optional_integer(row["x_restrict"]),
+            is_ai=bool(row["is_ai"]) if row["is_ai"] is not None else None,
             published_at=_optional_string(row["published_at"]),
             downloaded_at=_string(row["downloaded_at"]),
         )

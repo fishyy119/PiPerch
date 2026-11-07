@@ -8,6 +8,7 @@ from piperch.domain.artworks import ArtworkType
 from piperch.domain.bookmarks import BookmarkFolderKind, BookmarkVisibility
 from piperch.domain.downloads import ItemState, JobState
 from piperch.domain.groups import MAX_ARTWORK_GROUPS, MAX_GROUP_NAME_LENGTH
+from piperch.domain.sources import ArtworkSource
 from piperch.settings.models import EditableSettings
 
 
@@ -120,6 +121,7 @@ class SearchDiscoveryRequest(ApiModel):
 
 class UserDiscoveryRequest(ApiModel):
     source_type: Literal["user"]
+    source: ArtworkSource = ArtworkSource.PIXIV
     user_id: int = Field(gt=0)
     page: int = Field(default=0, ge=0)
 
@@ -159,12 +161,15 @@ DiscoveryRequest = Annotated[
 
 class DiscoveryItem(ApiModel):
     artwork_id: int
+    source: ArtworkSource = ArtworkSource.PIXIV
+    local_artwork_id: int | None = None
     title: str
     author_name: str
+    author_id: int | None = None
     artwork_type: ArtworkType
     page_count: int
-    x_restrict: int
-    is_ai: bool
+    x_restrict: int | None
+    is_ai: bool | None
     thumbnail_url: str | None
     in_library: bool
 
@@ -239,24 +244,36 @@ class BookmarkArtworkIdsRequest(ApiModel):
         return list(unique.values())
 
 
-class FollowedUserResponse(ApiModel):
+class AuthorResponse(ApiModel):
     user_id: int
     name: str
     avatar_url: str | None
 
 
-class FollowedUsersResponse(ApiModel):
-    items: list[FollowedUserResponse]
+class AuthorsResponse(ApiModel):
+    items: list[AuthorResponse]
 
 
 class DownloadJobCreate(ApiModel):
     artwork_ids: ArtworkIdList
+    source: ArtworkSource = ArtworkSource.PIXIV
     source_label: str = Field(default="手动选择", min_length=1, max_length=200)
+    author_ids: dict[Annotated[int, Field(gt=0)], Annotated[int, Field(gt=0)]] = Field(
+        default_factory=lambda: dict[int, int](), max_length=1000
+    )
 
     @field_validator("artwork_ids")
     @classmethod
     def validate_artwork_ids(cls, values: list[int]) -> list[int]:
         return _normalize_ids(values, label="作品 ID")
+
+    @model_validator(mode="after")
+    def require_fanbox_authors(self) -> DownloadJobCreate:
+        if self.source is ArtworkSource.FANBOX and any(
+            artwork_id not in self.author_ids for artwork_id in self.artwork_ids
+        ):
+            raise ValueError("FANBOX 下载必须同时提供每篇投稿的作者 ID。")
+        return self
 
 
 class DownloadJobCreated(ApiModel):
@@ -265,7 +282,8 @@ class DownloadJobCreated(ApiModel):
 
 class DownloadItemResponse(ApiModel):
     item_id: int
-    artwork_id: int
+    source: ArtworkSource
+    remote_id: int
     state: ItemState
     attempts: int
     error: str | None
@@ -311,6 +329,8 @@ class TagResponse(ApiModel):
 
 class ArtworkSummaryResponse(ApiModel):
     artwork_id: int
+    source: ArtworkSource
+    remote_id: int
     title: str
     artwork_type: ArtworkType
     author_id: int
@@ -318,8 +338,8 @@ class ArtworkSummaryResponse(ApiModel):
     series_id: int | None
     series_title: str | None
     page_count: int
-    x_restrict: int
-    is_ai: bool
+    x_restrict: int | None
+    is_ai: bool | None
     published_at: str | None
     downloaded_at: str
     is_favorite: bool
@@ -348,7 +368,7 @@ class UgoiraFrameResponse(ApiModel):
 
 class ArtworkDetailResponse(ArtworkSummaryResponse):
     description: str
-    local_linked_artwork_ids: list[int]
+    local_linked_artworks: dict[int, int]
     width: int | None
     height: int | None
     tags: list[TagResponse]

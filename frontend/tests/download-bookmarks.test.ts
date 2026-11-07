@@ -3,6 +3,7 @@ import { setupServer } from 'msw/node'
 import { createPinia, setActivePinia } from 'pinia'
 import { effectScope } from 'vue'
 
+import type { DiscoveryItem } from '@/features/discovery/discovery-api'
 import { useBookmarkPreview } from '@/features/downloads/useBookmarkPreview'
 
 import { discoveryItem } from './fixtures'
@@ -24,18 +25,22 @@ const privateFirstPage = [
   ),
 ]
 
+function wireItem({ remoteId, ...item }: DiscoveryItem) {
+  return { ...item, artworkId: remoteId }
+}
+
 const server = setupServer(
   http.post('/api/discovery', async ({ request }) => {
     const body = (await request.json()) as BookmarkRequestBody
     discoveryRequests.push(body)
     if (body.folder.visibility === 'public' && body.page === 0) {
-      return HttpResponse.json({ items: publicFirstPage, page: 0, nextPage: 1 })
+      return HttpResponse.json({ items: publicFirstPage.map(wireItem), page: 0, nextPage: 1 })
     }
     if (body.folder.visibility === 'private') {
-      return HttpResponse.json({ items: privateFirstPage, page: 0, nextPage: null })
+      return HttpResponse.json({ items: privateFirstPage.map(wireItem), page: 0, nextPage: null })
     }
     return HttpResponse.json({
-      items: [discoveryItem(3001, { title: '公开补位作品' })],
+      items: [wireItem(discoveryItem(3001, { title: '公开补位作品' }))],
       page: 1,
       nextPage: null,
     })
@@ -59,14 +64,14 @@ describe('收藏下载来源', () => {
           { visibility: 'private', tag: '私藏' },
         ])
         await preview.loadPage(0)
-        expect(preview.candidates.value.map((item) => item.artworkId)).toEqual(
-          publicFirstPage.map((item) => item.artworkId),
+        expect(preview.candidates.value.map((item) => item.remoteId)).toEqual(
+          publicFirstPage.map((item) => item.remoteId),
         )
         expect(preview.nextPage.value).toBe(1)
 
         await preview.loadPage(1)
-        expect(preview.candidates.value.map((item) => item.artworkId)).toEqual([
-          ...privateFirstPage.slice(1).map((item) => item.artworkId),
+        expect(preview.candidates.value.map((item) => item.remoteId)).toEqual([
+          ...privateFirstPage.slice(1).map((item) => item.remoteId),
           3001,
         ])
         expect(preview.page.value).toBe(1)

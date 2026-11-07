@@ -7,6 +7,7 @@ export const sourceOptions = [
   { value: 'artwork', label: '作品' },
   { value: 'search', label: '搜索' },
   { value: 'user', label: '用户' },
+  { value: 'fanbox', label: 'FANBOX' },
   { value: 'followUpdates', label: '更新' },
   { value: 'bookmark', label: '收藏' },
   { value: 'series', label: '系列' },
@@ -27,13 +28,17 @@ export const useDownloadWorkspaceStore = defineStore('download-workspace', () =>
   }
 
   function requestPreview(request: DiscoveryRequest) {
-    sourceType.value = request.sourceType
+    sourceType.value =
+      request.sourceType === 'user' && request.source === 'fanbox' ? 'fanbox' : request.sourceType
     pendingPreviewRequest.value = request
   }
 
   function takePreviewRequest(type: SourceType) {
     const request = pendingPreviewRequest.value
-    if (request?.sourceType !== type) return null
+    if (request === null) return null
+    const target =
+      request.sourceType === 'user' && request.source === 'fanbox' ? 'fanbox' : request.sourceType
+    if (target !== type) return null
     pendingPreviewRequest.value = null
     return request
   }

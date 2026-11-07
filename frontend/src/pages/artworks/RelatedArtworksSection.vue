@@ -11,13 +11,13 @@ import { SmartCropImage } from '@ui/image'
 import { SettingsPopover } from '@ui/settings-popover'
 import { Slider } from '@ui/slider'
 
-const props = defineProps<{ artworkId: number }>()
+const props = defineProps<{ localArtworkId: number }>()
 
 const cardWidth = usePreference('artworkDetail.relatedCardWidth')
 const relatedCount = usePreference('artworkDetail.relatedCount')
 const relatedQuery = useQuery({
-  queryKey: computed(() => artworkQueryKeys.related(props.artworkId, relatedCount.value)),
-  queryFn: () => listRelatedArtworks(props.artworkId, relatedCount.value),
+  queryKey: computed(() => artworkQueryKeys.related(props.localArtworkId, relatedCount.value)),
+  queryFn: () => listRelatedArtworks(props.localArtworkId, relatedCount.value),
   // 保留上一份数据以避免中间加载态高度坍缩；遮罩层负责阻止旧内容被操作。
   placeholderData: (previousData) => previousData,
 })
@@ -72,14 +72,14 @@ const gridStyle = computed(() => ({
     >
       <RouterLink
         v-for="related in relatedQuery.data.value"
-        :key="related.artworkId"
+        :key="related.localArtworkId"
         class="group block min-w-0"
-        :to="`/artworks/${String(related.artworkId)}`"
+        :to="`/artworks/${String(related.localArtworkId)}`"
       >
         <div class="aspect-square w-full overflow-hidden rounded-xl bg-muted">
           <SmartCropImage
             class="size-full object-cover transition duration-300 group-hover:scale-[1.025]"
-            :src="`/api/artworks/${String(related.artworkId)}/thumbnail`"
+            :src="`/api/artworks/${String(related.localArtworkId)}/thumbnail`"
             :alt="related.title"
             loading="lazy"
           />

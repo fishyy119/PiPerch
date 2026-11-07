@@ -1,11 +1,14 @@
 from __future__ import annotations
 
-from contextlib import contextmanager
+import sqlite3
+from contextlib import closing, contextmanager
 from importlib.resources import as_file, files
 from typing import TYPE_CHECKING, Protocol, cast
+from uuid import uuid4
 
 from alembic import command
 from alembic.config import Config
+from alembic.script import ScriptDirectory
 from sqlalchemy import create_engine, event
 from sqlalchemy.engine import URL, Connection
 
@@ -27,6 +30,18 @@ def run_migrations(paths: AppPaths) -> None:
         config.set_main_option("script_location", str(migration_path))
         migration_url = sqlite_url(paths.database).render_as_string(False).replace("%", "%%")
         config.set_main_option("sqlalchemy.url", migration_url)
+        if paths.database.is_file():
+            with closing(sqlite3.connect(paths.database)) as source:
+                has_version = source.execute(
+                    "SELECT 1 FROM sqlite_master WHERE type='table' AND name='alembic_version'"
+                ).fetchone()
+                current = source.execute("SELECT version_num FROM alembic_version").fetchone() if has_version else None
+                head = ScriptDirectory.from_config(config).get_current_head()
+                if current is not None and current[0] != head:
+                    # SQLite backup 会一并读取 WAL 中已提交的数据，不能只复制主数据库文件。
+                    backup = paths.database.with_name(f"{paths.database.stem}.before-{current[0]}-{uuid4().hex}.sqlite")
+                    with closing(sqlite3.connect(backup)) as target:
+                        source.backup(target)
         command.upgrade(config, "head")
 
 

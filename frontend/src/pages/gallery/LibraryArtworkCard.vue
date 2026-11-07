@@ -27,7 +27,7 @@ const props = defineProps<{
 const target = computed<ArtworkCardTarget>(() => ({
   kind: 'route',
   to: {
-    path: `/artworks/${String(props.artwork.artworkId)}`,
+    path: `/artworks/${String(props.artwork.localArtworkId)}`,
     state: galleryNavigationRouteState(props.navigationArtworkIds),
   },
 }))
@@ -38,12 +38,14 @@ const { update: updateFilters } = useGalleryFilters()
 const showTitle = usePreference('gallery.showTitle')
 const showAuthor = usePreference('gallery.showAuthor')
 const showFavoriteIndicator = usePreference('gallery.showFavoriteIndicator')
-const thumbnailUrl = computed(() => `/api/artworks/${String(props.artwork.artworkId)}/thumbnail`)
+const thumbnailUrl = computed(
+  () => `/api/artworks/${String(props.artwork.localArtworkId)}/thumbnail`,
+)
 const favoriteMutation = useMutation({
-  mutationFn: () => replaceFavoriteState(props.artwork.artworkId, !props.artwork.isFavorite),
+  mutationFn: () => replaceFavoriteState(props.artwork.localArtworkId, !props.artwork.isFavorite),
   onSuccess: async (favoriteState) => {
     await invalidateArtworkData(queryClient)
-    notifyFavoriteUpdate(favoriteState)
+    notifyFavoriteUpdate(favoriteState, props.artwork.source)
   },
   onError: (error) => {
     toast.error('更新收藏失败', { description: errorMessage(error) })
@@ -51,7 +53,7 @@ const favoriteMutation = useMutation({
 })
 
 function resolvePreviewUrl(pageIndex: number) {
-  return localArtworkPreviewUrl(props.artwork.artworkId, props.artwork.artworkType, pageIndex)
+  return localArtworkPreviewUrl(props.artwork.localArtworkId, props.artwork.artworkType, pageIndex)
 }
 
 function handleCardClick(event: MouseEvent) {
@@ -65,7 +67,7 @@ function handleCardClick(event: MouseEvent) {
 
   event.preventDefault()
   event.stopPropagation()
-  selection.toggleArtwork(props.artwork.artworkId)
+  selection.toggleArtwork(props.artwork.localArtworkId)
 }
 
 function handleCardDragStart(event: DragEvent) {
@@ -77,14 +79,14 @@ function handleCardDragStart(event: DragEvent) {
 <template>
   <LibraryArtworkContextMenu v-model:open="contextMenuOpen" :artwork="artwork">
     <ArtworkCard
-      :data-selection-id="artwork.artworkId"
+      :data-selection-id="artwork.localArtworkId"
       :title="artwork.title"
       :author-name="artwork.authorName"
       :page-count="artwork.pageCount"
       :thumbnail-url="thumbnailUrl"
       :target="target"
       :resolve-preview-url="resolvePreviewUrl"
-      :selected="selection.isSelected(artwork.artworkId)"
+      :selected="selection.isSelected(artwork.localArtworkId)"
       :show-title="showTitle"
       :show-author="showAuthor"
       :show-page-preview="!selection.enabled && !contextMenuOpen"
@@ -100,9 +102,9 @@ function handleCardDragStart(event: DragEvent) {
               'border-overlay-foreground/80 bg-overlay/55 shadow-sm backdrop-blur-sm transition',
             )
           "
-          :model-value="selection.isSelected(artwork.artworkId)"
+          :model-value="selection.isSelected(artwork.localArtworkId)"
           @click.stop
-          @update:model-value="selection.toggleArtwork(artwork.artworkId)"
+          @update:model-value="selection.toggleArtwork(artwork.localArtworkId)"
         />
         <button
           type="button"

@@ -132,6 +132,7 @@ function updateSort(sort: string, order: string) {
               { value: 'illust', label: '插画' },
               { value: 'manga', label: '漫画' },
               { value: 'ugoira', label: 'Ugoira' },
+              { value: 'fanbox', label: 'FANBOX' },
             ]"
             :key="option.value"
             :active="filters.artworkType === option.value"

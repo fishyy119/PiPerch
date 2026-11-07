@@ -18,6 +18,8 @@ from piperch.domain.downloads import DownloadJobDetail, DownloadJobSummary, Item
 def artwork_summary_response(summary: ArtworkSummary) -> ArtworkSummaryResponse:
     return ArtworkSummaryResponse(
         artwork_id=summary.artwork_id,
+        source=summary.source,
+        remote_id=summary.remote_id,
         title=summary.title,
         artwork_type=summary.artwork_type,
         author_id=summary.author_id,
@@ -36,12 +38,12 @@ def artwork_summary_response(summary: ArtworkSummary) -> ArtworkSummaryResponse:
 
 def artwork_detail_response(
     detail: ArtworkDetail,
-    local_linked_artwork_ids: list[int],
+    local_linked_artworks: dict[int, int],
 ) -> ArtworkDetailResponse:
     return ArtworkDetailResponse(
         **artwork_summary_response(detail.summary).model_dump(),
         description=detail.description,
-        local_linked_artwork_ids=local_linked_artwork_ids,
+        local_linked_artworks=local_linked_artworks,
         width=detail.width,
         height=detail.height,
         tags=[
@@ -92,7 +94,8 @@ def download_job_detail_response(job: DownloadJobDetail) -> DownloadJobDetailRes
         items=[
             DownloadItemResponse(
                 item_id=item.item_id,
-                artwork_id=item.artwork_id,
+                source=item.source,
+                remote_id=item.remote_id,
                 state=item.state,
                 attempts=item.attempts,
                 error=item.error,

@@ -39,18 +39,37 @@ class FavoriteRepository:
     def compare_with_remote(self, remote_artwork_ids: Sequence[int]) -> FavoriteSyncDiff:
         remote_ids = set(remote_artwork_ids)
         with self._database.connect() as connection:
-            local_ids = set(connection.scalars(select(artworks.c.id)))
-            local_favorite_ids = set(connection.scalars(select(favorite_artworks.c.artwork_id)))
-        matched_favorite_ids = remote_ids & local_ids
+            local_by_remote = {
+                int(remote_id): int(local_id)
+                for remote_id, local_id in connection.execute(
+                    select(artworks.c.remote_id, artworks.c.id).where(artworks.c.source == "pixiv")
+                )
+            }
+            local_ids = set(local_by_remote.values())
+            local_favorite_ids = set(connection.scalars(select(favorite_artworks.c.artwork_id))) & local_ids
+        matched_favorite_ids = {local_by_remote[remote_id] for remote_id in remote_ids & local_by_remote.keys()}
         return FavoriteSyncDiff(
             pixiv_favorite_count=len(remote_ids),
             local_artwork_count=len(local_ids),
             local_favorite_count=len(local_favorite_ids),
             matched_favorite_count=len(matched_favorite_ids),
-            unavailable_locally_count=len(remote_ids - local_ids),
+            unavailable_locally_count=len(remote_ids - local_by_remote.keys()),
             add_artwork_ids=tuple(sorted(matched_favorite_ids - local_favorite_ids)),
-            remove_artwork_ids=tuple(sorted(local_favorite_ids - remote_ids)),
+            remove_artwork_ids=tuple(sorted(local_favorite_ids - matched_favorite_ids)),
         )
+
+    def remote_ids_for_local(self, artwork_ids: Sequence[int]) -> dict[int, int]:
+        output: dict[int, int] = {}
+        unique_ids = tuple(dict.fromkeys(artwork_ids))
+        with self._database.connect() as connection:
+            for start in range(0, len(unique_ids), 900):
+                rows = connection.execute(
+                    select(artworks.c.id, artworks.c.remote_id).where(
+                        artworks.c.source == "pixiv", artworks.c.id.in_(unique_ids[start : start + 900])
+                    )
+                )
+                output.update((int(local_id), int(remote_id)) for local_id, remote_id in rows)
+        return output
 
     def apply_sync(
         self,
@@ -62,8 +81,8 @@ class FavoriteRepository:
         requested_removals = set(remove_artwork_ids)
         now = utc_now_text()
         with self._database.begin() as connection:
-            local_ids = set(connection.scalars(select(artworks.c.id)))
-            local_favorite_ids = set(connection.scalars(select(favorite_artworks.c.artwork_id)))
+            local_ids = set(connection.scalars(select(artworks.c.id).where(artworks.c.source == "pixiv")))
+            local_favorite_ids = set(connection.scalars(select(favorite_artworks.c.artwork_id))) & local_ids
             additions = sorted((requested_additions & local_ids) - local_favorite_ids)
             removals = sorted(requested_removals & local_favorite_ids)
             if additions:

@@ -19,20 +19,21 @@ import { usePageKeyboardShortcuts } from '@/shared/lib/usePageKeyboardShortcuts'
 
 const route = useRoute()
 const router = useRouter()
-const artworkId = computed(() => Number(route.params.artworkId))
+const localArtworkId = computed(() => Number(route.params.artworkId))
 const galleryNavigation = ref<GalleryNavigationState | null>(
   parseGalleryNavigationState(router.options.history.state),
 )
 
 const artworkQuery = useQuery({
-  queryKey: computed(() => artworkQueryKeys.detail(artworkId.value)),
-  queryFn: () => getArtwork(artworkId.value),
+  queryKey: computed(() => artworkQueryKeys.detail(localArtworkId.value)),
+  queryFn: () => getArtwork(localArtworkId.value),
   // 保留上一份数据以避免中间加载态高度坍缩；遮罩层负责阻止旧内容被操作。
   placeholderData: keepPreviousData,
 })
 // 侧栏只接收当前作品的数据，切换时卸载旧侧栏及其作者资料查询。
 const currentArtwork = computed(() =>
-  !artworkQuery.isPlaceholderData.value && artworkQuery.data.value?.artworkId === artworkId.value
+  !artworkQuery.isPlaceholderData.value &&
+  artworkQuery.data.value?.localArtworkId === localArtworkId.value
     ? artworkQuery.data.value
     : undefined,
 )
@@ -52,25 +53,27 @@ watch(
   },
 )
 
-watch(artworkId, (currentArtworkId) => {
+watch(localArtworkId, (currentArtworkId) => {
   const navigation = parseGalleryNavigationState(router.options.history.state)
-  galleryNavigation.value = navigation?.artworkIds.includes(currentArtworkId) ? navigation : null
+  galleryNavigation.value = navigation?.localArtworkIds.includes(currentArtworkId)
+    ? navigation
+    : null
 })
 
 function selectAdjacentArtwork(offset: -1 | 1) {
   const navigation = galleryNavigation.value
   if (navigation === null) return
 
-  const currentIndex = navigation.artworkIds.indexOf(artworkId.value)
+  const currentIndex = navigation.localArtworkIds.indexOf(localArtworkId.value)
   if (currentIndex < 0) return
 
-  const nextArtworkId = navigation.artworkIds[currentIndex + offset]
+  const nextArtworkId = navigation.localArtworkIds[currentIndex + offset]
   if (nextArtworkId === undefined) return
 
   void router
     .replace({
       path: `/artworks/${String(nextArtworkId)}`,
-      state: galleryNavigationRouteState(navigation.artworkIds),
+      state: galleryNavigationRouteState(navigation.localArtworkIds),
     })
     .then(() => window.scrollTo({ top: 0 }))
 }
@@ -79,7 +82,7 @@ usePageKeyboardShortcuts(
   (event) => {
     if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return
     const navigation = galleryNavigation.value
-    if (!navigation?.artworkIds.includes(artworkId.value)) return
+    if (!navigation?.localArtworkIds.includes(localArtworkId.value)) return
 
     event.preventDefault()
     selectAdjacentArtwork(event.key === 'ArrowUp' ? -1 : 1)
@@ -108,8 +111,11 @@ usePageKeyboardShortcuts(
         </div>
         <template v-if="artworkQuery.data.value">
           <ArtworkDescriptionSection :artwork="artworkQuery.data.value" />
-          <RelatedArtworksSection :artwork-id="artworkId" />
-          <RecommendedArtworksSection :artwork-id="artworkId" />
+          <RelatedArtworksSection :local-artwork-id="localArtworkId" />
+          <RecommendedArtworksSection
+            v-if="artworkQuery.data.value?.source === 'pixiv'"
+            :remote-id="artworkQuery.data.value.remoteId"
+          />
         </template>
       </div>
 

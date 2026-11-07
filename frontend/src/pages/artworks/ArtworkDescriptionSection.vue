@@ -27,7 +27,7 @@ function filterByTag(tagId: number) {
           {{ artworkTypeLabel(artwork.artworkType) }}
         </span>
         <span
-          v-if="artwork.xRestrict > 0"
+          v-if="(artwork.xRestrict ?? 0) > 0"
           class="rounded-lg bg-muted px-[0.55rem] py-[0.3rem] text-xs text-destructive!"
         >
           R18
@@ -45,7 +45,7 @@ function filterByTag(tagId: number) {
       v-if="artwork.description"
       class="mt-5 text-sm leading-7"
       :html="artwork.description"
-      :local-artwork-ids="artwork.localLinkedArtworkIds"
+      :local-artworks="artwork.localLinkedArtworks"
     />
     <p v-else class="mt-5 text-sm text-muted-foreground">作者没有为这件作品添加说明。</p>
 

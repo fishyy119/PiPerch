@@ -1,6 +1,7 @@
 import { z } from 'zod'
 
 import { artworkTypeSchema } from '@/features/artworks/artwork'
+import { artworkSourceSchema } from '@/features/artworks/artwork-source'
 import { api } from '@/shared/api/http'
 
 export const tagSchema = z.object({
@@ -10,8 +11,10 @@ export const tagSchema = z.object({
 })
 export type Tag = z.infer<typeof tagSchema>
 
-export const artworkSummarySchema = z.object({
+const artworkSummaryWireSchema = z.object({
   artworkId: z.number().int().positive(),
+  source: artworkSourceSchema,
+  remoteId: z.number().int().positive(),
   title: z.string(),
   artworkType: artworkTypeSchema,
   authorId: z.number().int().positive(),
@@ -19,13 +22,19 @@ export const artworkSummarySchema = z.object({
   seriesId: z.number().int().positive().nullable(),
   seriesTitle: z.string().nullable(),
   pageCount: z.number().int().positive(),
-  xRestrict: z.number().int().nonnegative(),
-  isAi: z.boolean(),
+  xRestrict: z.number().int().nonnegative().nullable(),
+  isAi: z.boolean().nullable(),
   publishedAt: z.string().nullable(),
   downloadedAt: z.string(),
   isFavorite: z.boolean(),
   groupIds: z.array(z.number().int().positive()),
 })
+export const artworkSummarySchema = artworkSummaryWireSchema.transform(
+  ({ artworkId, ...item }) => ({
+    ...item,
+    localArtworkId: artworkId,
+  }),
+)
 export type ArtworkSummary = z.infer<typeof artworkSummarySchema>
 
 const artworkPageSchema = z.object({
@@ -51,22 +60,24 @@ const namedCountPageSchema = z.object({
 })
 export type NamedCount = z.infer<typeof namedCountSchema>
 
-export const artworkDetailSchema = artworkSummarySchema.extend({
-  description: z.string(),
-  localLinkedArtworkIds: z.array(z.number().int().positive()),
-  width: z.number().int().nullable(),
-  height: z.number().int().nullable(),
-  tags: z.array(tagSchema),
-  media: z.array(
-    z.object({
-      role: z.string(),
-      pageIndex: z.number().int().nullable(),
-      mimeType: z.string(),
-      byteSize: z.number().int(),
-    }),
-  ),
-  ugoiraFrames: z.array(z.object({ fileName: z.string(), delayMs: z.number().int() })),
-})
+export const artworkDetailSchema = artworkSummaryWireSchema
+  .extend({
+    description: z.string(),
+    localLinkedArtworks: z.record(z.string(), z.number().int().positive()),
+    width: z.number().int().nullable(),
+    height: z.number().int().nullable(),
+    tags: z.array(tagSchema),
+    media: z.array(
+      z.object({
+        role: z.string(),
+        pageIndex: z.number().int().nullable(),
+        mimeType: z.string(),
+        byteSize: z.number().int(),
+      }),
+    ),
+    ugoiraFrames: z.array(z.object({ fileName: z.string(), delayMs: z.number().int() })),
+  })
+  .transform(({ artworkId, ...item }) => ({ ...item, localArtworkId: artworkId }))
 export type ArtworkDetail = z.infer<typeof artworkDetailSchema>
 
 export type MultiValueMatch = 'any' | 'all'
@@ -157,14 +168,14 @@ const artworkDeleteResultSchema = z.object({
 export type ArtworkDeleteResult = z.infer<typeof artworkDeleteResultSchema>
 
 export type DeleteArtworksRequest =
-  { mode: 'single'; artworkId: number } | { mode: 'bulk'; artworkIds: number[] }
+  { mode: 'single'; localArtworkId: number } | { mode: 'bulk'; localArtworkIds: number[] }
 
 export async function deleteArtworks(request: DeleteArtworksRequest) {
   const response =
     request.mode === 'single'
-      ? await api.delete<unknown>(`/api/artworks/${String(request.artworkId)}`)
+      ? await api.delete<unknown>(`/api/artworks/${String(request.localArtworkId)}`)
       : await api.post<unknown>('/api/artworks/bulk-delete', {
-          artworkIds: request.artworkIds,
+          artworkIds: request.localArtworkIds,
         })
   return artworkDeleteResultSchema.parse(response)
 }

@@ -8,12 +8,13 @@ from sqlalchemy import and_, exists, func, insert, select, update
 
 from piperch.database.tables import download_items, download_jobs
 from piperch.domain.downloads import DownloadItemRecord, DownloadJobDetail, DownloadJobSummary, ItemState, JobState
+from piperch.domain.sources import ArtworkSource
 from piperch.errors import ConflictError, NotFoundError
-from piperch.repositories._rows import integer, optional_string, string
+from piperch.repositories._rows import integer, optional_integer, optional_string, string
 from piperch.utils.datetime import utc_now_text
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable
+    from collections.abc import Iterable, Mapping
 
     from sqlalchemy.engine import Connection, RowMapping
 
@@ -24,7 +25,13 @@ class DownloadRepository:
     def __init__(self, database: Database) -> None:
         self._database = database
 
-    def create_job(self, artwork_ids: Iterable[int], source_label: str) -> str:
+    def create_job(
+        self,
+        artwork_ids: Iterable[int],
+        source_label: str,
+        source: ArtworkSource = ArtworkSource.PIXIV,
+        author_ids: Mapping[int, int] | None = None,
+    ) -> str:
         unique_ids = tuple(dict.fromkeys(artwork_ids))
         job_id = str(uuid4())
         now = utc_now_text()
@@ -43,7 +50,9 @@ class DownloadRepository:
                 [
                     {
                         "job_id": job_id,
-                        "artwork_id": artwork_id,
+                        "source": source.value,
+                        "remote_id": artwork_id,
+                        "author_id": (author_ids or {}).get(artwork_id),
                         "state": ItemState.QUEUED.value,
                         "attempts": 0,
                     }
@@ -200,7 +209,9 @@ class DownloadRepository:
                 job_id,
                 DownloadItemRecord(
                     item_id=item_id,
-                    artwork_id=integer(item_row["artwork_id"]),
+                    source=ArtworkSource(string(item_row["source"])),
+                    remote_id=integer(item_row["remote_id"]),
+                    author_id=optional_integer(item_row["author_id"]),
                     state=ItemState.RUNNING,
                     attempts=attempts,
                     error=None,
@@ -346,7 +357,9 @@ class DownloadRepository:
             items = tuple(
                 DownloadItemRecord(
                     item_id=integer(item["id"]),
-                    artwork_id=integer(item["artwork_id"]),
+                    source=ArtworkSource(string(item["source"])),
+                    remote_id=integer(item["remote_id"]),
+                    author_id=optional_integer(item["author_id"]),
                     state=ItemState(string(item["state"])),
                     attempts=integer(item["attempts"]),
                     error=optional_string(item["error"]),

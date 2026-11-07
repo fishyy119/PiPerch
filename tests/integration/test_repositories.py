@@ -11,6 +11,7 @@ from piperch.database.tables import tag_search_cache
 from piperch.domain.artworks import ArtworkType, MediaRecord, RemoteArtwork
 from piperch.domain.bookmarks import RemoteBookmarkReference
 from piperch.domain.downloads import ItemState
+from piperch.domain.sources import ArtworkSource
 from piperch.paths import AppPaths
 from piperch.repositories import (
     ArtworkGroupRepository,
@@ -35,7 +36,7 @@ if TYPE_CHECKING:
 
 def _artwork(artwork_id: int, tags: tuple[str, ...]) -> RemoteArtwork:
     return RemoteArtwork(
-        artwork_id=artwork_id,
+        remote_id=artwork_id,
         artwork_type=ArtworkType.ILLUST,
         title=f"测试作品 {artwork_id}",
         description="简介",
@@ -106,16 +107,27 @@ async def test_library_events_follow_commits_when_artwork_is_restored_during_del
     monkeypatch.setattr(thumbnails, "delete_artwork", restore_during_cleanup)
     try:
         async with events.subscribe() as queue:
-            await to_thread.run_sync(commits.commit, artwork, media)
+            local_id = await to_thread.run_sync(commits.commit, artwork, media)
             assert queue.get_nowait().name == "library-added"
 
-            result = await to_thread.run_sync(library.delete_artworks, [123])
+            result = await to_thread.run_sync(library.delete_artworks, [local_id])
 
             assert result.deleted == 1
             assert artworks.find_existing_ids([123]) == {123}
+            restored_id = artworks.find_local_ids([123])[123]
             assert [(event.name, event.data) for event in (queue.get_nowait(), queue.get_nowait())] == [
-                ("library-removed", {"artworkIds": [123]}),
-                ("library-added", {"artworkIds": [123]}),
+                (
+                    "library-removed",
+                    {
+                        "references": [{"localArtworkId": local_id, "source": "pixiv", "remoteId": 123}],
+                    },
+                ),
+                (
+                    "library-added",
+                    {
+                        "references": [{"localArtworkId": restored_id, "source": "pixiv", "remoteId": 123}],
+                    },
+                ),
             ]
     finally:
         database.close()
@@ -230,10 +242,10 @@ def test_download_commit_initializes_bookmark_state_only_for_new_artwork(tmp_pat
     favorites = FavoriteRepository(database)
     groups = ArtworkGroupRepository(database)
     try:
-        commits.commit(artwork, media, ("Pixiv标签",))
+        local_id = commits.commit(artwork, media, ("Pixiv标签",))
         commits.commit(artwork, media, ("不应覆盖",))
 
-        favorite = favorites.get_state(101)
+        favorite = favorites.get_state(local_id)
         imported_groups = groups.list_groups()
     finally:
         database.close()
@@ -270,7 +282,7 @@ def test_related_artworks_combine_author_and_shared_tags(tmp_path: Path) -> None
                 [
                     MediaRecord(
                         "page",
-                        f"{artwork.author_id}/{artwork.artwork_id}/{artwork.artwork_id}_p0.jpg",
+                        f"{artwork.author_id}/{artwork.remote_id}/{artwork.remote_id}_p0.jpg",
                         "image/jpeg",
                         10,
                         0,
@@ -284,18 +296,47 @@ def test_related_artworks_combine_author_and_shared_tags(tmp_path: Path) -> None
     assert [item.artwork_id for item in related] == [2, 3, 4]
 
 
-def test_find_existing_artwork_ids_ignores_unknown_and_duplicate_ids(tmp_path: Path) -> None:
-    _, database, _, artworks, commits, _ = _repositories(tmp_path)
+def test_same_remote_id_stays_isolated_through_pixiv_sync_and_fanbox_deletion(tmp_path: Path) -> None:
+    paths, database, settings, artworks, commits, _ = _repositories(tmp_path)
+    favorites = FavoriteRepository(database)
+    library = LibraryService(paths, settings, artworks, library_commits=LibraryCommitCoordinator(AppEventBroker()))
+    root = settings.get().library_root
+    pixiv_path = root / "100/101/101_p0.jpg"
+    fanbox_path = root / "fanbox/100/101/101_p0.jpg"
+    for path in (pixiv_path, fanbox_path):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(b"image")
     try:
-        commits.commit(
+        pixiv_id = commits.commit(
             _artwork(101, ()),
-            [MediaRecord("page", "100/101/101_p0.jpg", "image/jpeg", 10, 0)],
+            [MediaRecord("page", "100/101/101_p0.jpg", "image/jpeg", 5, 0)],
         )
-        existing_ids = artworks.find_existing_ids([101, 101, 202])
+        fanbox_id = commits.commit(
+            replace(
+                _artwork(101, ()),
+                source=ArtworkSource.FANBOX,
+                artwork_type=ArtworkType.FANBOX,
+                x_restrict=None,
+                is_ai=None,
+            ),
+            [MediaRecord("page", "fanbox/100/101/101_p0.jpg", "image/jpeg", 5, 0)],
+        )
+        assert pixiv_id != fanbox_id
+        assert artworks.find_local_ids([101], ArtworkSource.PIXIV) == {101: pixiv_id}
+        assert artworks.find_local_ids([101], ArtworkSource.FANBOX) == {101: fanbox_id}
+        favorites.replace_state(pixiv_id, is_favorite=True)
+        favorites.replace_state(fanbox_id, is_favorite=True)
+        assert favorites.compare_with_remote([]).remove_artwork_ids == (pixiv_id,)
+        favorites.apply_sync(add_artwork_ids=(), remove_artwork_ids=(pixiv_id, fanbox_id))
+        assert not favorites.get_state(pixiv_id).is_favorite
+        assert favorites.get_state(fanbox_id).is_favorite
+        favorites.replace_state(fanbox_id, is_favorite=False)
+        assert library.delete_artworks([fanbox_id]).deleted == 1
+        assert pixiv_path.is_file()
+        assert not fanbox_path.exists()
+        assert artworks.is_complete(pixiv_id, root)
     finally:
         database.close()
-
-    assert existing_ids == {101}
 
 
 def test_download_completeness_requires_every_page(tmp_path: Path) -> None:
@@ -312,13 +353,13 @@ def test_download_completeness_requires_every_page(tmp_path: Path) -> None:
     first_path.write_bytes(b"first")
     try:
         first_page = MediaRecord("page", "100/101/101_p0.jpg", "image/jpeg", 5, 0)
-        commits.commit(artwork, [first_page])
-        incomplete = artworks.is_complete(101, library_root)
+        local_id = commits.commit(artwork, [first_page])
+        incomplete = artworks.is_complete(local_id, library_root)
 
         second_path.write_bytes(b"second")
         second_page = MediaRecord("page", "100/101/101_p1.jpg", "image/jpeg", 6, 1)
         commits.commit(artwork, [first_page, second_page])
-        complete = artworks.is_complete(101, library_root)
+        complete = artworks.is_complete(local_id, library_root)
     finally:
         database.close()
 
@@ -334,18 +375,18 @@ def test_delete_metadata_removes_unused_gallery_facets(tmp_path: Path) -> None:
         series_title="测试系列",
     )
     try:
-        commits.commit(
+        local_id = commits.commit(
             artwork,
             [MediaRecord("page", "100/101/101_p0.jpg", "image/jpeg", 10, 0)],
         )
-        deleted = artworks.delete_metadata([101])
+        deleted = artworks.delete_metadata([local_id])
         available_tags = artworks.list_tags("", 50)
         available_authors = artworks.list_authors("")
         available_series, series_total = artworks.list_series(0, 50, "")
     finally:
         database.close()
 
-    assert deleted == {101}
+    assert deleted == {local_id}
     assert available_tags == []
     assert available_authors == []
     assert available_series == []
@@ -410,16 +451,19 @@ def test_interrupted_delete_is_restored_when_metadata_still_exists(tmp_path: Pat
     assert not pending.exists()
 
 
-def test_running_download_is_requeued_during_recovery(tmp_path: Path) -> None:
+def test_recovery_requeues_download_with_its_source_and_author_context(tmp_path: Path) -> None:
     _, database, _, _, _, downloads = _repositories(tmp_path)
     try:
-        job_id = downloads.create_job([123], "中断任务")
+        job_id = downloads.create_job([123], "中断任务", ArtworkSource.FANBOX, author_ids={123: 100})
         assert downloads.claim_next() is not None
 
         downloads.recover_interrupted()
         recovered = downloads.get_job(job_id)
+        resumed = downloads.claim_next()
     finally:
         database.close()
 
     assert recovered.summary.state.value == "queued"
     assert recovered.items[0].state is ItemState.QUEUED
+    assert resumed is not None
+    assert (resumed[1].source, resumed[1].remote_id, resumed[1].author_id) == (ArtworkSource.FANBOX, 123, 100)

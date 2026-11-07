@@ -1,19 +1,42 @@
 import { z } from 'zod'
 
 import { artworkTypeSchema } from '@/features/artworks/artwork'
+import type { ArtworkSource, DownloadReference } from '@/features/artworks/artwork-source'
+import { authorSummarySchema } from '@/features/authors/author-api'
 import { api, type ApiRequestOptions } from '@/shared/api/http'
 
-export const discoveryItemSchema = z.object({
+const discoveryItemFields = {
   artworkId: z.number().int().positive(),
+  localArtworkId: z.number().int().positive().nullable(),
   title: z.string(),
   authorName: z.string(),
   artworkType: artworkTypeSchema,
   pageCount: z.number().int().positive(),
-  xRestrict: z.number().int().nonnegative(),
-  isAi: z.boolean(),
-  thumbnailUrl: z.string().startsWith('/api/pixiv-images?url=').nullable(),
+  xRestrict: z.number().int().nonnegative().nullable(),
+  isAi: z.boolean().nullable(),
+  thumbnailUrl: z
+    .union([
+      z.string().startsWith('/api/pixiv-images?url='),
+      z.string().startsWith('/api/fanbox-images?url='),
+    ])
+    .nullable(),
   inLibrary: z.boolean(),
-})
+}
+
+export const discoveryItemSchema = z
+  .discriminatedUnion('source', [
+    z.object({
+      ...discoveryItemFields,
+      source: z.literal('pixiv'),
+      authorId: z.number().int().positive().nullable(),
+    }),
+    z.object({
+      ...discoveryItemFields,
+      source: z.literal('fanbox'),
+      authorId: z.number().int().positive(),
+    }),
+  ])
+  .transform(({ artworkId, ...item }) => ({ ...item, remoteId: artworkId }))
 export type DiscoveryItem = z.infer<typeof discoveryItemSchema>
 
 export const recommendedUserSchema = z.object({
@@ -48,7 +71,11 @@ const discoveryResponseSchema = z.object({
   nextPage: z.number().int().nonnegative().nullable(),
   totalPages: z.number().int().nonnegative().nullable().default(null),
   failures: z
-    .array(z.object({ artworkId: z.number().int().positive(), message: z.string() }))
+    .array(
+      z
+        .object({ artworkId: z.number().int().positive(), message: z.string() })
+        .transform(({ artworkId, ...failure }) => ({ ...failure, remoteId: artworkId })),
+    )
     .default([]),
 })
 
@@ -61,13 +88,18 @@ const recommendedUsersResponseSchema = z.object({
 })
 
 const artworkPreviewResponseSchema = z.object({
-  urls: z.array(z.string().startsWith('/api/pixiv-images?url=')),
+  urls: z.array(
+    z.union([
+      z.string().startsWith('/api/pixiv-images?url='),
+      z.string().startsWith('/api/fanbox-images?url='),
+    ]),
+  ),
 })
 
 export type DiscoveryRequest =
   | { sourceType: 'artwork'; inputs: string[]; page: number }
   | { sourceType: 'search'; keyword: string; page: number }
-  | { sourceType: 'user'; userId: number; page: number }
+  | { sourceType: 'user'; source?: ArtworkSource; userId: number; page: number }
   | { sourceType: 'followUpdates'; page: number }
   | { sourceType: 'bookmark'; folder: BookmarkFolderReference; page: number }
   | { sourceType: 'series'; seriesId: number; page: number }
@@ -93,15 +125,27 @@ export async function listRecommendedUsers() {
   ).items
 }
 
-export async function listArtworkPreviewUrls(artworkId: number) {
-  const path = `/api/discovery/artworks/${encodeURIComponent(String(artworkId))}/preview`
+export async function listArtworkPreviewUrls(artwork: DownloadReference) {
+  const query =
+    artwork.source === 'fanbox' ? `?source=fanbox&authorId=${String(artwork.authorId)}` : ''
+  const path = `/api/discovery/artworks/${encodeURIComponent(String(artwork.remoteId))}/preview${query}`
   return artworkPreviewResponseSchema.parse(await api.get<unknown>(path)).urls
 }
 
-export async function listSelectableUserArtworkIds(userId: number) {
+export async function listSelectableUserArtworkIds(
+  userId: number,
+  source: ArtworkSource = 'pixiv',
+) {
   const schema = z.object({ artworkIds: z.array(z.number().int().positive()) })
-  const path = `/api/discovery/users/${encodeURIComponent(String(userId))}/selectable-artwork-ids`
+  const path = `/api/discovery/users/${encodeURIComponent(String(userId))}/selectable-artwork-ids${source === 'fanbox' ? '?source=fanbox' : ''}`
   return schema.parse(await api.get<unknown>(path)).artworkIds
+}
+
+export async function searchFanboxAuthors(query: string) {
+  const schema = z.object({ items: z.array(authorSummarySchema) })
+  return schema.parse(
+    await api.get<unknown>(`/api/discovery/fanbox/authors?query=${encodeURIComponent(query)}`),
+  ).items
 }
 
 export async function listBookmarkFolders() {

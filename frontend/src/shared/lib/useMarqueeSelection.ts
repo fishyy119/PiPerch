@@ -1,36 +1,32 @@
 import SelectionArea, { type SelectionEvent } from '@viselect/vanilla'
 import { onBeforeUnmount, type Ref, watch } from 'vue'
 
+import { mergeMarqueeSelection } from '@/shared/lib/marquee-selection'
+
 const SELECTABLE_SELECTOR = '[data-selection-id]'
 const REMOVING_CLASS = 'selection-area--removing'
 const IGNORED_START_SELECTOR = 'button, input, select, textarea, [data-selection-ignore]'
 
 let nextScopeId = 0
 
-interface MarqueeSelectionOptions {
-  selectedIds: () => readonly number[]
-  setSelectedIds: (artworkIds: readonly number[]) => void
+interface MarqueeSelectionOptions<Item> {
+  selectedItems: () => readonly Item[]
+  setSelectedItems: (items: readonly Item[]) => void
+  getKey: (item: Item) => string
+  resolveItem: (element: HTMLElement) => Item | undefined
   enabled?: () => boolean
   canStart?: (event: MouseEvent) => boolean
 }
 
-function selectionIds(elements: Element[]) {
-  return elements.flatMap((element) => {
-    if (!(element instanceof HTMLElement)) return []
-    const selectionId = Number(element.dataset.selectionId)
-    return Number.isSafeInteger(selectionId) && selectionId > 0 ? [selectionId] : []
-  })
-}
-
-export function useMarqueeSelection(
+export function useMarqueeSelection<Item>(
   root: Ref<HTMLElement | null>,
-  options: MarqueeSelectionOptions,
+  options: MarqueeSelectionOptions<Item>,
 ) {
   const scopeId = `marquee-${String(nextScopeId++)}`
   let selectionRoot: HTMLElement | null = null
   let selectionArea: SelectionArea | null = null
-  let initialIds: number[] = []
-  let intersectingIds: number[] = []
+  let initialItems: Item[] = []
+  let intersectingItems: Item[] = []
   let active = false
   let removing = false
   let suppressClick = false
@@ -43,12 +39,17 @@ export function useMarqueeSelection(
   function applySelection() {
     if (!active) return
     // 普通框选追加，按住 Shift 时从初始选择中移除。
-    const nextIds = new Set(initialIds)
-    intersectingIds.forEach((selectionId) => {
-      if (removing) nextIds.delete(selectionId)
-      else nextIds.add(selectionId)
+    options.setSelectedItems(
+      mergeMarqueeSelection(initialItems, intersectingItems, options.getKey, removing),
+    )
+  }
+
+  function selectionItems(elements: Element[]) {
+    return elements.flatMap((element) => {
+      if (!(element instanceof HTMLElement)) return []
+      const item = options.resolveItem(element)
+      return item === undefined ? [] : [item]
     })
-    options.setSelectedIds([...nextIds])
   }
 
   function setRemoving(value: boolean) {
@@ -65,8 +66,8 @@ export function useMarqueeSelection(
     window.removeEventListener('keydown', handleModifierChange)
     window.removeEventListener('keyup', handleModifierChange)
     active = false
-    initialIds = []
-    intersectingIds = []
+    initialItems = []
+    intersectingItems = []
     setRemoving(false)
   }
 
@@ -107,8 +108,8 @@ export function useMarqueeSelection(
   }
 
   function handleStart({ event }: SelectionEvent) {
-    initialIds = [...options.selectedIds()]
-    intersectingIds = []
+    initialItems = [...options.selectedItems()]
+    intersectingItems = []
     active = true
     setRemoving(event instanceof MouseEvent && event.shiftKey)
     window.addEventListener('keydown', handleModifierChange)
@@ -117,13 +118,13 @@ export function useMarqueeSelection(
 
   function handleMove({ store }: SelectionEvent) {
     if (!active) return
-    intersectingIds = selectionIds(store.selected)
+    intersectingItems = selectionItems(store.selected)
     applySelection()
   }
 
   function handleStop({ store }: SelectionEvent) {
     if (!active) return
-    intersectingIds = selectionIds(store.selected)
+    intersectingItems = selectionItems(store.selected)
     applySelection()
     armClickSuppression()
     stopInteraction()

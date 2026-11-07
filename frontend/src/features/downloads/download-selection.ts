@@ -1,91 +1,127 @@
 import { defineStore } from 'pinia'
 import { computed, ref, watch } from 'vue'
 
+import {
+  type ArtworkIdentity,
+  artworkReferenceKey,
+  type DownloadReference,
+} from '@/features/artworks/artwork-source'
 import type { DiscoveryItem } from '@/features/discovery/discovery-api'
+import { discoveryPreview, type DownloadPreview } from '@/features/downloads/download-preview'
 import { useLibraryMembershipStore } from '@/features/library/library-membership'
 
-export interface DownloadSelectionEntry {
-  artworkId: number
-  item: DiscoveryItem | null
+export type DownloadSelectionEntry = DownloadReference & { preview: DownloadPreview | null }
+
+function downloadReference(item: DiscoveryItem): DownloadReference {
+  return item.source === 'fanbox'
+    ? { source: item.source, remoteId: item.remoteId, authorId: item.authorId }
+    : { source: item.source, remoteId: item.remoteId }
 }
 
 export const useDownloadSelection = defineStore('download-selection', () => {
   const library = useLibraryMembershipStore()
-  const ids = ref(new Set<number>())
-  const itemCache = ref(new Map<number, DiscoveryItem>())
-  const selectedIds = computed(() => [...ids.value])
+  const references = ref(new Map<string, DownloadReference>())
+  const candidates = ref(new Map<string, DownloadReference>())
+  const previews = ref(new Map<string, DownloadPreview>())
+  const selectedReferences = computed(() => [...references.value.values()])
   const selectedEntries = computed<DownloadSelectionEntry[]>(() =>
-    selectedIds.value.map((artworkId) => ({
-      artworkId,
-      item: itemCache.value.get(artworkId) ?? null,
+    selectedReferences.value.map((item) => ({
+      ...item,
+      preview: previews.value.get(artworkReferenceKey(item.source, item.remoteId)) ?? null,
     })),
   )
+
+  function isSelected(item: ArtworkIdentity) {
+    return references.value.has(artworkReferenceKey(item.source, item.remoteId))
+  }
+
+  function referenceForKey(key: string) {
+    return references.value.get(key) ?? candidates.value.get(key)
+  }
+
+  function cachePreviews(items: readonly DownloadPreview[]) {
+    const next = new Map(previews.value)
+    for (const item of items) next.set(artworkReferenceKey(item.source, item.remoteId), item)
+    previews.value = next
+  }
 
   function cacheItems(items: readonly DiscoveryItem[]) {
     if (items.length === 0) return
     library.seedStatuses(items)
-    const next = new Map(itemCache.value)
-    items.forEach((item) => next.set(item.artworkId, item))
-    itemCache.value = next
+    const next = new Map(candidates.value)
+    for (const item of items)
+      next.set(artworkReferenceKey(item.source, item.remoteId), downloadReference(item))
+    candidates.value = next
+    cachePreviews(items.map(discoveryPreview))
+  }
+
+  function add(items: readonly DownloadReference[]) {
+    const available = items.filter(
+      (item) => !library.isInLibrary(item.remoteId, false, item.source),
+    )
+    const next = new Map(references.value)
+    for (const item of available) next.set(artworkReferenceKey(item.source, item.remoteId), item)
+    references.value = next
+    return available
+  }
+
+  function remove(items: readonly ArtworkIdentity[]) {
+    const next = new Map(references.value)
+    for (const item of items) next.delete(artworkReferenceKey(item.source, item.remoteId))
+    references.value = next
   }
 
   function toggle(item: DiscoveryItem) {
     cacheItems([item])
-    if (library.isInLibrary(item.artworkId, item.inLibrary)) return
-    const next = new Set(ids.value)
-    if (next.has(item.artworkId)) next.delete(item.artworkId)
-    else next.add(item.artworkId)
-    ids.value = next
+    if (library.isInLibrary(item.remoteId, item.inLibrary, item.source)) return
+    if (isSelected(item)) remove([item])
+    else add([downloadReference(item)])
   }
 
-  function addAll(candidates: readonly DiscoveryItem[]) {
-    cacheItems(candidates)
-    addIds(
-      candidates
-        .filter((item) => !library.isInLibrary(item.artworkId, item.inLibrary))
-        .map((item) => item.artworkId),
+  function addAll(items: readonly DiscoveryItem[]) {
+    cacheItems(items)
+    add(items.map(downloadReference))
+  }
+
+  function removeAll(items: readonly DiscoveryItem[]) {
+    remove(items)
+  }
+
+  function setSelected(items: readonly DownloadReference[]) {
+    references.value = new Map(
+      items
+        .filter((item) => !library.isInLibrary(item.remoteId, false, item.source))
+        .map((item) => [artworkReferenceKey(item.source, item.remoteId), item]),
     )
   }
 
-  function removeAll(candidates: readonly DiscoveryItem[]) {
-    removeIds(candidates.map((item) => item.artworkId))
-  }
-
-  function addIds(artworkIds: readonly number[]) {
-    const availableIds = artworkIds.filter((id) => !library.isInLibrary(id))
-    ids.value = new Set([...ids.value, ...availableIds])
-    return availableIds
-  }
-
-  function removeIds(artworkIds: readonly number[]) {
-    const next = new Set(ids.value)
-    artworkIds.forEach((artworkId) => next.delete(artworkId))
-    ids.value = next
-  }
-
-  function setSelected(artworkIds: readonly number[]) {
-    ids.value = new Set(artworkIds.filter((id) => !library.isInLibrary(id)))
-  }
-
   function clear() {
-    ids.value = new Set()
+    references.value = new Map()
   }
 
   watch(
     () => library.statuses,
-    () => removeIds(selectedIds.value.filter((id) => library.isInLibrary(id))),
+    () =>
+      remove(
+        selectedReferences.value.filter((item) =>
+          library.isInLibrary(item.remoteId, false, item.source),
+        ),
+      ),
     { flush: 'sync' },
   )
 
   return {
-    selectedIds,
+    selectedReferences,
     selectedEntries,
+    isSelected,
+    referenceForKey,
     cacheItems,
+    cachePreviews,
     toggle,
     addAll,
     removeAll,
-    addIds,
-    removeIds,
+    add,
+    remove,
     setSelected,
     clear,
   }

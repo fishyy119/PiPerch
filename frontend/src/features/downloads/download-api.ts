@@ -1,5 +1,6 @@
 import { z } from 'zod'
 
+import { artworkSourceSchema, type DownloadReference } from '@/features/artworks/artwork-source'
 import { api } from '@/shared/api/http'
 
 const jobStateSchema = z.enum([
@@ -34,7 +35,8 @@ export type DownloadJob = z.infer<typeof downloadJobSchema>
 
 const downloadItemSchema = z.object({
   itemId: z.number().int(),
-  artworkId: z.number().int(),
+  source: artworkSourceSchema,
+  remoteId: z.number().int(),
   state: z.enum(['queued', 'running', 'skipped', 'succeeded', 'failed', 'cancelled']),
   attempts: z.number().int(),
   error: z.string().nullable(),
@@ -53,9 +55,26 @@ const jobPageSchema = z.object({
   totalPages: z.number().int(),
 })
 
-export async function createDownloadJob(artworkIds: number[], sourceLabel: string) {
+export type DownloadBatch =
+  | { source: 'pixiv'; references: readonly Extract<DownloadReference, { source: 'pixiv' }>[] }
+  | { source: 'fanbox'; references: readonly Extract<DownloadReference, { source: 'fanbox' }>[] }
+
+export async function createDownloadJob(batch: DownloadBatch, sourceLabel: string) {
   const schema = z.object({ jobId: z.string() })
-  return schema.parse(await api.post<unknown>('/api/download-jobs', { artworkIds, sourceLabel }))
+  return schema.parse(
+    await api.post<unknown>('/api/download-jobs', {
+      artworkIds: batch.references.map((item) => item.remoteId),
+      sourceLabel,
+      source: batch.source,
+      ...(batch.source === 'fanbox'
+        ? {
+            authorIds: Object.fromEntries(
+              batch.references.map((item) => [item.remoteId, item.authorId]),
+            ),
+          }
+        : {}),
+    }),
+  )
 }
 
 export async function listDownloadJobs() {

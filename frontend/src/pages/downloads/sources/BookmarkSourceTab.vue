@@ -18,7 +18,7 @@ import { Button } from '@ui/button'
 
 interface LoadedBookmarkSelection {
   key: string
-  artworkIds: number[]
+  remoteIds: number[]
 }
 
 const selection = useDownloadSelection()
@@ -72,7 +72,7 @@ const confirmedFolderSummary = computed(() => {
 })
 
 const selectableArtworkIds = computed(() =>
-  (loadedSelection.value?.artworkIds ?? []).filter((id) => !library.isInLibrary(id)),
+  (loadedSelection.value?.remoteIds ?? []).filter((id) => !library.isInLibrary(id)),
 )
 const allWorksSelected = computed(() => {
   const loaded = loadedSelection.value
@@ -80,7 +80,9 @@ const allWorksSelected = computed(() => {
     loaded !== null &&
     loaded.key === selectionKey(confirmedFolders.value) &&
     selectableArtworkIds.value.length > 0 &&
-    selectableArtworkIds.value.every((artworkId) => selection.selectedIds.includes(artworkId))
+    selectableArtworkIds.value.every((artworkId) =>
+      selection.isSelected({ source: 'pixiv', remoteId: artworkId }),
+    )
   )
 })
 
@@ -96,17 +98,19 @@ const selectAllMutation = useMutation({
   mutationFn: async (selectedFolders: BookmarkFolderReference[]) => {
     const key = selectionKey(selectedFolders)
     const loaded = loadedSelection.value
-    const artworkIds =
+    const remoteIds =
       loaded?.key === key
-        ? loaded.artworkIds
+        ? loaded.remoteIds
         : await listSelectableBookmarkArtworkIds(selectedFolders)
-    return { key, artworkIds }
+    return { key, remoteIds }
   },
   onSuccess: (result) => {
     loadedSelection.value = result
-    const artworkIds = selection.addIds(result.artworkIds)
-    selectionNotice.value = artworkIds.length
-      ? `已选择收藏夹中的全部 ${String(artworkIds.length)} 个作品。`
+    const remoteIds = selection.add(
+      result.remoteIds.map((remoteId) => ({ source: 'pixiv', remoteId })),
+    )
+    selectionNotice.value = remoteIds.length
+      ? `已选择收藏夹中的全部 ${String(remoteIds.length)} 个作品。`
       : '所选收藏夹中没有可选择的作品。'
   },
 })
@@ -140,7 +144,7 @@ function toggleAllWorks() {
   const key = selectionKey(confirmedFolders.value)
   const loaded = loadedSelection.value
   if (loaded?.key === key && allWorksSelected.value) {
-    selection.removeIds(selectableArtworkIds.value)
+    selection.remove(selectableArtworkIds.value.map((remoteId) => ({ source: 'pixiv', remoteId })))
     return
   }
   selectAllMutation.mutate(confirmedFolders.value.map(cloneFolder))

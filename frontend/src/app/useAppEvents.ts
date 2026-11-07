@@ -2,10 +2,11 @@ import { useQueryClient } from '@tanstack/vue-query'
 import { onBeforeUnmount, onMounted } from 'vue'
 import { z } from 'zod'
 
+import { libraryArtworkReferenceSchema } from '@/features/artworks/artwork-source'
 import { useLibraryMembershipStore } from '@/features/library/library-membership'
 
 const libraryChangeSchema = z.object({
-  artworkIds: z.array(z.number().int().positive()),
+  references: z.array(libraryArtworkReferenceSchema),
 })
 
 export function useAppEvents() {
@@ -20,8 +21,10 @@ export function useAppEvents() {
   function handleLibraryChange(event: Event, inLibrary: boolean) {
     try {
       if (!(event instanceof MessageEvent) || typeof event.data !== 'string') return
-      const { artworkIds } = libraryChangeSchema.parse(JSON.parse(event.data) as unknown)
-      library.applyChange(artworkIds, inLibrary)
+      const { references } = libraryChangeSchema.parse(JSON.parse(event.data) as unknown)
+      for (const item of references) {
+        library.applyReference(item, inLibrary)
+      }
     } catch {
       // 忽略无效事件，保留当前图库状态。
     }

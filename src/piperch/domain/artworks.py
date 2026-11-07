@@ -4,6 +4,8 @@ from dataclasses import dataclass
 from enum import StrEnum
 from typing import TYPE_CHECKING
 
+from piperch.domain.sources import ArtworkSource
+
 if TYPE_CHECKING:
     from piperch.domain.bookmarks import RemoteBookmarkReference
 
@@ -12,6 +14,7 @@ class ArtworkType(StrEnum):
     ILLUST = "illust"
     MANGA = "manga"
     UGOIRA = "ugoira"
+    FANBOX = "fanbox"
 
 
 @dataclass(frozen=True, slots=True)
@@ -33,7 +36,7 @@ class UgoiraFrame:
 
 @dataclass(frozen=True, slots=True)
 class RemoteArtwork:
-    artwork_id: int
+    remote_id: int
     artwork_type: ArtworkType
     title: str
     description: str
@@ -46,8 +49,8 @@ class RemoteArtwork:
     page_count: int
     width: int | None
     height: int | None
-    x_restrict: int
-    is_ai: bool
+    x_restrict: int | None
+    is_ai: bool | None
     published_at: str | None
     original_urls: tuple[str, ...]
     thumbnail_url: str | None
@@ -55,6 +58,7 @@ class RemoteArtwork:
     ugoira_zip_url: str | None = None
     ugoira_frames: tuple[UgoiraFrame, ...] = ()
     tags: tuple[str, ...] = ()
+    source: ArtworkSource = ArtworkSource.PIXIV
 
 
 @dataclass(frozen=True, slots=True)
@@ -69,6 +73,8 @@ class MediaRecord:
 @dataclass(frozen=True, slots=True)
 class ArtworkSummary:
     artwork_id: int
+    source: ArtworkSource
+    remote_id: int
     title: str
     artwork_type: ArtworkType
     author_id: int
@@ -76,8 +82,8 @@ class ArtworkSummary:
     series_id: int | None
     series_title: str | None
     page_count: int
-    x_restrict: int
-    is_ai: bool
+    x_restrict: int | None
+    is_ai: bool | None
     published_at: str | None
     downloaded_at: str
     is_favorite: bool = False

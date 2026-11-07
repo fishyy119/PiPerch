@@ -47,8 +47,8 @@ class StubArtworkRepository:
     def is_complete(self, _artwork_id: int, _library_root: Path) -> bool:
         return False
 
-    def find_existing_ids(self, _artwork_ids: Sequence[int]) -> set[int]:
-        return set()
+    def find_local_ids(self, _artwork_ids: Sequence[int], _source: object = None) -> dict[int, int]:
+        return {}
 
     def list_media(self, _artwork_id: int) -> tuple[MediaRecord, ...]:
         return ()
@@ -58,8 +58,9 @@ class StubArtworkDownloadCommitService:
     def __init__(self) -> None:
         self.saved_media: tuple[MediaRecord, ...] | None = None
 
-    def commit(self, _artwork: RemoteArtwork, media: Sequence[MediaRecord]) -> None:
+    def commit(self, _artwork: RemoteArtwork, media: Sequence[MediaRecord]) -> int:
         self.saved_media = tuple(media)
+        return 1
 
 
 class StubFavoriteRepository:
@@ -84,7 +85,7 @@ class StubPixivClient:
         self.bookmarked_ids: set[int] = set()
 
     async def get_artwork(self, artwork_id: int, _cookie: str | None) -> RemoteArtwork:
-        assert artwork_id == self._artwork.artwork_id
+        assert artwork_id == self._artwork.remote_id
         return self._artwork
 
     async def sync_bookmark_state(self, artwork_id: int, is_favorite: bool, _cookie: str | None) -> None:
@@ -132,7 +133,7 @@ async def test_download_writes_configured_image_format(
         webp_quality=67,
     )
     artwork = RemoteArtwork(
-        artwork_id=123,
+        remote_id=123,
         artwork_type=ArtworkType.ILLUST,
         title="测试作品",
         description="",
@@ -192,8 +193,8 @@ async def test_download_writes_configured_image_format(
         pixel = image.getpixel((0, 0))
         assert isinstance(pixel, tuple) and len(pixel) == 4
         assert pixel[3] == 128
-    assert (paths.thumbnails / "123.webp").is_file()
-    page_thumbnails = sorted((paths.thumbnails / "pages" / "123").glob("*.webp"))
+    assert (paths.thumbnails / "1.webp").is_file()
+    page_thumbnails = sorted((paths.thumbnails / "pages" / "1").glob("*.webp"))
     assert [path.name for path in page_thumbnails] == ["0.webp", "1.webp", "2.webp"]
 
 
@@ -212,7 +213,7 @@ async def test_thumbnail_failure_keeps_committed_artwork_files(tmp_path: Path) -
         webp_quality=75,
     )
     artwork = RemoteArtwork(
-        artwork_id=123,
+        remote_id=123,
         artwork_type=ArtworkType.ILLUST,
         title="测试作品",
         description="",
@@ -265,7 +266,7 @@ async def test_cancellation_before_commit_discards_staged_media(tmp_path: Path) 
         webp_quality=75,
     )
     artwork = RemoteArtwork(
-        artwork_id=123,
+        remote_id=123,
         artwork_type=ArtworkType.ILLUST,
         title="测试作品",
         description="",
@@ -324,7 +325,7 @@ async def test_bookmark_failure_keeps_downloaded_artwork_without_marking_local_f
     settings.initialize()
     settings.patch(pixiv_cookie="PHPSESSID=123_test", webp_enabled=False)
     artwork = RemoteArtwork(
-        artwork_id=123,
+        remote_id=123,
         artwork_type=ArtworkType.ILLUST,
         title="测试作品",
         description="",
@@ -368,8 +369,8 @@ async def test_bookmark_failure_keeps_downloaded_artwork_without_marking_local_f
 
         assert bookmark_failed
         assert result is ItemState.SUCCEEDED
-        assert artworks.is_complete(123, settings.get().library_root)
-        assert favorites.get_state(123).is_favorite is False
+        assert artworks.is_complete(artworks.find_local_ids([123])[123], settings.get().library_root)
+        assert favorites.get_state(artworks.find_local_ids([123])[123]).is_favorite is False
         assert pixiv.bookmarked_ids == set()
     finally:
         database.close()

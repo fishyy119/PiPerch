@@ -6,22 +6,22 @@ import { computed, ref, watch } from 'vue'
 import { usePreference } from '@/app/usePreference'
 import { listArtworkRecommendations } from '@/features/discovery/discovery-api'
 import { useDownloadSelection } from '@/features/downloads/download-selection'
+import { useDownloadMarqueeSelection } from '@/features/downloads/useDownloadMarqueeSelection'
 import DiscoveryArtworkCard from '@/shared/components/discovery/DiscoveryArtworkCard.vue'
 import DownloadSelectionButton from '@/shared/components/downloads/DownloadSelectionButton.vue'
 import { errorMessage } from '@/shared/errors'
-import { useMarqueeSelection } from '@/shared/lib/useMarqueeSelection'
 import { Button } from '@ui/button'
 import { Card } from '@ui/card'
 import { SettingsPopover } from '@ui/settings-popover'
 import { Slider } from '@ui/slider'
 import { toast } from '@ui/toast'
 
-const props = defineProps<{ artworkId: number }>()
+const props = defineProps<{ remoteId: number }>()
 
 const selection = useDownloadSelection()
 const cardWidth = usePreference('artworkDetail.relatedCardWidth')
 const recommendationsQuery = useQuery({
-  queryKey: computed(() => ['artwork-recommendations', props.artworkId] as const),
+  queryKey: computed(() => ['artwork-recommendations', props.remoteId] as const),
   queryFn: ({ queryKey, signal }) => listArtworkRecommendations(queryKey[1], { signal }),
   staleTime: Number.POSITIVE_INFINITY,
   refetchOnWindowFocus: false,
@@ -30,12 +30,7 @@ const recommendationsQuery = useQuery({
 })
 
 const selectionRoot = ref<HTMLElement | null>(null)
-const marquee = useMarqueeSelection(selectionRoot, {
-  selectedIds: () => selection.selectedIds,
-  setSelectedIds: selection.setSelected,
-  canStart: (event) =>
-    !event.ctrlKey || !(event.target instanceof Element) || !event.target.closest('a'),
-})
+const marquee = useDownloadMarqueeSelection(selectionRoot)
 const gridStyle = computed(() => ({
   gridTemplateColumns: `repeat(auto-fill, minmax(min(100%, ${String(cardWidth.value)}px), ${String(cardWidth.value)}px))`,
 }))
@@ -103,9 +98,9 @@ async function refreshRecommendations() {
     >
       <DiscoveryArtworkCard
         v-for="artwork in recommendationsQuery.data.value"
-        :key="artwork.artworkId"
+        :key="artwork.remoteId"
         :artwork="artwork"
-        :selected="selection.selectedIds.includes(artwork.artworkId)"
+        :selected="selection.isSelected(artwork)"
         @toggle="selection.toggle"
       />
     </div>

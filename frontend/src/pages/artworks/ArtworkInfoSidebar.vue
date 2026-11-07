@@ -28,7 +28,7 @@ const authorProfileQuery = useQuery({
 })
 
 watch(
-  () => props.artwork.artworkId,
+  () => props.artwork.localArtworkId,
   () => {
     authorAvatarFailed.value = false
   },
@@ -48,7 +48,12 @@ function filterAuthor() {
 }
 
 function searchAuthor() {
-  requestPreview({ sourceType: 'user', userId: props.artwork.authorId, page: 0 })
+  requestPreview({
+    sourceType: 'user',
+    source: props.artwork.source,
+    userId: props.artwork.authorId,
+    page: 0,
+  })
   void router.push('/downloads')
 }
 
@@ -61,7 +66,7 @@ function filterSeries() {
 }
 
 function copyArtworkId() {
-  void writeToClipboard(String(props.artwork.artworkId))
+  void writeToClipboard(String(props.artwork.remoteId))
 }
 
 function formatDate(value: string | null) {
@@ -76,14 +81,17 @@ function formatDate(value: string | null) {
     <Card as="section" class="p-5">
       <div class="flex items-center justify-between gap-3">
         <h3 class="text-sm font-semibold text-muted-foreground">画师</h3>
-        <span v-if="authorProfileQuery.isPending.value" class="text-xs text-muted-foreground">
+        <span
+          v-if="artwork.source === 'pixiv' && authorProfileQuery.isPending.value"
+          class="text-xs text-muted-foreground"
+        >
           查询中…
         </span>
         <span v-else-if="authorProfileQuery.error.value" class="text-xs text-muted-foreground">
           状态未知
         </span>
         <AuthorFollowButton
-          v-else-if="authorProfileQuery.data.value"
+          v-else-if="artwork.source === 'pixiv' && authorProfileQuery.data.value"
           size="small"
           :user-id="artwork.authorId"
           :followed="authorProfileQuery.data.value.isFollowed"
@@ -143,6 +151,10 @@ function formatDate(value: string | null) {
       <h3 class="text-sm font-semibold">作品信息</h3>
       <dl class="mt-3 grid gap-3 text-sm">
         <div class="flex justify-between gap-3">
+          <dt class="text-muted-foreground">来源</dt>
+          <dd>{{ artwork.source === 'fanbox' ? 'FANBOX' : 'Pixiv' }}</dd>
+        </div>
+        <div class="flex justify-between gap-3">
           <dt
             class="cursor-pointer text-muted-foreground transition-colors hover:text-primary"
             title="复制作品 ID"
@@ -150,7 +162,7 @@ function formatDate(value: string | null) {
           >
             作品 ID
           </dt>
-          <dd>{{ artwork.artworkId }}</dd>
+          <dd>{{ artwork.remoteId }}</dd>
         </div>
         <div class="flex justify-between gap-3">
           <dt class="text-muted-foreground">类型</dt>

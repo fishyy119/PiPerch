@@ -7,6 +7,7 @@ import {
   type ArtworkPreviewUrlResolver,
   localArtworkPreviewUrl,
 } from '@/features/artworks/artwork-card'
+import { artworkOriginalUrl, artworkReferenceKey } from '@/features/artworks/artwork-source'
 import { type DiscoveryItem, listArtworkPreviewUrls } from '@/features/discovery/discovery-api'
 import { useLibraryMembershipStore } from '@/features/library/library-membership'
 import ArtworkCard from '@/shared/components/artworks/ArtworkCard.vue'
@@ -27,28 +28,32 @@ const emit = defineEmits<{
 const queryClient = useQueryClient()
 const library = useLibraryMembershipStore()
 const inLibrary = computed(() =>
-  library.isInLibrary(props.artwork.artworkId, props.artwork.inLibrary),
+  library.isInLibrary(props.artwork.remoteId, props.artwork.inLibrary, props.artwork.source),
+)
+const localId = computed(() =>
+  library.localId(props.artwork.remoteId, props.artwork.source, props.artwork.localArtworkId),
 )
 const thumbnailUrl = computed(() =>
-  inLibrary.value
-    ? `/api/artworks/${String(props.artwork.artworkId)}/thumbnail`
+  inLibrary.value && localId.value !== null
+    ? `/api/artworks/${String(localId.value)}/thumbnail`
     : props.artwork.thumbnailUrl,
 )
 const target = computed<ArtworkCardTarget>(() => ({
   kind: 'external',
-  href: `https://www.pixiv.net/artworks/${String(props.artwork.artworkId)}`,
+  href: artworkOriginalUrl(props.artwork),
 }))
 
 const resolvePreviewUrl = computed<ArtworkPreviewUrlResolver>(() => {
-  const { artworkId, artworkType } = props.artwork
-  if (inLibrary.value) {
-    return (pageIndex) => localArtworkPreviewUrl(artworkId, artworkType, pageIndex)
+  const { remoteId, artworkType, source, authorId } = props.artwork
+  if (inLibrary.value && localId.value !== null) {
+    const id = localId.value
+    return (pageIndex) => localArtworkPreviewUrl(id, artworkType, pageIndex)
   }
 
   return async (pageIndex) => {
     const urls = await queryClient.query({
-      queryKey: ['discovery-artwork-preview', artworkId],
-      queryFn: () => listArtworkPreviewUrls(artworkId),
+      queryKey: ['discovery-artwork-preview', source, remoteId, authorId],
+      queryFn: () => listArtworkPreviewUrls(props.artwork),
       retry: false,
       staleTime: 'static',
     })
@@ -70,7 +75,9 @@ function handleCardClick(event: MouseEvent) {
 <template>
   <ArtworkCard
     class="select-none"
-    :data-selection-id="inLibrary ? undefined : artwork.artworkId"
+    :data-selection-id="
+      inLibrary ? undefined : artworkReferenceKey(artwork.source, artwork.remoteId)
+    "
     :title="artwork.title"
     :author-name="artwork.authorName"
     :page-count="artwork.pageCount"

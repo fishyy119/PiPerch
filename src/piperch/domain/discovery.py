@@ -14,9 +14,10 @@ class DiscoveryCandidate:
     author_name: str
     artwork_type: ArtworkType
     page_count: int
-    x_restrict: int
-    is_ai: bool
+    x_restrict: int | None
+    is_ai: bool | None
     thumbnail_url: str | None
+    author_id: int | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -44,7 +45,7 @@ class RecommendedUser:
 
 
 @dataclass(frozen=True, slots=True)
-class FollowedUser:
+class AuthorSummary:
     user_id: int
     name: str
     avatar_url: str | None

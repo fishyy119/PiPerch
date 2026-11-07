@@ -1,7 +1,7 @@
 import { createGroup, replaceArtworkGroups } from '@/features/groups/groups-api'
 
 export interface CreateGroupAndAddArtworkRequest {
-  artworkId: number
+  localArtworkId: number
   name: string
   groupIds: number[]
 }
@@ -9,5 +9,5 @@ export interface CreateGroupAndAddArtworkRequest {
 export async function createGroupAndAddArtwork(request: CreateGroupAndAddArtworkRequest) {
   const group = await createGroup(request.name)
   const groupIds = Array.from(new Set([...request.groupIds, group.groupId]))
-  return replaceArtworkGroups(request.artworkId, groupIds)
+  return replaceArtworkGroups(request.localArtworkId, groupIds)
 }

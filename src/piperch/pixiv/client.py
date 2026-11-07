@@ -18,9 +18,9 @@ from piperch.domain.bookmarks import (
 )
 from piperch.domain.discovery import (
     ArtworkDiscoveryFailure,
+    AuthorSummary,
     DiscoveryCandidate,
     DiscoveryResult,
-    FollowedUser,
     RecommendedUser,
     UserProfile,
 )
@@ -71,7 +71,7 @@ class PixivClient:
         self._bookmark_cache_total: int | None = None
         self._bookmark_cache_complete = False
         self._followed_users_lock = asyncio.Lock()
-        self._followed_users: tuple[FollowedUser, ...] | None = None
+        self._followed_users: tuple[AuthorSummary, ...] | None = None
 
     async def reconfigure(self, proxy_url: str | None, request_interval_ms: int) -> None:
         await self._transport.reconfigure(proxy_url, request_interval_ms)
@@ -410,7 +410,7 @@ class PixivClient:
         }
         return sorted((item for item in ids if item > 0), reverse=True)
 
-    async def list_followed_users(self, cookie: str | None, *, refresh: bool = False) -> list[FollowedUser]:
+    async def list_followed_users(self, cookie: str | None, *, refresh: bool = False) -> list[AuthorSummary]:
         """读取缓存的完整关注列表，仅在首次读取或显式刷新时请求 Pixiv。"""
         async with self._followed_users_lock:
             if refresh or self._followed_users is None:
@@ -419,7 +419,7 @@ class PixivClient:
                 self._followed_users = tuple(users)
             return list(self._followed_users)
 
-    async def _fetch_followed_users(self, cookie: str | None) -> list[FollowedUser]:
+    async def _fetch_followed_users(self, cookie: str | None) -> list[AuthorSummary]:
         """读取当前账号公开与非公开关注的作者，并按 Pixiv 返回顺序去重。"""
         own_user_id = parse_pixiv_user_id(cookie)
         if own_user_id is None:
@@ -429,7 +429,7 @@ class PixivClient:
                 401,
             )
 
-        followed: dict[int, FollowedUser] = {}
+        followed: dict[int, AuthorSummary] = {}
         page_size = 100
         for visibility in ("show", "hide"):
             offset = 0
@@ -456,7 +456,7 @@ class PixivClient:
                         continue
                     followed.setdefault(
                         user_id,
-                        FollowedUser(
+                        AuthorSummary(
                             user_id=user_id,
                             name=_text(user.get("userName")) or f"用户 {user_id}",
                             avatar_url=_text(user.get("profileImageUrl")) or None,
@@ -831,7 +831,7 @@ class PixivClient:
         if author_id is None:
             raise UpstreamError("invalid_pixiv_response", "Pixiv 作品数据缺少作者 ID。")
         return RemoteArtwork(
-            artwork_id=artwork_id,
+            remote_id=artwork_id,
             artwork_type=artwork_type,
             title=_text(body.get("illustTitle")) or _text(body.get("title")) or f"作品 {artwork_id}",
             description=_text(body.get("description")),

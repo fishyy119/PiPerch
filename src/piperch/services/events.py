@@ -3,16 +3,41 @@ from __future__ import annotations
 import asyncio
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Literal, TypedDict
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator, Sequence
 
+    from piperch.domain.sources import ArtworkSource, LibraryArtworkReference
+
+
+class JobUpdatePayload(TypedDict):
+    jobId: str
+
+
+class LibraryReferencePayload(TypedDict):
+    localArtworkId: int
+    source: ArtworkSource
+    remoteId: int
+
+
+class LibraryChangePayload(TypedDict):
+    references: list[LibraryReferencePayload]
+
 
 @dataclass(frozen=True, slots=True)
-class ServerEvent:
-    name: Literal["job-updated", "library-added", "library-removed"]
-    data: dict[str, str | list[int]]
+class JobUpdatedEvent:
+    name: Literal["job-updated"]
+    data: JobUpdatePayload
+
+
+@dataclass(frozen=True, slots=True)
+class LibraryChangedEvent:
+    name: Literal["library-added", "library-removed"]
+    data: LibraryChangePayload
+
+
+type ServerEvent = JobUpdatedEvent | LibraryChangedEvent
 
 
 class AppEventBroker:
@@ -24,14 +49,30 @@ class AppEventBroker:
             self._loop = None
 
     async def publish_job_update(self, job_id: str) -> None:
-        self._publish(ServerEvent("job-updated", {"jobId": job_id}))
+        self._publish(JobUpdatedEvent("job-updated", {"jobId": job_id}))
 
-    def publish_library_change(self, artwork_ids: Sequence[int], *, in_library: bool) -> None:
+    def publish_library_change(
+        self,
+        references: Sequence[LibraryArtworkReference],
+        *,
+        in_library: bool,
+    ) -> None:
         """在提交锁内按顺序入队，允许数据库工作线程安全发布。"""
-        unique_ids = list(dict.fromkeys(artwork_ids))
-        if unique_ids and self._loop is not None:
+        unique_references = tuple(dict.fromkeys(references))
+        if unique_references and self._loop is not None:
             name = "library-added" if in_library else "library-removed"
-            self._loop.call_soon_threadsafe(self._publish, ServerEvent(name, {"artworkIds": unique_ids}))
+            self._loop.call_soon_threadsafe(
+                self._publish,
+                LibraryChangedEvent(
+                    name,
+                    {
+                        "references": [
+                            {"localArtworkId": item.local_artwork_id, "source": item.source, "remoteId": item.remote_id}
+                            for item in unique_references
+                        ],
+                    },
+                ),
+            )
 
     def _publish(self, event: ServerEvent) -> None:
         for queue in tuple(self._subscribers):

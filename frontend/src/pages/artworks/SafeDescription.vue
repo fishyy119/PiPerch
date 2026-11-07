@@ -5,11 +5,13 @@ import { useRouter } from 'vue-router'
 
 import { pixivArtworkIdFromUrl } from '@/features/artworks/pixiv-artwork-link'
 
-const props = defineProps<{ html: string; localArtworkIds: readonly number[] }>()
+const props = defineProps<{
+  html: string
+  localArtworks: Record<string, number>
+}>()
 const router = useRouter()
 const clean = computed(() => {
   const sanitized = DOMPurify.sanitize(props.html)
-  const localArtworkIds = new Set(props.localArtworkIds)
   const document = new DOMParser().parseFromString(sanitized, 'text/html')
   document.querySelectorAll<HTMLAnchorElement>('a').forEach((anchor) => {
     // 站内跳转标记，保护性清除同名属性。
@@ -19,9 +21,10 @@ const clean = computed(() => {
     if (href === null) return
 
     const artworkId = pixivArtworkIdFromUrl(href)
-    if (artworkId !== null && localArtworkIds.has(artworkId)) {
-      anchor.href = `/artworks/${String(artworkId)}`
-      anchor.dataset.localArtworkId = String(artworkId)
+    const localId = artworkId === null ? undefined : props.localArtworks[String(artworkId)]
+    if (localId !== undefined) {
+      anchor.href = `/artworks/${String(localId)}`
+      anchor.dataset.localArtworkId = String(localId)
       anchor.removeAttribute('target')
       return
     }

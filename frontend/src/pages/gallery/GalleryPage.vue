@@ -46,8 +46,10 @@ const preferredPageSize = usePreference('gallery.pageSize')
 const galleryGrid = ref<HTMLElement | null>(null)
 const marquee = useMarqueeSelection(galleryGrid, {
   enabled: () => selection.enabled,
-  selectedIds: () => selection.selectedIds,
-  setSelectedIds: selection.setSelected,
+  selectedItems: () => selection.selectedIds,
+  setSelectedItems: selection.setSelected,
+  getKey: (id) => String(id),
+  resolveItem: (element) => positiveInt(element.dataset.selectionId),
 })
 
 function positiveInt(value: string | null | undefined) {
@@ -140,7 +142,7 @@ const artworksQuery = useQuery({
   queryFn: () => listArtworks(artworkFilters()),
 })
 
-const refreshFollowedUsersMutation = useMutation({
+const refreshAuthorSummarysMutation = useMutation({
   mutationFn: () => listFollowedUsers(true),
   onSuccess: async () => {
     await queryClient.invalidateQueries({ queryKey: ['artworks', 'list'], refetchType: 'none' })
@@ -179,7 +181,7 @@ const resultRange = computed(() => {
   return `共 ${String(data.totalElements)} 项，第 ${String(first)}–${String(last)} 项`
 })
 const navigationArtworkIds = computed(() =>
-  (artworksQuery.data.value?.items ?? []).map((artwork) => artwork.artworkId),
+  (artworksQuery.data.value?.items ?? []).map((artwork) => artwork.localArtworkId),
 )
 watch(routeSearch, (search) => {
   searchInput.value = search
@@ -289,12 +291,12 @@ usePageKeyboardShortcuts((event) => {
       v-if="typeof galleryFilterValues.authorId === 'string'"
       variant="secondary"
       class="shrink-0"
-      :disabled="refreshFollowedUsersMutation.isPending.value || artworksQuery.isFetching.value"
-      @click="refreshFollowedUsersMutation.mutate()"
+      :disabled="refreshAuthorSummarysMutation.isPending.value || artworksQuery.isFetching.value"
+      @click="refreshAuthorSummarysMutation.mutate()"
     >
       <RefreshCw
         :size="17"
-        :class="{ 'animate-spin': refreshFollowedUsersMutation.isPending.value }"
+        :class="{ 'animate-spin': refreshAuthorSummarysMutation.isPending.value }"
       />
       <span class="hidden lg:inline">刷新关注</span>
     </Button>
@@ -354,7 +356,7 @@ usePageKeyboardShortcuts((event) => {
     >
       <LibraryArtworkCard
         v-for="artwork in artworksQuery.data.value.items"
-        :key="artwork.artworkId"
+        :key="artwork.localArtworkId"
         :artwork="artwork"
         :navigation-artwork-ids="navigationArtworkIds"
       />

@@ -9,13 +9,13 @@ const userProfileSchema = z.object({
 
 export type UserProfile = z.infer<typeof userProfileSchema>
 
-const followedUserSchema = z.object({
+export const authorSummarySchema = z.object({
   userId: z.number().int().positive(),
   name: z.string(),
   avatarUrl: z.string().startsWith('/api/pixiv-images?url=').nullable(),
 })
 
-export type FollowedUser = z.infer<typeof followedUserSchema>
+export type AuthorSummary = z.infer<typeof authorSummarySchema>
 
 export function userProfileKey(userId: number) {
   return ['user-profile', userId] as const
@@ -31,7 +31,7 @@ export async function getUserProfile(userId: number, options?: ApiRequestOptions
 }
 
 export async function listFollowedUsers(refresh = false) {
-  const schema = z.object({ items: z.array(followedUserSchema) })
+  const schema = z.object({ items: z.array(authorSummarySchema) })
   const query = refresh ? '?refresh=true' : ''
   return schema.parse(await api.get<unknown>(`/api/authors/followed${query}`)).items
 }

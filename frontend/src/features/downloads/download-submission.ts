@@ -2,12 +2,13 @@ import { useQueryClient } from '@tanstack/vue-query'
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 
-import { createDownloadJob } from '@/features/downloads/download-api'
+import type { DownloadReference } from '@/features/artworks/artwork-source'
+import { createDownloadJob, type DownloadBatch } from '@/features/downloads/download-api'
 import { useDownloadSelection } from '@/features/downloads/download-selection'
 
 export interface DownloadSubmissionResult {
   createdJobCount: number
-  submittedArtworkIds: number[]
+  submittedReferences: DownloadReference[]
   remainingCount: number
   failedError: unknown
 }
@@ -20,11 +21,15 @@ export const useDownloadSubmissionStore = defineStore('download-submission', () 
   let activeSubmission: Promise<DownloadSubmissionResult> | null = null
 
   async function runSubmission(sourceLabel: string): Promise<DownloadSubmissionResult> {
-    const artworkIds = [...selection.selectedIds]
-    const batches = Array.from({ length: Math.ceil(artworkIds.length / 1000) }, (_, index) =>
-      artworkIds.slice(index * 1000, (index + 1) * 1000),
-    )
-    const submittedArtworkIds: number[] = []
+    const references = [...selection.selectedReferences]
+    const batches: DownloadBatch[] = []
+    const pixiv = references.filter((item) => item.source === 'pixiv')
+    const fanbox = references.filter((item) => item.source === 'fanbox')
+    for (let index = 0; index < pixiv.length; index += 1000)
+      batches.push({ source: 'pixiv', references: pixiv.slice(index, index + 1000) })
+    for (let index = 0; index < fanbox.length; index += 1000)
+      batches.push({ source: 'fanbox', references: fanbox.slice(index, index + 1000) })
+    const submittedReferences: DownloadReference[] = []
     let createdJobCount = 0
     let failedError: unknown = null
     for (const [index, batch] of batches.entries()) {
@@ -33,9 +38,10 @@ export const useDownloadSubmissionStore = defineStore('download-submission', () 
           batches.length > 1 ? `，第 ${String(index + 1)}/${String(batches.length)} 批` : ''
         await createDownloadJob(
           batch,
-          `${sourceLabel}来源（${String(artworkIds.length)} 项${batchSuffix}）`,
+          `${sourceLabel}来源（${String(references.length)} 项${batchSuffix}）`,
         )
-        submittedArtworkIds.push(...batch)
+        submittedReferences.push(...batch.references)
+        selection.remove(batch.references)
         createdJobCount += 1
       } catch (submissionError) {
         if (createdJobCount === 0) throw submissionError
@@ -45,11 +51,10 @@ export const useDownloadSubmissionStore = defineStore('download-submission', () 
     }
     const result = {
       createdJobCount,
-      submittedArtworkIds,
-      remainingCount: artworkIds.length - submittedArtworkIds.length,
+      submittedReferences,
+      remainingCount: references.length - submittedReferences.length,
       failedError,
     }
-    selection.removeIds(result.submittedArtworkIds)
     await queryClient.invalidateQueries({ queryKey: ['download-jobs'] })
     return result
   }

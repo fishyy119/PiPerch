@@ -74,8 +74,8 @@ export function useBookmarkPreview() {
 
       const nextSeenIds = new Set(seenIds.value)
       const uniqueItems = result.items.filter((item) => {
-        if (nextSeenIds.has(item.artworkId)) return false
-        nextSeenIds.add(item.artworkId)
+        if (nextSeenIds.has(item.remoteId)) return false
+        nextSeenIds.add(item.remoteId)
         return true
       })
       seenIds.value = nextSeenIds

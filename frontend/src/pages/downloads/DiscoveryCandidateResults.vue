@@ -2,30 +2,21 @@
 import { computed, ref } from 'vue'
 
 import type { DiscoveryItem } from '@/features/discovery/discovery-api'
+import { useDownloadSelection } from '@/features/downloads/download-selection'
+import { useDownloadMarqueeSelection } from '@/features/downloads/useDownloadMarqueeSelection'
 import DiscoveryArtworkCard from '@/shared/components/discovery/DiscoveryArtworkCard.vue'
-import { useMarqueeSelection } from '@/shared/lib/useMarqueeSelection'
 
 const props = withDefaults(
   defineProps<{
     candidates: readonly DiscoveryItem[]
-    selectedIds: readonly number[]
     cardWidth?: number
   }>(),
   { cardWidth: 220 },
 )
 
-const emit = defineEmits<{
-  toggle: [item: DiscoveryItem]
-  setSelection: [artworkIds: readonly number[]]
-}>()
-
+const selection = useDownloadSelection()
 const selectionRoot = ref<HTMLElement | null>(null)
-const marquee = useMarqueeSelection(selectionRoot, {
-  selectedIds: () => props.selectedIds,
-  setSelectedIds: (artworkIds) => emit('setSelection', artworkIds),
-  canStart: (event) =>
-    !event.ctrlKey || !(event.target instanceof Element) || !event.target.closest('a'),
-})
+const marquee = useDownloadMarqueeSelection(selectionRoot)
 const artworkGridStyle = computed(() => ({
   gridTemplateColumns: `repeat(auto-fill, minmax(min(100%, ${String(props.cardWidth)}px), 1fr))`,
 }))
@@ -40,10 +31,10 @@ const artworkGridStyle = computed(() => ({
   >
     <DiscoveryArtworkCard
       v-for="item in candidates"
-      :key="item.artworkId"
+      :key="`${item.source}:${String(item.remoteId)}`"
       :artwork="item"
-      :selected="selectedIds.includes(item.artworkId)"
-      @toggle="emit('toggle', $event)"
+      :selected="selection.isSelected(item)"
+      @toggle="selection.toggle"
     />
   </div>
 </template>

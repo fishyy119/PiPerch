@@ -2,6 +2,7 @@
 import { sourceOptions, useDownloadWorkspaceState } from '@/features/downloads/download-workspace'
 import ArtworkSourceTab from '@/pages/downloads/sources/ArtworkSourceTab.vue'
 import BookmarkSourceTab from '@/pages/downloads/sources/BookmarkSourceTab.vue'
+import FanboxSourceTab from '@/pages/downloads/sources/FanboxSourceTab.vue'
 import FollowUpdatesSourceTab from '@/pages/downloads/sources/FollowUpdatesSourceTab.vue'
 import SearchSourceTab from '@/pages/downloads/sources/SearchSourceTab.vue'
 import SeriesSourceTab from '@/pages/downloads/sources/SeriesSourceTab.vue'
@@ -26,6 +27,9 @@ const { sourceType, setSourceType } = useDownloadWorkspaceState()
     </template>
     <template #user>
       <UserSourceTab />
+    </template>
+    <template #fanbox>
+      <FanboxSourceTab />
     </template>
     <template #followUpdates>
       <FollowUpdatesSourceTab />

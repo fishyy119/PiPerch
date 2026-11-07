@@ -29,7 +29,7 @@ const bulkGroupsOpen = ref(false)
 const visibleFullySelected = computed(
   () =>
     props.visibleArtworkIds.length > 0 &&
-    props.visibleArtworkIds.every((artworkId) => selection.isSelected(artworkId)),
+    props.visibleArtworkIds.every((localArtworkId) => selection.isSelected(localArtworkId)),
 )
 
 const groupsQuery = useQuery({
@@ -53,16 +53,16 @@ const bulkGroupsMutation = useMutation({
 
 const deleteMutation = useMutation({
   mutationFn: async () => {
-    const artworkIds = selection.selectedIds
-    const result = await deleteArtworks({ mode: 'bulk', artworkIds })
-    return { artworkIds, result }
+    const localArtworkIds = selection.selectedIds
+    const result = await deleteArtworks({ mode: 'bulk', localArtworkIds })
+    return { localArtworkIds, result }
   },
-  onSuccess: async ({ artworkIds, result }) => {
+  onSuccess: async ({ localArtworkIds, result }) => {
     deleteOpen.value = false
     const skippedIds = new Set(result.skippedFavoriteArtworkIds)
-    artworkIds
-      .filter((artworkId) => !skippedIds.has(artworkId))
-      .forEach((artworkId) => removeArtworkData(queryClient, artworkId))
+    localArtworkIds
+      .filter((localArtworkId) => !skippedIds.has(localArtworkId))
+      .forEach((localArtworkId) => removeArtworkData(queryClient, localArtworkId))
     if (result.skippedFavoriteArtworkIds.length > 0) {
       selection.setSelected(result.skippedFavoriteArtworkIds)
       toast.warning(`已删除 ${String(result.deleted)} 个作品`, {

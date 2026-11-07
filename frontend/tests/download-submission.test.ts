@@ -9,7 +9,9 @@ import { useDownloadSubmissionStore } from '@/features/downloads/download-submis
 import { renderComposable } from './composable'
 
 interface DownloadRequestBody {
+  source: 'pixiv' | 'fanbox'
   artworkIds: number[]
+  authorIds?: Record<string, number>
   sourceLabel: string
 }
 
@@ -32,11 +34,13 @@ afterEach(() => server.resetHandlers())
 afterAll(() => server.close())
 
 describe('下载任务提交', () => {
-  it('分批提交失败时只移除已经提交的作品', async () => {
+  it('分来源分批提交失败后，仅重试尚未提交的完整引用', async () => {
     const pinia = createPinia()
     setActivePinia(pinia)
     const selection = useDownloadSelection()
-    selection.addIds(Array.from({ length: 1001 }, (_, index) => index + 1))
+    selection.add(
+      Array.from({ length: 1001 }, (_, index) => ({ source: 'pixiv', remoteId: index + 1 })),
+    )
     const queryClient = new QueryClient({
       defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
     })
@@ -51,11 +55,24 @@ describe('下载任务提交', () => {
       expect(submittedRequests.map((request) => request.artworkIds)).toEqual([submittedIds, [1001]])
       expect(result).toMatchObject({
         createdJobCount: 1,
-        submittedArtworkIds: submittedIds,
+        submittedReferences: submittedIds.map((remoteId) => ({ source: 'pixiv', remoteId })),
         remainingCount: 1,
         failedError: { code: 'submission_failed', status: 503 },
       })
-      expect(selection.selectedIds).toEqual([1001])
+      expect(selection.selectedReferences).toEqual([{ source: 'pixiv', remoteId: 1001 }])
+      selection.add([{ source: 'fanbox', remoteId: 1001, authorId: 42 }])
+      server.use(
+        http.post('/api/download-jobs', async ({ request }) => {
+          submittedRequests.push((await request.json()) as DownloadRequestBody)
+          return HttpResponse.json({ jobId: 'retry-job' })
+        }),
+      )
+      await submission.submit('FANBOX')
+      expect(submittedRequests.slice(2)).toMatchObject([
+        { source: 'pixiv', artworkIds: [1001] },
+        { source: 'fanbox', artworkIds: [1001], authorIds: { '1001': 42 } },
+      ])
+      expect(selection.selectedReferences).toEqual([])
     } finally {
       unmount()
       queryClient.clear()

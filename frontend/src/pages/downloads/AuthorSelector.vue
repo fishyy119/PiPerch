@@ -2,20 +2,24 @@
 import { UserRound } from '@lucide/vue'
 import { ref } from 'vue'
 
-import type { FollowedUser } from '@/features/authors/author-api'
+import type { AuthorSummary } from '@/features/authors/author-api'
 import { ManagedImage } from '@ui/image'
 
-defineProps<{
-  users: readonly FollowedUser[]
-  selectedUserId: number | null
-}>()
+withDefaults(
+  defineProps<{
+    users: readonly AuthorSummary[]
+    selectedUserId: number | null
+    emptyMessage?: string
+    showId?: boolean
+  }>(),
+  { emptyMessage: '当前账号没有已关注作者。', showId: false },
+)
 
 const emit = defineEmits<{
-  select: [user: FollowedUser]
+  select: [user: AuthorSummary]
 }>()
 
 const failedAvatars = ref(new Set<number>())
-
 function markAvatarUnavailable(userId: number) {
   failedAvatars.value = new Set([...failedAvatars.value, userId])
 }
@@ -47,8 +51,13 @@ function markAvatarUnavailable(userId: number) {
         />
         <UserRound v-else :size="20" />
       </span>
-      <strong class="min-w-0 truncate text-sm">{{ user.name }}</strong>
+      <span class="min-w-0">
+        <strong class="block truncate text-sm">{{ user.name }}</strong>
+        <span v-if="showId" class="mt-0.5 block text-xs text-muted-foreground">{{
+          user.userId
+        }}</span>
+      </span>
     </button>
   </div>
-  <p v-else class="py-5 text-center text-sm text-muted-foreground">当前账号没有已关注作者。</p>
+  <p v-else class="py-5 text-center text-sm text-muted-foreground">{{ emptyMessage }}</p>
 </template>

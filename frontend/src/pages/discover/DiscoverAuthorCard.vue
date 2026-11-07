@@ -3,6 +3,7 @@ import { UserRound } from '@lucide/vue'
 import { ref } from 'vue'
 
 import type { DiscoveryItem, RecommendedUser } from '@/features/discovery/discovery-api'
+import { useDownloadSelection } from '@/features/downloads/download-selection'
 import AuthorFollowButton from '@/shared/components/authors/AuthorFollowButton.vue'
 import AuthorIdButton from '@/shared/components/authors/AuthorIdButton.vue'
 import DiscoveryArtworkCard from '@/shared/components/discovery/DiscoveryArtworkCard.vue'
@@ -11,7 +12,6 @@ import { ManagedImage } from '@ui/image'
 
 defineProps<{
   author: RecommendedUser
-  selectedIds: readonly number[]
 }>()
 
 const emit = defineEmits<{
@@ -19,6 +19,7 @@ const emit = defineEmits<{
   followChange: [userId: number, followed: boolean]
 }>()
 
+const selection = useDownloadSelection()
 const avatarFailed = ref(false)
 
 function pixivUserUrl(userId: number) {
@@ -74,9 +75,9 @@ function pixivUserUrl(userId: number) {
     <div v-if="author.artworks.length" class="mt-auto grid grid-cols-5 gap-x-3 gap-y-5 pt-5">
       <DiscoveryArtworkCard
         v-for="artwork in author.artworks"
-        :key="artwork.artworkId"
+        :key="artwork.remoteId"
         :artwork="artwork"
-        :selected="selectedIds.includes(artwork.artworkId)"
+        :selected="selection.isSelected(artwork)"
         :show-author="false"
         @toggle="emit('toggle', $event)"
       />

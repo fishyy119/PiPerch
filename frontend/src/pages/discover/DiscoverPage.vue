@@ -10,11 +10,11 @@ import {
   type RecommendedUser,
 } from '@/features/discovery/discovery-api'
 import { useDownloadSelection } from '@/features/downloads/download-selection'
+import { useDownloadMarqueeSelection } from '@/features/downloads/useDownloadMarqueeSelection'
 import DiscoverAuthorCard from '@/pages/discover/DiscoverAuthorCard.vue'
 import DiscoveryArtworkCard from '@/shared/components/discovery/DiscoveryArtworkCard.vue'
 import DownloadSelectionButton from '@/shared/components/downloads/DownloadSelectionButton.vue'
 import { errorMessage } from '@/shared/errors'
-import { useMarqueeSelection } from '@/shared/lib/useMarqueeSelection'
 import { Button } from '@ui/button'
 import { Card } from '@ui/card'
 import { Select } from '@ui/select'
@@ -29,12 +29,7 @@ const selection = useDownloadSelection()
 const queryClient = useQueryClient()
 const activeView = ref<DiscoveryView>('artworks')
 const selectionRoot = ref<HTMLElement | null>(null)
-const marquee = useMarqueeSelection(selectionRoot, {
-  selectedIds: () => selection.selectedIds,
-  setSelectedIds: selection.setSelected,
-  canStart: (event) =>
-    !event.ctrlKey || !(event.target instanceof Element) || !event.target.closest('a'),
-})
+const marquee = useDownloadMarqueeSelection(selectionRoot)
 const cardWidth = usePreference('discovery.cardWidth')
 const authorColumns = usePreference('discovery.authorColumns')
 const DISCOVERY_AUTHOR_COLUMN_OPTIONS = [1, 2, 3] as const
@@ -179,9 +174,9 @@ function updateAuthorFollowState(userId: number, followed: boolean) {
         >
           <DiscoveryArtworkCard
             v-for="artwork in recommendationsQuery.data.value"
-            :key="artwork.artworkId"
+            :key="artwork.remoteId"
             :artwork="artwork"
-            :selected="selection.selectedIds.includes(artwork.artworkId)"
+            :selected="selection.isSelected(artwork)"
             @toggle="selection.toggle"
           />
         </div>
@@ -215,7 +210,6 @@ function updateAuthorFollowState(userId: number, followed: boolean) {
             v-for="author in recommendedUsersQuery.data.value"
             :key="author.userId"
             :author="author"
-            :selected-ids="selection.selectedIds"
             @follow-change="updateAuthorFollowState"
             @toggle="selection.toggle"
           />

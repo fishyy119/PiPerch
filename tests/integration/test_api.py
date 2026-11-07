@@ -5,11 +5,13 @@ from dataclasses import replace
 from io import BytesIO
 from typing import TYPE_CHECKING
 
+import pytest
 from PIL import Image
 
 from piperch.domain.artworks import ArtworkType, MediaRecord, RemoteArtwork
 from piperch.domain.bookmarks import BookmarkFolder, BookmarkFolderKind, BookmarkFolderReference, BookmarkVisibility
-from piperch.domain.discovery import ArtworkDiscoveryFailure, DiscoveryCandidate, DiscoveryResult, FollowedUser
+from piperch.domain.discovery import ArtworkDiscoveryFailure, AuthorSummary, DiscoveryCandidate, DiscoveryResult
+from piperch.domain.sources import ArtworkSource
 from piperch.errors import UpstreamError
 from piperch.services.storage import StorageMigrationSelection
 
@@ -54,9 +56,9 @@ def test_followed_users_returns_safe_author_fields(
 ) -> None:
     client, container = app_client
 
-    async def list_followed_users(cookie: str | None, *, refresh: bool = False) -> list[FollowedUser]:
+    async def list_followed_users(cookie: str | None, *, refresh: bool = False) -> list[AuthorSummary]:
         assert cookie is None
-        return [FollowedUser(101, "测试作者", "https://i.pximg.net/avatar.jpg")]
+        return [AuthorSummary(101, "测试作者", "https://i.pximg.net/avatar.jpg")]
 
     monkeypatch.setattr(container.pixiv, "list_followed_users", list_followed_users)
 
@@ -144,12 +146,13 @@ def test_bookmark_discovery_marks_existing_artworks(
             1,
         )
 
-    def find_existing_ids(artwork_ids: Sequence[int]) -> set[int]:
+    def find_local_ids(artwork_ids: Sequence[int], source: ArtworkSource = ArtworkSource.PIXIV) -> dict[int, int]:
         assert artwork_ids == [101, 102]
-        return {101}
+        assert source is ArtworkSource.PIXIV
+        return {101: 5}
 
     monkeypatch.setattr(container.pixiv, "discover_bookmarks", discover_bookmarks)
-    monkeypatch.setattr(container.artworks, "find_existing_ids", find_existing_ids)
+    monkeypatch.setattr(container.artworks, "find_local_ids", find_local_ids)
 
     response = client.post(
         "/api/discovery",
@@ -213,7 +216,7 @@ def test_discovery_marks_artwork_already_in_library(
 ) -> None:
     client, container = app_client
     local_artwork = RemoteArtwork(
-        artwork_id=101,
+        remote_id=101,
         artwork_type=ArtworkType.ILLUST,
         title="本地作品",
         description="",
@@ -467,7 +470,7 @@ def test_artwork_page_thumbnail_is_created_for_existing_media(
 ) -> None:
     client, container = app_client
     artwork = RemoteArtwork(
-        artwork_id=101,
+        remote_id=101,
         artwork_type=ArtworkType.ILLUST,
         title="已有作品",
         description="",
@@ -489,12 +492,12 @@ def test_artwork_page_thumbnail_is_created_for_existing_media(
     source = container.settings.get().library_root / "201" / "101" / "101_p0.jpg"
     source.parent.mkdir(parents=True)
     Image.new("RGB", (640, 320), (30, 120, 210)).save(source, "JPEG")
-    container.download_commits.commit(
+    local_id = container.download_commits.commit(
         artwork,
         [MediaRecord("page", "201/101/101_p0.jpg", "image/jpeg", source.stat().st_size, 0)],
     )
 
-    response = client.get("/api/artworks/101/pages/0/thumbnail")
+    response = client.get(f"/api/artworks/{local_id}/pages/0/thumbnail")
 
     assert response.status_code == 200
     assert response.headers["content-type"] == "image/webp"
@@ -521,7 +524,7 @@ def test_download_job_list_uses_summary_and_detail_includes_items(
     assert "progress" not in summary.json()["items"][0]
     assert summary.json()["items"][0]["counts"]["running"] == 1
     assert detail.status_code == 200
-    assert [item["artworkId"] for item in detail.json()["items"]] == [101]
+    assert [item["remoteId"] for item in detail.json()["items"]] == [101]
 
 
 def test_gallery_accepts_camel_case_filter_parameters(
@@ -529,7 +532,7 @@ def test_gallery_accepts_camel_case_filter_parameters(
 ) -> None:
     client, container = app_client
     first = RemoteArtwork(
-        artwork_id=101,
+        remote_id=101,
         artwork_type=ArtworkType.MANGA,
         title="目标作品",
         description="",
@@ -550,7 +553,7 @@ def test_gallery_accepts_camel_case_filter_parameters(
         tags=("目标标签", "共同标签"),
     )
     second = RemoteArtwork(
-        artwork_id=102,
+        remote_id=102,
         artwork_type=ArtworkType.ILLUST,
         title="其他作品",
         description="",
@@ -571,7 +574,7 @@ def test_gallery_accepts_camel_case_filter_parameters(
         tags=("其他标签",),
     )
     partial_match = RemoteArtwork(
-        artwork_id=103,
+        remote_id=103,
         artwork_type=ArtworkType.MANGA,
         title="部分匹配作品",
         description="",
@@ -591,7 +594,7 @@ def test_gallery_accepts_camel_case_filter_parameters(
         thumbnail_url=None,
         tags=("目标标签",),
     )
-    container.download_commits.commit(
+    first_id = container.download_commits.commit(
         first,
         [MediaRecord("page", "201/101/101_p0.jpg", "image/jpeg", 10, 0)],
     )
@@ -599,7 +602,7 @@ def test_gallery_accepts_camel_case_filter_parameters(
         second,
         [MediaRecord("page", "202/102/102_p0.jpg", "image/jpeg", 10, 0)],
     )
-    container.download_commits.commit(
+    partial_id = container.download_commits.commit(
         partial_match,
         [MediaRecord("page", "201/103/103_p0.jpg", "image/jpeg", 10, 0)],
     )
@@ -609,8 +612,8 @@ def test_gallery_accepts_camel_case_filter_parameters(
 
     first_group = container.groups.create_group("第一组")
     second_group = container.groups.create_group("第二组")
-    container.groups.replace_groups(101, group_ids=(first_group.group_id, second_group.group_id))
-    container.groups.replace_groups(103, group_ids=(first_group.group_id,))
+    container.groups.replace_groups(first_id, group_ids=(first_group.group_id, second_group.group_id))
+    container.groups.replace_groups(partial_id, group_ids=(first_group.group_id,))
 
     response = client.get(
         f"/api/artworks?tagId={target_tag_id}&tagId={shared_tag_id}&tagMatch=all"
@@ -626,9 +629,9 @@ def test_gallery_accepts_camel_case_filter_parameters(
     assert response.status_code == 200
     payload = response.json()
     assert payload["totalElements"] == 1
-    assert [item["artworkId"] for item in payload["items"]] == [101]
+    assert [item["artworkId"] for item in payload["items"]] == [first_id]
     assert group_response.status_code == 200
-    assert [item["artworkId"] for item in group_response.json()["items"]] == [101]
+    assert [item["artworkId"] for item in group_response.json()["items"]] == [first_id]
     assert tags_response.status_code == 200
     assert [item["name"] for item in tags_response.json()] == ["目标标签", "其他标签"]
     assert authors_response.status_code == 200
@@ -640,7 +643,7 @@ def test_local_groups_can_organize_non_favorite_artworks(
 ) -> None:
     client, container = app_client
     artwork = RemoteArtwork(
-        artwork_id=701,
+        remote_id=701,
         artwork_type=ArtworkType.ILLUST,
         title="非收藏作品",
         description="",
@@ -660,25 +663,25 @@ def test_local_groups_can_organize_non_favorite_artworks(
         thumbnail_url=None,
     )
     media = [MediaRecord("page", "801/701/701_p0.jpg", "image/jpeg", 10, 0)]
-    container.download_commits.commit(artwork, media)
+    local_id = container.download_commits.commit(artwork, media)
 
     local_group = client.post("/api/groups", json={"name": "本地分组"})
     assert local_group.status_code == 200
     local_group_id = local_group.json()["groupId"]
 
     grouped = client.put(
-        "/api/artworks/701/groups",
+        f"/api/artworks/{local_id}/groups",
         json={"groupIds": [local_group_id]},
     )
     assert grouped.status_code == 200
-    assert grouped.json() == {"artworkId": 701, "groupIds": [local_group_id]}
+    assert grouped.json() == {"artworkId": local_id, "groupIds": [local_group_id]}
 
     filtered = client.get(
         "/api/artworks",
         params=[("favorite", "no"), ("groupId", local_group_id)],
     )
     assert filtered.status_code == 200
-    assert [item["artworkId"] for item in filtered.json()["items"]] == [701]
+    assert [item["artworkId"] for item in filtered.json()["items"]] == [local_id]
 
 
 def test_artwork_deletion_protects_favorites_and_keeps_bulk_progress(
@@ -688,7 +691,7 @@ def test_artwork_deletion_protects_favorites_and_keeps_bulk_progress(
     client, container = app_client
     published_events: list[ServerEvent] = []
     artwork = RemoteArtwork(
-        artwork_id=801,
+        remote_id=801,
         artwork_type=ArtworkType.ILLUST,
         title="收藏保护作品",
         description="",
@@ -707,51 +710,61 @@ def test_artwork_deletion_protects_favorites_and_keeps_bulk_progress(
         original_urls=("https://i.pximg.net/801.jpg",),
         thumbnail_url=None,
     )
+    local_ids: dict[int, int] = {}
     for artwork_id in (801, 802):
         current = replace(
             artwork,
-            artwork_id=artwork_id,
+            remote_id=artwork_id,
             title=f"删除测试作品 {artwork_id}",
             original_urls=(f"https://i.pximg.net/{artwork_id}.jpg",),
         )
-        container.download_commits.commit(
+        local_ids[artwork_id] = container.download_commits.commit(
             current,
             [MediaRecord("page", f"901/{artwork_id}/{artwork_id}_p0.jpg", "image/jpeg", 4, 0)],
         )
         media_path = container.settings.get().library_root / "901" / str(artwork_id) / f"{artwork_id}_p0.jpg"
         media_path.parent.mkdir(parents=True, exist_ok=True)
         media_path.write_bytes(b"test")
-    container.favorites.replace_state(801, is_favorite=True)
+    container.favorites.replace_state(local_ids[801], is_favorite=True)
     monkeypatch.setattr(container.events, "_publish", published_events.append)
 
-    single = client.delete("/api/artworks/801")
+    single = client.delete(f"/api/artworks/{local_ids[801]}")
 
     assert single.status_code == 409
     assert single.json()["error"]["code"] == "favorite_artwork_delete_forbidden"
-    assert client.get("/api/artworks/801").status_code == 200
+    assert client.get(f"/api/artworks/{local_ids[801]}").status_code == 200
     assert (container.settings.get().library_root / "901" / "801" / "801_p0.jpg").is_file()
     assert published_events == []
 
-    bulk = client.post("/api/artworks/bulk-delete", json={"artworkIds": [801, 802, 803]})
+    bulk = client.post("/api/artworks/bulk-delete", json={"artworkIds": [local_ids[801], local_ids[802], 9999]})
 
     assert bulk.status_code == 200
-    assert bulk.json() == {"deleted": 1, "skippedFavoriteArtworkIds": [801]}
-    assert [(event.name, event.data) for event in published_events] == [("library-removed", {"artworkIds": [802]})]
-    assert client.get("/api/artworks/801").status_code == 200
-    assert client.get("/api/artworks/802").status_code == 404
+    assert bulk.json() == {"deleted": 1, "skippedFavoriteArtworkIds": [local_ids[801]]}
+    assert [(event.name, event.data) for event in published_events] == [
+        (
+            "library-removed",
+            {
+                "references": [{"localArtworkId": local_ids[802], "source": "pixiv", "remoteId": 802}],
+            },
+        )
+    ]
+    assert client.get(f"/api/artworks/{local_ids[801]}").status_code == 200
+    assert client.get(f"/api/artworks/{local_ids[802]}").status_code == 404
     assert (container.settings.get().library_root / "901" / "801" / "801_p0.jpg").is_file()
     assert not (container.settings.get().library_root / "901" / "802").exists()
 
 
-def test_favorite_update_keeps_local_state_when_pixiv_sync_fails(
+@pytest.mark.parametrize("source", [ArtworkSource.PIXIV, ArtworkSource.FANBOX])
+def test_favorite_updates_sync_only_pixiv_and_keep_local_state_on_remote_failure(
     app_client: tuple[ApiTestClient, AppContainer],
     monkeypatch: MonkeyPatch,
+    source: ArtworkSource,
 ) -> None:
     client, container = app_client
     artwork = RemoteArtwork(
-        artwork_id=702,
-        artwork_type=ArtworkType.ILLUST,
-        title="收藏同步失败作品",
+        remote_id=702,
+        artwork_type=ArtworkType.FANBOX if source is ArtworkSource.FANBOX else ArtworkType.ILLUST,
+        title="收藏来源隔离作品",
         description="",
         author_id=802,
         author_name="测试作者",
@@ -767,23 +780,37 @@ def test_favorite_update_keeps_local_state_when_pixiv_sync_fails(
         published_at=None,
         original_urls=("https://i.pximg.net/702.jpg",),
         thumbnail_url=None,
+        source=source,
     )
-    container.download_commits.commit(
+    prefix = "fanbox/" if source is ArtworkSource.FANBOX else ""
+    local_id = container.download_commits.commit(
         artwork,
-        [MediaRecord("page", "802/702/702_p0.jpg", "image/jpeg", 10, 0)],
+        [MediaRecord("page", f"{prefix}802/702/702_p0.jpg", "image/jpeg", 10, 0)],
     )
 
-    async def fail_sync(artwork_id: int, is_favorite: bool, cookie: str | None) -> None:
-        assert (artwork_id, is_favorite, cookie) == (702, True, None)
+    sync_attempts: list[int] = []
+
+    async def fail_sync(artwork_id: int, _is_favorite: bool, _cookie: str | None) -> None:
+        sync_attempts.append(artwork_id)
         raise UpstreamError("pixiv_write_failed", "Pixiv 收藏更新失败。")
 
     monkeypatch.setattr(container.pixiv, "sync_bookmark_state", fail_sync)
 
-    response = client.put("/api/artworks/702/favorite", json={"isFavorite": True})
+    response = client.put(f"/api/artworks/{local_id}/favorite", json={"isFavorite": True})
 
-    assert response.status_code == 502
-    assert response.json()["error"]["code"] == "pixiv_write_failed"
-    assert container.favorites.get_state(702).is_favorite is False
+    if source is ArtworkSource.PIXIV:
+        assert response.status_code == 502
+        assert response.json()["error"]["code"] == "pixiv_write_failed"
+        assert container.favorites.get_state(local_id).is_favorite is False
+        return
+
+    assert response.status_code == 200
+    assert response.json()["pixivSynced"] is False
+    assert container.favorites.get_state(local_id).is_favorite is True
+    response = client.put(f"/api/artworks/{local_id}/favorite", json={"isFavorite": False})
+    assert response.status_code == 200
+    assert sync_attempts == []
+    assert container.favorites.get_state(local_id).is_favorite is False
 
 
 def test_manual_favorite_sync_preserves_missing_artworks_in_reviewed_changes(
@@ -792,7 +819,7 @@ def test_manual_favorite_sync_preserves_missing_artworks_in_reviewed_changes(
 ) -> None:
     client, container = app_client
     artwork = RemoteArtwork(
-        artwork_id=901,
+        remote_id=901,
         artwork_type=ArtworkType.ILLUST,
         title="本地收藏同步作品",
         description="",
@@ -811,20 +838,21 @@ def test_manual_favorite_sync_preserves_missing_artworks_in_reviewed_changes(
         original_urls=("https://i.pximg.net/901.jpg",),
         thumbnail_url=None,
     )
+    local_ids: dict[int, int] = {}
     for artwork_id in (901, 902, 903, 904):
         current = replace(
             artwork,
-            artwork_id=artwork_id,
+            remote_id=artwork_id,
             title=f"同步作品 {artwork_id}",
             original_urls=(f"https://i.pximg.net/{artwork_id}.jpg",),
         )
-        container.download_commits.commit(
+        local_ids[artwork_id] = container.download_commits.commit(
             current,
             [MediaRecord("page", f"902/{artwork_id}/{artwork_id}_p0.jpg", "image/jpeg", 10, 0)],
         )
-    container.favorites.replace_state(901, is_favorite=True)
-    container.favorites.replace_state(902, is_favorite=True)
-    container.favorites.replace_state(904, is_favorite=True)
+    container.favorites.replace_state(local_ids[901], is_favorite=True)
+    container.favorites.replace_state(local_ids[902], is_favorite=True)
+    container.favorites.replace_state(local_ids[904], is_favorite=True)
 
     async def list_bookmark_artwork_ids(
         folders: Sequence[BookmarkFolderReference],
@@ -860,17 +888,17 @@ def test_manual_favorite_sync_preserves_missing_artworks_in_reviewed_changes(
         "removeCount": 1,
         "preservedFavoriteCount": 1,
     }
-    assert container.favorites.get_state(901).is_favorite is True
-    assert container.favorites.get_state(902).is_favorite is True
-    assert container.favorites.get_state(903).is_favorite is False
-    assert container.favorites.get_state(904).is_favorite is True
+    assert container.favorites.get_state(local_ids[901]).is_favorite is True
+    assert container.favorites.get_state(local_ids[902]).is_favorite is True
+    assert container.favorites.get_state(local_ids[903]).is_favorite is False
+    assert container.favorites.get_state(local_ids[904]).is_favorite is True
 
     applied = client.post(f"/api/favorite-sync-plans/{plan_id}/apply")
 
     assert applied.status_code == 200
     assert applied.json() == {"added": 1, "removed": 1}
-    assert container.favorites.get_state(901).is_favorite is False
-    assert container.favorites.get_state(902).is_favorite is True
-    assert container.favorites.get_state(903).is_favorite is True
-    assert container.favorites.get_state(904).is_favorite is True
+    assert container.favorites.get_state(local_ids[901]).is_favorite is False
+    assert container.favorites.get_state(local_ids[902]).is_favorite is True
+    assert container.favorites.get_state(local_ids[903]).is_favorite is True
+    assert container.favorites.get_state(local_ids[904]).is_favorite is True
     assert client.post(f"/api/favorite-sync-plans/{plan_id}/apply").status_code == 409

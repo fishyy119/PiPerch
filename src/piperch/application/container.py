@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from piperch.database import Database
+    from piperch.fanbox import FanboxClient
     from piperch.paths import AppPaths
     from piperch.pixiv import PixivClient
     from piperch.repositories import ArtworkGroupRepository, ArtworkRepository, DownloadRepository, FavoriteRepository
@@ -33,6 +34,7 @@ class AppContainer:
     downloads: DownloadRepository
     download_commits: ArtworkDownloadCommitService
     pixiv: PixivClient
+    fanbox: FanboxClient
     supervisor: DownloadSupervisor
     events: AppEventBroker
     library: LibraryService

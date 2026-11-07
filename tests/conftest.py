@@ -26,4 +26,7 @@ def app_client(app_paths: AppPaths) -> Generator[tuple[ApiTestClient, AppContain
     app = create_app(app_paths)
     with TestClient(app) as client:
         container = cast("AppContainer", app.state.container)
+        # API 契约测试手动驱动任务状态，避免后台领取同一任务并发起真实网络请求。
+        assert client.portal is not None
+        client.portal.call(container.supervisor.stop)
         yield cast("ApiTestClient", client), container

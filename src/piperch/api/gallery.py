@@ -94,10 +94,10 @@ def get_artwork(
 ) -> ArtworkDetailResponse:
     detail = container.artworks.get_detail(artwork_id)
     linked_artwork_ids = parse_artwork_ids([detail.description])
-    existing_ids = container.artworks.find_existing_ids(linked_artwork_ids)
+    local_linked_artworks = container.artworks.find_local_ids(linked_artwork_ids)
     return artwork_detail_response(
         detail,
-        sorted(existing_ids),
+        local_linked_artworks,
     )
 
 

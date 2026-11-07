@@ -34,6 +34,8 @@ async def create_job(
         container.downloads.create_job,
         request.artwork_ids,
         request.source_label,
+        request.source,
+        request.author_ids,
     )
     container.supervisor.notify()
     await container.events.publish_job_update(job_id)

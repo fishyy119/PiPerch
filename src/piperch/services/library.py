@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from threading import Lock
 from typing import TYPE_CHECKING
 
+from piperch.domain.sources import LibraryArtworkReference, artwork_directory
 from piperch.errors import AppError, NotFoundError
 from piperch.services.library_files import LibraryFileOperations
 from piperch.services.thumbnails import ArtworkThumbnailCache
@@ -58,6 +59,7 @@ class LibraryService:
         existing_ids: list[int] = []
         deletable_ids: list[int] = []
         staged: list[tuple[int, Path, Path]] = []
+        references: list[LibraryArtworkReference] = []
         try:
             for artwork_id in requested_ids:
                 try:
@@ -68,7 +70,9 @@ class LibraryService:
                 if detail.summary.is_favorite:
                     continue
                 deletable_ids.append(artwork_id)
-                source = (root / str(detail.summary.author_id) / str(artwork_id)).resolve()
+                summary = detail.summary
+                references.append(LibraryArtworkReference(artwork_id, summary.source, summary.remote_id))
+                source = artwork_directory(root, summary.source, summary.author_id, summary.remote_id).resolve()
                 self._require_safe_artwork_path(root, source)
                 if source.exists():
                     if not source.is_dir():
@@ -81,7 +85,9 @@ class LibraryService:
                     target.parent.mkdir(parents=True, exist_ok=True)
                     source.replace(target)
                     staged.append((artwork_id, source, target))
-            deleted_ids = self._library_commits.commit_removal(lambda: self._artworks.delete_metadata(deletable_ids))
+            deleted_ids = self._library_commits.commit_removal(
+                lambda: self._artworks.delete_metadata(deletable_ids), references=references
+            )
         except Exception:
             for _, source, target in reversed(staged):
                 if target.exists():
@@ -129,11 +135,12 @@ class LibraryService:
                     continue
                 artwork_id = int(artwork_text)
                 try:
-                    self._artworks.get_detail(artwork_id)
+                    detail = self._artworks.get_detail(artwork_id)
                 except NotFoundError:
                     shutil.rmtree(target, ignore_errors=True)
                     continue
-                source = (library_root / author_dir.name / artwork_text).resolve()
+                summary = detail.summary
+                source = artwork_directory(library_root, summary.source, summary.author_id, summary.remote_id).resolve()
                 self._require_safe_artwork_path(library_root, source)
                 if source.exists():
                     shutil.rmtree(target, ignore_errors=True)
@@ -147,7 +154,11 @@ class LibraryService:
 
     @staticmethod
     def _require_safe_artwork_path(root: Path, source: Path) -> None:
-        if source == root or root not in source.parents or len(source.relative_to(root).parts) != 2:
+        if source == root or root not in source.parents:
+            raise AppError("unsafe_delete_path", "作品目录不符合安全删除规则，已拒绝操作。", 409)
+        parts = source.relative_to(root).parts
+        expected = parts if len(parts) == 2 else parts[1:] if len(parts) == 3 and parts[0] == "fanbox" else ()
+        if len(expected) != 2 or not all(part.isdecimal() for part in expected):
             raise AppError(
                 "unsafe_delete_path",
                 "作品目录不符合安全删除规则，已拒绝操作。",

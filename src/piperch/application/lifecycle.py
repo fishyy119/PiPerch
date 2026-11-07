@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 
 from piperch.application.container import AppContainer
 from piperch.database import Database, run_migrations
+from piperch.fanbox import FanboxClient
 from piperch.pixiv import PixivClient
 from piperch.repositories import ArtworkGroupRepository, ArtworkRepository, DownloadRepository, FavoriteRepository
 from piperch.services.downloads import ArtworkDownloadCommitService, ArtworkDownloadService, DownloadSupervisor
@@ -56,6 +57,7 @@ async def shutdown_resources(
     pixiv: PixivClient,
     database: Database,
     *,
+    fanbox: FanboxClient | None = None,
     supervisor_timeout_seconds: float = _SUPERVISOR_STOP_TIMEOUT_SECONDS,
     http_timeout_seconds: float = _HTTP_CLOSE_TIMEOUT_SECONDS,
 ) -> None:
@@ -63,6 +65,8 @@ async def shutdown_resources(
     try:
         await _run_shutdown_step("下载监督器", supervisor.stop(), supervisor_timeout_seconds)
         await _run_shutdown_step("Pixiv HTTP 客户端", pixiv.close(), http_timeout_seconds)
+        if fanbox is not None:
+            await _run_shutdown_step("FANBOX HTTP 客户端", fanbox.close(), http_timeout_seconds)
     finally:
         database.close()
 
@@ -81,6 +85,9 @@ async def lifespan(app: FastAPI, *, paths: AppPaths, control: AppControl) -> Asy
     pixiv = PixivClient(
         proxy_url=current_settings.proxy_url,
         request_interval_ms=current_settings.request_interval_ms,
+    )
+    fanbox = FanboxClient(
+        proxy_url=current_settings.proxy_url, request_interval_ms=current_settings.request_interval_ms
     )
     artwork_repository = ArtworkRepository(database)
     favorite_repository = FavoriteRepository(database)
@@ -109,6 +116,7 @@ async def lifespan(app: FastAPI, *, paths: AppPaths, control: AppControl) -> Asy
         favorite_repository,
         thumbnail_cache,
         library_files,
+        fanbox=fanbox,
     )
     supervisor = DownloadSupervisor(download_repository, download_service, events, settings_manager)
     mutation_lock = Lock()
@@ -144,6 +152,7 @@ async def lifespan(app: FastAPI, *, paths: AppPaths, control: AppControl) -> Asy
         downloads=download_repository,
         download_commits=download_commit_service,
         pixiv=pixiv,
+        fanbox=fanbox,
         supervisor=supervisor,
         events=events,
         library=library_service,
@@ -157,4 +166,4 @@ async def lifespan(app: FastAPI, *, paths: AppPaths, control: AppControl) -> Asy
     try:
         yield
     finally:
-        await shutdown_resources(supervisor, pixiv, database)
+        await shutdown_resources(supervisor, pixiv, database, fanbox=fanbox)

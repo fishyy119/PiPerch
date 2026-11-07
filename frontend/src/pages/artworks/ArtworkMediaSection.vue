@@ -15,6 +15,7 @@ import { useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 
 import { artworkTypeLabel } from '@/features/artworks/artwork'
+import { artworkOriginalUrl } from '@/features/artworks/artwork-source'
 import { type ArtworkDetail, deleteArtworks } from '@/features/artworks/artworks-api'
 import { notifyFavoriteUpdate } from '@/features/favorites/favorite-feedback'
 import { replaceFavoriteState } from '@/features/favorites/favorites-api'
@@ -58,12 +59,13 @@ const groupsQuery = useQuery({
 })
 
 const deleteMutation = useMutation({
-  mutationFn: () => deleteArtworks({ mode: 'single', artworkId: props.artwork.artworkId }),
+  mutationFn: () =>
+    deleteArtworks({ mode: 'single', localArtworkId: props.artwork.localArtworkId }),
   onSuccess: async () => {
-    const artworkId = props.artwork.artworkId
+    const localArtworkId = props.artwork.localArtworkId
     deleteOpen.value = false
     router.back()
-    removeArtworkData(queryClient, artworkId)
+    removeArtworkData(queryClient, localArtworkId)
     await invalidateArtworkGroupData(queryClient)
   },
   onError: (error) => {
@@ -72,15 +74,15 @@ const deleteMutation = useMutation({
 })
 
 const favoriteMutation = useMutation({
-  mutationFn: (request: { artworkId: number; isFavorite: boolean }) =>
-    replaceFavoriteState(request.artworkId, request.isFavorite),
+  mutationFn: (request: { localArtworkId: number; isFavorite: boolean }) =>
+    replaceFavoriteState(request.localArtworkId, request.isFavorite),
   onSuccess: async (favoriteState) => {
-    updateArtworkDetail(queryClient, favoriteState.artworkId, (artwork) => ({
+    updateArtworkDetail(queryClient, favoriteState.localArtworkId, (artwork) => ({
       ...artwork,
       isFavorite: favoriteState.isFavorite,
     }))
     await invalidateArtworkData(queryClient)
-    notifyFavoriteUpdate(favoriteState)
+    notifyFavoriteUpdate(favoriteState, props.artwork.source)
   },
   onError: (error) => {
     toast.error('更新收藏失败', { description: errorMessage(error) })
@@ -88,10 +90,10 @@ const favoriteMutation = useMutation({
 })
 
 const groupMutation = useMutation({
-  mutationFn: (request: { artworkId: number; groupIds: number[]; selected: boolean }) =>
-    replaceArtworkGroups(request.artworkId, request.groupIds),
+  mutationFn: (request: { localArtworkId: number; groupIds: number[]; selected: boolean }) =>
+    replaceArtworkGroups(request.localArtworkId, request.groupIds),
   onSuccess: async (membership, request) => {
-    updateArtworkDetail(queryClient, membership.artworkId, (artwork) => ({
+    updateArtworkDetail(queryClient, membership.localArtworkId, (artwork) => ({
       ...artwork,
       groupIds: membership.groupIds,
     }))
@@ -107,7 +109,7 @@ const createAndAddGroupMutation = useMutation({
   mutationFn: createGroupAndAddArtwork,
   onSuccess: async (membership) => {
     createGroupOpen.value = false
-    updateArtworkDetail(queryClient, membership.artworkId, (artwork) => ({
+    updateArtworkDetail(queryClient, membership.localArtworkId, (artwork) => ({
       ...artwork,
       groupIds: membership.groupIds,
     }))
@@ -129,7 +131,7 @@ const pageIndexes = computed(() =>
 const currentPage = computed(() => selectedPage.value ?? pageIndexes.value[0] ?? null)
 const previewUrl = computed(() => {
   if (props.artwork.artworkType === 'ugoira') {
-    return `/api/artworks/${String(props.artwork.artworkId)}/ugoira`
+    return `/api/artworks/${String(props.artwork.localArtworkId)}/ugoira`
   }
   return currentPage.value === null ? '' : mediaUrl(currentPage.value)
 })
@@ -161,7 +163,7 @@ const pageSelectorCanExpand = computed(
 )
 
 watch(
-  () => props.artwork.artworkId,
+  () => props.artwork.localArtworkId,
   () => {
     selectedPage.value = null
     pageSelectorExpanded.value = false
@@ -197,7 +199,7 @@ watch(
 )
 
 function mediaUrl(page: number) {
-  return `/api/artworks/${String(props.artwork.artworkId)}/pages/${String(page)}`
+  return `/api/artworks/${String(props.artwork.localArtworkId)}/pages/${String(page)}`
 }
 
 function mediaThumbnailUrl(page: number) {
@@ -220,14 +222,14 @@ function selectAdjacentPage(offset: -1 | 1) {
 
 function toggleFavorite() {
   favoriteMutation.mutate({
-    artworkId: props.artwork.artworkId,
+    localArtworkId: props.artwork.localArtworkId,
     isFavorite: !props.artwork.isFavorite,
   })
 }
 
 function changeGroup(groupId: number, selected: boolean) {
   groupMutation.mutate({
-    artworkId: props.artwork.artworkId,
+    localArtworkId: props.artwork.localArtworkId,
     groupIds: selected
       ? [...new Set([...props.artwork.groupIds, groupId])]
       : props.artwork.groupIds.filter((currentGroupId) => currentGroupId !== groupId),
@@ -242,7 +244,7 @@ function openCreateGroup() {
 
 function createAndAddGroup(name: string) {
   createAndAddGroupMutation.mutate({
-    artworkId: props.artwork.artworkId,
+    localArtworkId: props.artwork.localArtworkId,
     name,
     groupIds: props.artwork.groupIds,
   })
@@ -398,11 +400,11 @@ usePageKeyboardShortcuts(
         <Button
           as="a"
           variant="secondary"
-          :href="`https://www.pixiv.net/artworks/${String(artwork.artworkId)}`"
+          :href="artworkOriginalUrl(artwork)"
           target="_blank"
           rel="noreferrer"
         >
-          <ExternalLink :size="16" />打开 Pixiv
+          <ExternalLink :size="16" />打开 {{ artwork.source === 'fanbox' ? 'FANBOX' : 'Pixiv' }}
         </Button>
         <Button
           variant="danger"

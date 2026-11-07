@@ -5,8 +5,8 @@ from fastapi import APIRouter, Depends, Path, Query, Request, Response, status
 
 from piperch.api.dependencies import get_container
 from piperch.api.models import (
-    FollowedUserResponse,
-    FollowedUsersResponse,
+    AuthorResponse,
+    AuthorsResponse,
     UserProfileResponse,
 )
 from piperch.api.pixiv_images import proxied_image_url
@@ -16,16 +16,16 @@ from piperch.application.container import AppContainer
 router = APIRouter(prefix="/authors", tags=["authors"])
 
 
-@router.get("/followed", response_model=FollowedUsersResponse)
+@router.get("/followed", response_model=AuthorsResponse)
 async def followed_authors(
     refresh: bool = Query(default=False),
     container: AppContainer = Depends(get_container),
-) -> FollowedUsersResponse:
+) -> AuthorsResponse:
     settings = await to_thread.run_sync(container.settings.get)
     items = await container.pixiv.list_followed_users(settings.pixiv_cookie, refresh=refresh)
-    return FollowedUsersResponse(
+    return AuthorsResponse(
         items=[
-            FollowedUserResponse(
+            AuthorResponse(
                 user_id=item.user_id,
                 name=item.name,
                 avatar_url=proxied_image_url(item.avatar_url),
