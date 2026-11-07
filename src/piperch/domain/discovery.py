@@ -18,6 +18,7 @@ class DiscoveryCandidate:
     is_ai: bool | None
     thumbnail_url: str | None
     author_id: int | None = None
+    preview_only: bool = False
 
 
 @dataclass(frozen=True, slots=True)

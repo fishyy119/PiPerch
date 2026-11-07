@@ -21,6 +21,7 @@ const discoveryItemFields = {
     ])
     .nullable(),
   inLibrary: z.boolean(),
+  previewOnly: z.boolean().default(false),
 }
 
 export const discoveryItemSchema = z

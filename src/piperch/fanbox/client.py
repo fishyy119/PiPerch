@@ -120,4 +120,11 @@ class FanboxClient:
         return await self._transport.fetch_thumbnail(url)
 
     async def download(self, url: str, target: Path) -> tuple[str, int]:
-        return await self._transport.download(url, target)
+        try:
+            return await self._transport.download(url, target)
+        except UpstreamError as error:
+            if error.code != "fanbox_image_not_found" or not urlsplit(url).path.startswith("/data/"):
+                raise
+        # 归档状态可能滞后，仅在原图确实缺失时回退到对应预览图。
+        preview_url = f"https://img.pawchive.pw/thumbnail{urlsplit(url).path}"
+        return await self._transport.download(preview_url, target)

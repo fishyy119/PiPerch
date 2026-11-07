@@ -172,6 +172,7 @@ class DiscoveryItem(ApiModel):
     is_ai: bool | None
     thumbnail_url: str | None
     in_library: bool
+    preview_only: bool = False
 
 
 class ArtworkDiscoveryFailureResponse(ApiModel):

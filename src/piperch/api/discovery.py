@@ -59,6 +59,7 @@ def _discovery_items(
                 item.thumbnail_url
             ),
             in_library=item.artwork_id in existing_ids,
+            preview_only=item.preview_only,
             local_artwork_id=existing_ids.get(item.artwork_id),
         )
         for item in candidates

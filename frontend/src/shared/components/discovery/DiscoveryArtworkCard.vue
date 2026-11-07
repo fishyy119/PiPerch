@@ -96,6 +96,12 @@ function handleCardClick(event: MouseEvent) {
       >
         已在图库
       </span>
+      <span
+        v-else-if="artwork.previewOnly"
+        class="absolute right-2 bottom-2 z-10 rounded-lg bg-overlay/75 px-2 py-1 text-xs font-medium text-overlay-foreground shadow-sm"
+      >
+        仅预览图
+      </span>
     </template>
   </ArtworkCard>
 </template>

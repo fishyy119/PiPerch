@@ -105,6 +105,7 @@ def parse_candidate(post: Mapping[str, object], author_id: int, author_name: str
         is_ai=None,
         thumbnail_url=thumbnail_url(thumbnail),
         author_id=author_id,
+        preview_only=post.get("has_full") is False,
     )
 
 

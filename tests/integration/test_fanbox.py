@@ -21,15 +21,15 @@ if TYPE_CHECKING:
 
 
 @pytest.mark.asyncio
-async def test_fanbox_download_stores_only_image_attachments_without_remote_bookmarks(
+async def test_fanbox_download_preserves_originals_and_stores_missing_image_previews_without_remote_bookmarks(
     app_client: tuple[ApiTestClient, AppContainer],
     monkeypatch: MonkeyPatch,
 ) -> None:
     _, container = app_client
     images: list[bytes] = []
-    for color in ("blue", "red"):
+    for color, image_format in (("blue", "PNG"), ("red", "JPEG")):
         image = BytesIO()
-        Image.new("RGB", (8, 8), color).save(image, "PNG")
+        Image.new("RGB", (8, 8), color).save(image, image_format)
         images.append(image.getvalue())
     files = [
         {"name": "first.png", "path": f"/aa/aa/{'a' * 64}.png"},
@@ -41,6 +41,7 @@ async def test_fanbox_download_stores_only_image_attachments_without_remote_book
         "id": "701",
         "user": "100",
         "service": "fanbox",
+        "has_full": False,
         "title": "Images",
         "content": "<p>Body</p>",
         "published": "2026-11-07T00:00:00",
@@ -61,8 +62,12 @@ async def test_fanbox_download_stores_only_image_attachments_without_remote_book
         upstream.get("https://pawchive.pw/api/v1/fanbox/user/100/post/701").mock(
             return_value=httpx.Response(200, json=post)
         )
+        upstream.get(f"https://n2.pawchive.pw/data{files[1]['path']}").mock(return_value=httpx.Response(404))
         for url, content in zip(
-            (f"https://file.pawchive.pw/data{files[0]['path']}", f"https://n2.pawchive.pw/data{files[1]['path']}"),
+            (
+                f"https://file.pawchive.pw/data{files[0]['path']}",
+                f"https://img.pawchive.pw/thumbnail/data{files[1]['path']}",
+            ),
             images,
             strict=True,
         ):
@@ -90,6 +95,8 @@ async def test_fanbox_download_stores_only_image_attachments_without_remote_book
     for item, expected in zip(media, images, strict=True):
         assert item.relative_path.startswith("fanbox/100/701/")
         assert (container.settings.get().library_root / item.relative_path).read_bytes() == expected
+    assert media[1].mime_type == "image/jpeg"
+    assert media[1].relative_path.endswith((".jpg", ".jpeg"))
     assert bookmark_calls == []
 
 
@@ -101,7 +108,8 @@ async def test_fanbox_pagination_preserves_empty_website_pages_after_image_filte
         {"id": str(index), "user": "100", "service": "fanbox", "file": image, "attachments": []}
         for index in range(1, 102)
     ]
-    posts[50]["attachments"] = [image]
+    posts[50].update(attachments=[image], has_full=False)
+    posts[51].update(attachments=[image], has_full=True)
     try:
         with respx.mock(assert_all_called=False) as upstream:
             upstream.get("https://pawchive.pw/api/v1/fanbox/user/100/profile").mock(
@@ -121,10 +129,12 @@ async def test_fanbox_pagination_preserves_empty_website_pages_after_image_filte
             assert first.candidates == []
             assert (first.next_page, first.total_pages) == (1, 3)
             middle = await client.discover_user(100, 1)
-            assert [candidate.artwork_id for candidate in middle.candidates] == [51]
+            assert [candidate.artwork_id for candidate in middle.candidates] == [51, 52]
+            assert [candidate.preview_only for candidate in middle.candidates] == [True, False]
             assert (middle.next_page, middle.total_pages) == (2, 3)
             last = await client.discover_user(100, 2)
             assert last.candidates == []
             assert (last.next_page, last.total_pages) == (None, 3)
+            assert await client.list_user_artwork_ids(100) == [51, 52]
     finally:
         await client.close()

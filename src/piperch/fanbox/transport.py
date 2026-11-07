@@ -155,7 +155,8 @@ class FanboxTransport:
                             and int(expected) != size
                         ):
                             raise UpstreamError("truncated_download", "FANBOX 图片下载不完整。")
-                    await to_thread.run_sync(self._validate_image, part)
+                    # 预览地址的扩展名和响应头可能仍沿用原图格式，以文件内容为准。
+                    mime = await to_thread.run_sync(self._validate_image, part) or mime
                     part.replace(target)
                     return mime, size
                 except (httpx.HTTPError, UpstreamError) as error:
@@ -181,9 +182,10 @@ class FanboxTransport:
         raise UpstreamError("fanbox_download_failed", "FANBOX 图片下载失败。")
 
     @staticmethod
-    def _validate_image(path: Path) -> None:
+    def _validate_image(path: Path) -> str:
         try:
             with Image.open(path) as image:
                 image.verify()
+                return Image.MIME.get(image.format or "", "")
         except (OSError, ValueError) as error:
             raise UpstreamError("invalid_fanbox_image", "FANBOX 附件不是有效的图片文件。") from error

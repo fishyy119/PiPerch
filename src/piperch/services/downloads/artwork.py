@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+import mimetypes
 import shutil
 import zipfile
 from pathlib import Path
@@ -317,6 +318,9 @@ class ArtworkDownloadService:
                 if self._fanbox is None:
                     raise AppError("source_unavailable", "FANBOX 下载服务尚未初始化。", 400)
                 mime, size = await self._fanbox.download(url, target)
+                suffix = mimetypes.guess_extension(mime)
+                if suffix is not None and suffix in _IMAGE_EXTENSIONS and target.suffix != suffix:
+                    target = target.replace(target.with_suffix(suffix))
             else:
                 mime, size = await self._pixiv.download(url, target)
             cancellation.raise_if_requested()

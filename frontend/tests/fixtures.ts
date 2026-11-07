@@ -19,6 +19,7 @@ export function discoveryItem(
     isAi: false,
     thumbnailUrl: null,
     inLibrary: false,
+    previewOnly: false,
   }
   return overrides.source === 'fanbox'
     ? { ...fields, ...overrides }
