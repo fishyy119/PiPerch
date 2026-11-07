@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { Check, ChevronLeft, ChevronRight } from '@lucide/vue'
-import { computed } from 'vue'
+import { Check } from '@lucide/vue'
+import { computed, ref } from 'vue'
 
 import { usePreference } from '@/app/usePreference'
 import type { DiscoveryItem } from '@/features/discovery/discovery-api'
@@ -9,6 +9,7 @@ import { useLibraryMembershipStore } from '@/features/library/library-membership
 import DiscoveryCandidateResults from '@/pages/downloads/DiscoveryCandidateResults.vue'
 import { Button } from '@ui/button'
 import { Card } from '@ui/card'
+import { Pagination } from '@ui/pagination'
 import { SettingsPopover } from '@ui/settings-popover'
 import { Slider } from '@ui/slider'
 
@@ -31,11 +32,7 @@ const emit = defineEmits<{
 const selection = useDownloadSelection()
 const library = useLibraryMembershipStore()
 const cardWidth = usePreference('downloadCandidates.cardWidth')
-const pageLabel = computed(() =>
-  props.totalPages === null
-    ? String(props.page + 1)
-    : `${String(props.page + 1)} / ${String(Math.max(1, props.totalPages))}`,
-)
+const pageInput = ref('1')
 const selectableCandidates = computed(() =>
   props.candidates.filter(
     (item) => !library.isInLibrary(item.remoteId, item.inLibrary, item.source),
@@ -65,29 +62,15 @@ function togglePage() {
           <h2 class="font-semibold">候选作品</h2>
           <p class="text-sm text-muted-foreground">跨页选择会保留，提交任务后自动清空。</p>
         </div>
-        <div class="flex shrink-0 items-center gap-2">
-          <Button
-            variant="secondary"
-            size="icon"
-            title="上一页"
-            :disabled="page === 0 || pending"
-            @click="emit('loadPage', page - 1)"
-          >
-            <ChevronLeft :size="17" />
-          </Button>
-          <span class="min-w-4 text-center text-sm text-muted-foreground tabular-nums">
-            第 {{ pageLabel }} 页
-          </span>
-          <Button
-            variant="secondary"
-            size="icon"
-            title="下一页"
-            :disabled="nextPage === null || pending"
-            @click="nextPage !== null && emit('loadPage', nextPage)"
-          >
-            <ChevronRight :size="17" />
-          </Button>
-        </div>
+        <Pagination
+          v-model="pageInput"
+          compact
+          :page="page"
+          :next-page="nextPage"
+          :total-pages="totalPages"
+          :pending="pending"
+          @load-page="emit('loadPage', $event)"
+        />
         <div class="flex flex-wrap items-center justify-end gap-2">
           <Button variant="secondary" :disabled="candidates.length === 0" @click="togglePage">
             <Check :size="17" />{{ pageFullySelected ? '取消本页' : '选择本页' }}
@@ -116,23 +99,15 @@ function togglePage() {
         <slot name="errors" />
       </div>
 
-      <div class="flex items-center justify-between border-t p-4">
-        <Button
-          variant="secondary"
-          :disabled="page === 0 || pending"
-          @click="emit('loadPage', page - 1)"
-        >
-          <ChevronLeft :size="17" />上一页
-        </Button>
-        <span class="text-sm text-muted-foreground">第 {{ pageLabel }} 页</span>
-        <Button
-          variant="secondary"
-          :disabled="nextPage === null || pending"
-          @click="nextPage !== null && emit('loadPage', nextPage)"
-        >
-          下一页<ChevronRight :size="17" />
-        </Button>
-      </div>
+      <Pagination
+        v-model="pageInput"
+        class="border-t p-4"
+        :page="page"
+        :next-page="nextPage"
+        :total-pages="totalPages"
+        :pending="pending"
+        @load-page="emit('loadPage', $event)"
+      />
     </Card>
   </div>
 </template>

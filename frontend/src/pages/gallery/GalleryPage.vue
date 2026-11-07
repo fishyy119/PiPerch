@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { CheckSquare, ChevronLeft, ChevronRight, RefreshCw } from '@lucide/vue'
+import { CheckSquare, RefreshCw } from '@lucide/vue'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query'
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
@@ -31,6 +31,7 @@ import { usePageKeyboardShortcuts } from '@/shared/lib/usePageKeyboardShortcuts'
 import { Button } from '@ui/button'
 import { Card } from '@ui/card'
 import { FilterButton } from '@ui/filter-button'
+import { Pagination } from '@ui/pagination'
 import { SearchInput } from '@ui/search-input'
 import { toast } from '@ui/toast'
 
@@ -140,6 +141,10 @@ function artworkFilters(): ArtworkListFilters {
 const artworksQuery = useQuery({
   queryKey: computed(() => artworkQueryKeys.list(artworkFilters())),
   queryFn: () => listArtworks(artworkFilters()),
+})
+const nextPage = computed(() => {
+  const next = pageNumber() + 1
+  return next < (artworksQuery.data.value?.totalPages ?? 0) ? next : null
 })
 
 const refreshAuthorSummarysMutation = useMutation({
@@ -363,22 +368,14 @@ usePageKeyboardShortcuts((event) => {
     </div>
     <Card v-else class="py-20 text-center text-muted-foreground"> 图库中没有符合条件的作品。 </Card>
 
-    <nav class="mt-8 flex items-center justify-center gap-3">
-      <Button variant="secondary" :disabled="pageNumber() === 0" @click="setPage(pageNumber() - 1)">
-        <ChevronLeft :size="17" />上一页
-      </Button>
-      <span class="text-sm text-muted-foreground">
-        第 {{ pageNumber() + 1 }} /
-        {{ Math.max(1, artworksQuery.data.value?.totalPages ?? 1) }}
-        页
-      </span>
-      <Button
-        variant="secondary"
-        :disabled="pageNumber() + 1 >= (artworksQuery.data.value?.totalPages ?? 0)"
-        @click="setPage(pageNumber() + 1)"
-      >
-        下一页<ChevronRight :size="17" />
-      </Button>
+    <nav class="mt-8 flex justify-center">
+      <Pagination
+        :page="pageNumber()"
+        :next-page="nextPage"
+        :total-pages="artworksQuery.data.value?.totalPages ?? null"
+        :pending="artworksQuery.isFetching.value"
+        @load-page="setPage"
+      />
     </nav>
   </div>
 
