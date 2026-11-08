@@ -7,6 +7,8 @@
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-08
+
 ### Added
 
 - 图库主搜索框支持失焦自动搜索；主搜索框和筛选面板的作者搜索均支持按作者 ID 精确匹配，数字输入同时保留名称匹配，主搜索框还会匹配作品 ID。
@@ -88,6 +90,7 @@
 - 提供图库筛选、随机展示、批量选择、作品详情、多页图片预览、灯箱和快捷键操作。
 - 支持本地收藏及与 Pixiv 的收藏同步。
 
-[Unreleased]: https://github.com/fishyy119/PiPerch/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/fishyy119/PiPerch/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/fishyy119/PiPerch/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/fishyy119/PiPerch/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/fishyy119/PiPerch/releases/tag/v0.1.0
