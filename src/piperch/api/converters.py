@@ -44,8 +44,6 @@ def artwork_detail_response(
         **artwork_summary_response(detail.summary).model_dump(),
         description=detail.description,
         local_linked_artworks=local_linked_artworks,
-        width=detail.width,
-        height=detail.height,
         tags=[
             TagResponse(
                 tag_id=tag.tag_id,

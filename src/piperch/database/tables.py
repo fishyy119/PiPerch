@@ -23,7 +23,6 @@ authors = Table(
     Column("id", BigInteger, primary_key=True, autoincrement=False),
     Column("name", Text, nullable=False),
     Column("account", Text, nullable=True),
-    Column("avatar_url", Text, nullable=True),
     Column("updated_at", String(40), nullable=False),
 )
 
@@ -48,8 +47,6 @@ artworks = Table(
     Column("author_id", BigInteger, ForeignKey("authors.id", ondelete="RESTRICT"), nullable=False),
     Column("series_id", BigInteger, ForeignKey("series.id", ondelete="SET NULL"), nullable=True),
     Column("page_count", Integer, nullable=False),
-    Column("width", Integer, nullable=True),
-    Column("height", Integer, nullable=True),
     Column("x_restrict", Integer, nullable=True),
     Column("is_ai", Boolean, nullable=True),
     Column("published_at", String(40), nullable=True),

@@ -370,8 +370,6 @@ class UgoiraFrameResponse(ApiModel):
 class ArtworkDetailResponse(ArtworkSummaryResponse):
     description: str
     local_linked_artworks: dict[int, int]
-    width: int | None
-    height: int | None
     tags: list[TagResponse]
     media: list[MediaResponse]
     ugoira_frames: list[UgoiraFrameResponse]

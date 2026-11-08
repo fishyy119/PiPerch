@@ -169,10 +169,6 @@ function formatDate(value: string | null) {
           <dd>{{ artworkTypeLabel(artwork.artworkType) }}</dd>
         </div>
         <div class="flex justify-between gap-3">
-          <dt class="text-muted-foreground">尺寸</dt>
-          <dd>{{ artwork.width ?? '未知' }} × {{ artwork.height ?? '未知' }}</dd>
-        </div>
-        <div class="flex justify-between gap-3">
           <dt class="text-muted-foreground">页数</dt>
           <dd>{{ artwork.pageCount }}</dd>
         </div>

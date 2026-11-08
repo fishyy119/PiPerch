@@ -150,14 +150,13 @@ class ArtworkRepository:
             "id": artwork.author_id,
             "name": artwork.author_name,
             "account": artwork.author_account,
-            "avatar_url": artwork.author_avatar_url,
             "updated_at": now,
         }
         exists = connection.scalar(select(authors.c.id).where(authors.c.id == artwork.author_id))
         if exists is None:
             connection.execute(insert(authors).values(**values))
         else:
-            # 不用来源缺失的资料清空另一个平台已经保存的账号和头像。
+            # 不用来源缺失的资料清空另一个平台已经保存的账号。
             values = {key: value for key, value in values.items() if value is not None}
             connection.execute(update(authors).where(authors.c.id == artwork.author_id).values(**values))
 
@@ -193,8 +192,6 @@ class ArtworkRepository:
             "author_id": artwork.author_id,
             "series_id": artwork.series_id,
             "page_count": artwork.page_count,
-            "width": artwork.width,
-            "height": artwork.height,
             "x_restrict": artwork.x_restrict,
             "is_ai": artwork.is_ai,
             "published_at": artwork.published_at,
@@ -493,8 +490,6 @@ class ArtworkRepository:
             return ArtworkDetail(
                 summary=summary,
                 description=_string(row["description"]),
-                width=_optional_integer(row["width"]),
-                height=_optional_integer(row["height"]),
                 tags=local_tags,
                 media=tuple(
                     MediaRecord(

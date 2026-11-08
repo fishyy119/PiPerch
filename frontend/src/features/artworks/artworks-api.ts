@@ -64,8 +64,6 @@ export const artworkDetailSchema = artworkSummaryWireSchema
   .extend({
     description: z.string(),
     localLinkedArtworks: z.record(z.string(), z.number().int().positive()),
-    width: z.number().int().nullable(),
-    height: z.number().int().nullable(),
     tags: z.array(tagSchema),
     media: z.array(
       z.object({

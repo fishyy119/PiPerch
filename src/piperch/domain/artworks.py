@@ -43,12 +43,9 @@ class RemoteArtwork:
     author_id: int
     author_name: str
     author_account: str | None
-    author_avatar_url: str | None
     series_id: int | None
     series_title: str | None
     page_count: int
-    width: int | None
-    height: int | None
     x_restrict: int | None
     is_ai: bool | None
     published_at: str | None
@@ -94,8 +91,6 @@ class ArtworkSummary:
 class ArtworkDetail:
     summary: ArtworkSummary
     description: str
-    width: int | None
-    height: int | None
     tags: tuple[TagRecord, ...]
     media: tuple[MediaRecord, ...]
     ugoira_frames: tuple[UgoiraFrame, ...]
