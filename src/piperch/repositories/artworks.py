@@ -299,9 +299,10 @@ class ArtworkRepository:
                 artworks.c.title.contains(search_value, autoescape=True),
                 authors.c.name.contains(search_value, autoescape=True),
             )
-            conditions.append(
-                or_(artworks.c.remote_id == int(search_value), text_match) if search_value.isdigit() else text_match
-            )
+            if search_value.isdigit():
+                search_id = int(search_value)
+                text_match = or_(artworks.c.remote_id == search_id, artworks.c.author_id == search_id, text_match)
+            conditions.append(text_match)
         if author_id == "followed":
             conditions.append(artworks.c.author_id.in_(followed_author_ids))
         elif author_id == "unfollowed":
@@ -611,7 +612,10 @@ class ArtworkRepository:
             )
         statement = statement.limit(limit + len(included_ids))
         if search:
-            search_condition = authors.c.name.contains(search, autoescape=True)
+            search_value = search.strip()
+            search_condition = authors.c.name.contains(search_value, autoescape=True)
+            if search_value.isdigit():
+                search_condition = or_(authors.c.id == int(search_value), search_condition)
             statement = statement.where(
                 or_(search_condition, authors.c.id.in_(included_ids)) if included_ids else search_condition
             )

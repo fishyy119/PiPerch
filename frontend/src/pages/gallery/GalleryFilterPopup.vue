@@ -255,7 +255,7 @@ function updateSort(sort: string, order: string) {
             <SearchInput
               v-model="authorSearch"
               class="min-w-32 flex-1 sm:max-w-sm"
-              placeholder="搜索作者…"
+              placeholder="搜索作者名称或 ID…"
             />
             <FilterOptionButton
               v-for="option in [

@@ -213,6 +213,16 @@ function submitSearch() {
   pushQuery({ search: searchInput.value.trim() })
 }
 
+function submitSearchOnFocusOut(event: FocusEvent) {
+  const container = event.currentTarget
+  const nextTarget = event.relatedTarget
+  if (!(container instanceof HTMLElement)) return
+  if (nextTarget instanceof Node && container.contains(nextTarget)) return
+  if (searchInput.value.trim() === routeSearch.value) return
+
+  submitSearch()
+}
+
 function clearSearch() {
   searchInput.value = ''
   submitSearch()
@@ -271,10 +281,11 @@ usePageKeyboardShortcuts((event) => {
       <SearchInput
         v-model="searchInput"
         class="max-w-xl min-w-40 flex-1"
-        placeholder="搜索作品标题或画师…"
+        placeholder="搜索标题、画师、作品 ID 或作者 ID…"
         clearable
         submit-button
         @clear="clearSearch"
+        @focusout="submitSearchOnFocusOut"
       />
 
       <FilterButton
@@ -330,10 +341,11 @@ usePageKeyboardShortcuts((event) => {
         <SearchInput
           v-model="searchInput"
           class="w-full"
-          placeholder="搜索作品标题或画师…"
+          placeholder="搜索标题、画师、作品 ID 或作者 ID…"
           clearable
           submit-button
           @clear="clearSearch"
+          @focusout="submitSearchOnFocusOut"
         />
       </form>
     </div>
