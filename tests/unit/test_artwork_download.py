@@ -108,7 +108,7 @@ class StubPixivClient:
 
 
 class FailingThumbnailCache(ArtworkThumbnailCache):
-    def create_cover_thumbnail(self, artwork_id: int, source: Path) -> Path:
+    def ensure_cover_thumbnail(self, artwork_id: int, source: Path) -> Path:
         raise OSError("thumbnail failed")
 
 

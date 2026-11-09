@@ -460,5 +460,5 @@ class ArtworkDownloadService:
         if source_record is None:
             return
         source = final_dir / Path(source_record.relative_path).name
-        self._thumbnails.create_cover_thumbnail(artwork_id, source)
+        self._thumbnails.ensure_cover_thumbnail(artwork_id, source)
         self._thumbnails.create_page_thumbnails(artwork_id, final_dir, media)
