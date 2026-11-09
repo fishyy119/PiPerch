@@ -19,6 +19,7 @@ from piperch.database.tables import (
 )
 from piperch.domain.artworks import (
     ArtworkDetail,
+    ArtworkImageSummary,
     ArtworkSummary,
     ArtworkType,
     AuthorSummary,
@@ -140,9 +141,31 @@ class ArtworkRepository:
                     relative_path=_string(row["relative_path"]),
                     mime_type=_string(row["mime_type"]),
                     byte_size=_integer(row["byte_size"]),
+                    width=_optional_integer(row["width"]),
+                    height=_optional_integer(row["height"]),
                 )
                 for row in rows
             )
+
+    def list_artwork_images(self, artwork_ids: Sequence[int]) -> list[ArtworkImageSummary]:
+        if not artwork_ids:
+            return []
+        with self._database.connect() as connection:
+            rows = connection.execute(
+                select(media_files)
+                .where(media_files.c.artwork_id.in_(artwork_ids), media_files.c.role.in_(("page", "ugoiraZip")))
+                .order_by(media_files.c.artwork_id, media_files.c.page_index)
+            ).mappings()
+            return [
+                ArtworkImageSummary(
+                    artwork_id=_integer(row["artwork_id"]),
+                    role="ugoira" if row["role"] == "ugoiraZip" else "page",
+                    page_index=_optional_integer(row["page_index"]),
+                    width=_optional_integer(row["width"]),
+                    height=_optional_integer(row["height"]),
+                )
+                for row in rows
+            ]
 
     @staticmethod
     def upsert_author(connection: Connection, artwork: RemoteArtwork, now: str) -> None:
@@ -244,6 +267,8 @@ class ArtworkRepository:
                         "relative_path": item.relative_path,
                         "mime_type": item.mime_type,
                         "byte_size": item.byte_size,
+                        "width": item.width,
+                        "height": item.height,
                         "downloaded_at": now,
                     }
                     for item in media
@@ -499,6 +524,8 @@ class ArtworkRepository:
                         relative_path=_string(item["relative_path"]),
                         mime_type=_string(item["mime_type"]),
                         byte_size=_integer(item["byte_size"]),
+                        width=_optional_integer(item["width"]),
+                        height=_optional_integer(item["height"]),
                     )
                     for item in media_rows
                 ),
@@ -527,6 +554,8 @@ class ArtworkRepository:
             relative_path=_string(row["relative_path"]),
             mime_type=_string(row["mime_type"]),
             byte_size=_integer(row["byte_size"]),
+            width=_optional_integer(row["width"]),
+            height=_optional_integer(row["height"]),
         )
 
     def list_tags(

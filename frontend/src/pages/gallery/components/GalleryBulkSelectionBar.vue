@@ -11,12 +11,13 @@ import {
   invalidateArtworkGroupData,
   removeArtworkData,
 } from '@/features/library/library-query-cache'
-import BulkGroupsDialog from '@/pages/gallery/BulkGroupsDialog.vue'
 import { errorMessage } from '@/shared/errors'
 import { Button } from '@ui/button'
 import { Card } from '@ui/card'
 import { ConfirmDialog } from '@ui/confirm-dialog'
 import { toast } from '@ui/toast'
+
+import BulkGroupsDialog from './BulkGroupsDialog.vue'
 
 const props = defineProps<{
   visibleArtworkIds: readonly number[]

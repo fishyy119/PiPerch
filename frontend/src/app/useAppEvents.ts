@@ -4,6 +4,7 @@ import { z } from 'zod'
 
 import { libraryArtworkReferenceSchema } from '@/features/artworks/artwork-source'
 import { useLibraryMembershipStore } from '@/features/library/library-membership'
+import { invalidateArtworkImages } from '@/features/library/library-query-cache'
 
 const libraryChangeSchema = z.object({
   references: z.array(libraryArtworkReferenceSchema),
@@ -25,6 +26,10 @@ export function useAppEvents() {
       for (const item of references) {
         library.applyReference(item, inLibrary)
       }
+      void invalidateArtworkImages(
+        queryClient,
+        references.map((item) => item.localArtworkId),
+      )
     } catch {
       // 忽略无效事件，保留当前图库状态。
     }

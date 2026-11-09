@@ -11,6 +11,15 @@ export const tagSchema = z.object({
 })
 export type Tag = z.infer<typeof tagSchema>
 
+const artworkImageSchema = z.object({
+  artworkId: z.number().int().positive(),
+  role: z.enum(['page', 'ugoira']),
+  pageIndex: z.number().int().nonnegative().nullable(),
+  width: z.number().int().positive().nullable(),
+  height: z.number().int().positive().nullable(),
+})
+export type ArtworkImage = z.infer<typeof artworkImageSchema>
+
 const artworkSummaryWireSchema = z.object({
   artworkId: z.number().int().positive(),
   source: artworkSourceSchema,
@@ -65,14 +74,7 @@ export const artworkDetailSchema = artworkSummaryWireSchema
     description: z.string(),
     localLinkedArtworks: z.record(z.string(), z.number().int().positive()),
     tags: z.array(tagSchema),
-    media: z.array(
-      z.object({
-        role: z.string(),
-        pageIndex: z.number().int().nullable(),
-        mimeType: z.string(),
-        byteSize: z.number().int(),
-      }),
-    ),
+    images: z.array(artworkImageSchema),
     ugoiraFrames: z.array(z.object({ fileName: z.string(), delayMs: z.number().int() })),
   })
   .transform(({ artworkId, ...item }) => ({ ...item, localArtworkId: artworkId }))
@@ -126,6 +128,16 @@ export async function listArtworks(filters: ArtworkListFilters) {
   return artworkPageSchema.parse(
     await api.get<unknown>(`/api/artworks?${artworkListQuery(filters).toString()}`),
   )
+}
+
+export async function listArtworkImages(artworkIds: readonly number[], signal?: AbortSignal) {
+  const params = new URLSearchParams()
+  artworkIds.forEach((id) => params.append('artworkId', String(id)))
+  return z
+    .array(artworkImageSchema)
+    .parse(
+      await api.get<unknown>(`/api/artworks/images?${params.toString()}`, signal ? { signal } : {}),
+    )
 }
 
 export async function listTags(search = '', includeIds: number[] = []) {

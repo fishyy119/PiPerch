@@ -355,11 +355,12 @@ class ArtworkPage(ApiModel):
     total_pages: int
 
 
-class MediaResponse(ApiModel):
-    role: str
+class ArtworkImageResponse(ApiModel):
+    artwork_id: int
+    role: Literal["page", "ugoira"]
     page_index: int | None
-    mime_type: str
-    byte_size: int
+    width: int | None
+    height: int | None
 
 
 class UgoiraFrameResponse(ApiModel):
@@ -371,7 +372,7 @@ class ArtworkDetailResponse(ArtworkSummaryResponse):
     description: str
     local_linked_artworks: dict[int, int]
     tags: list[TagResponse]
-    media: list[MediaResponse]
+    images: list[ArtworkImageResponse]
     ugoira_frames: list[UgoiraFrameResponse]
 
 

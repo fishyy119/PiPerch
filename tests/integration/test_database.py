@@ -17,6 +17,7 @@ def test_initial_migration_and_sqlite_pragmas(tmp_path: Path) -> None:
         inspector = inspect(database.engine)
         table_names = set(inspector.get_table_names())
         download_item_columns = {column["name"] for column in inspector.get_columns("download_items")}
+        media_columns = {column["name"] for column in inspector.get_columns("media_files")}
         artwork_group_foreign_keys = inspector.get_foreign_keys("artwork_group_items")
         with database.connect() as connection:
             foreign_keys = connection.scalar(text("PRAGMA foreign_keys"))
@@ -42,6 +43,7 @@ def test_initial_migration_and_sqlite_pragmas(tmp_path: Path) -> None:
         "ugoira_frames",
     } <= table_names
     assert not {"progress_phase", "progress_completed", "progress_total"} & download_item_columns
+    assert {"width", "height"} <= media_columns
     assert any(
         foreign_key["referred_table"] == "artworks" and foreign_key["constrained_columns"] == ["artwork_id"]
         for foreign_key in artwork_group_foreign_keys

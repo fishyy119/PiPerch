@@ -2,7 +2,9 @@ import type { Get, Paths } from 'type-fest'
 
 export interface PreferenceConfig {
   gallery: {
+    layout: 'grid' | 'masonry'
     cardWidth: number
+    masonryImageWidth: number
     pageSize: number
     showTitle: boolean
     showAuthor: boolean
@@ -23,7 +25,9 @@ export interface PreferenceConfig {
 
 export const PREFERENCE_DEFAULTS: PreferenceConfig = {
   gallery: {
+    layout: 'grid',
     cardWidth: 220,
+    masonryImageWidth: 220,
     pageSize: 24,
     showTitle: true,
     showAuthor: true,

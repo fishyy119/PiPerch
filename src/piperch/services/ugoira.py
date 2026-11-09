@@ -20,7 +20,7 @@ if TYPE_CHECKING:
 
 
 class UgoiraAnimationCache:
-    """由本地 ZIP 和帧时序按需生成可重建的动态 WebP 缓存。"""
+    """由本地 ZIP 和帧时序生成可重建的动态 WebP 缓存。"""
 
     def __init__(self, paths: AppPaths) -> None:
         self._directory = paths.data_dir / "cache" / "ugoira"

@@ -1,17 +1,19 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
+
 from piperch.api.models import (
     ArtworkDetailResponse,
+    ArtworkImageResponse,
     ArtworkSummaryResponse,
     DownloadItemResponse,
     DownloadJobDetailResponse,
     DownloadJobSummaryResponse,
     JobCounts,
-    MediaResponse,
     TagResponse,
     UgoiraFrameResponse,
 )
-from piperch.domain.artworks import ArtworkDetail, ArtworkSummary
+from piperch.domain.artworks import ArtworkDetail, ArtworkImageSummary, ArtworkSummary
 from piperch.domain.downloads import DownloadJobDetail, DownloadJobSummary, ItemState
 
 
@@ -36,9 +38,20 @@ def artwork_summary_response(summary: ArtworkSummary) -> ArtworkSummaryResponse:
     )
 
 
+def artwork_image_response(image: ArtworkImageSummary) -> ArtworkImageResponse:
+    return ArtworkImageResponse(
+        artwork_id=image.artwork_id,
+        role=image.role,
+        page_index=image.page_index,
+        width=image.width,
+        height=image.height,
+    )
+
+
 def artwork_detail_response(
     detail: ArtworkDetail,
     local_linked_artworks: dict[int, int],
+    images: Sequence[ArtworkImageSummary],
 ) -> ArtworkDetailResponse:
     return ArtworkDetailResponse(
         **artwork_summary_response(detail.summary).model_dump(),
@@ -51,15 +64,7 @@ def artwork_detail_response(
             )
             for tag in detail.tags
         ],
-        media=[
-            MediaResponse(
-                role=item.role,
-                page_index=item.page_index,
-                mime_type=item.mime_type,
-                byte_size=item.byte_size,
-            )
-            for item in detail.media
-        ],
+        images=[artwork_image_response(image) for image in images],
         ugoira_frames=[
             UgoiraFrameResponse(file_name=item.file_name, delay_ms=item.delay_ms) for item in detail.ugoira_frames
         ],

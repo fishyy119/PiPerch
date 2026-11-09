@@ -10,11 +10,12 @@ from fastapi import Path as PathParameter
 from fastapi.responses import FileResponse
 from pydantic import Field
 
-from piperch.api.converters import artwork_detail_response, artwork_summary_response
+from piperch.api.converters import artwork_detail_response, artwork_image_response, artwork_summary_response
 from piperch.api.dependencies import get_container
 from piperch.api.models import (
     ArtworkDeleteResponse,
     ArtworkDetailResponse,
+    ArtworkImageResponse,
     ArtworkPage,
     ArtworkSummaryResponse,
     BulkDeleteRequest,
@@ -87,6 +88,14 @@ async def list_artworks(
     )
 
 
+@router.get("/artworks/images", response_model=list[ArtworkImageResponse])
+def list_artwork_images(
+    artwork_ids: list[PositiveId] = Query(alias="artworkId", min_length=1, max_length=100),
+    container: AppContainer = Depends(get_container),
+) -> list[ArtworkImageResponse]:
+    return [artwork_image_response(image) for image in container.artworks.list_artwork_images(artwork_ids)]
+
+
 @router.get("/artworks/{artwork_id}", response_model=ArtworkDetailResponse)
 def get_artwork(
     artwork_id: int = PathParameter(gt=0),
@@ -98,6 +107,7 @@ def get_artwork(
     return artwork_detail_response(
         detail,
         local_linked_artworks,
+        container.artworks.list_artwork_images([artwork_id]),
     )
 
 

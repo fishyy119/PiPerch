@@ -9,12 +9,12 @@ describe('本地偏好存储', () => {
     expect(localStorage.getItem('piperch.preferences.gallery.cardWidth')).toBeNull()
 
     setPreference('gallery.cardWidth', 225)
-    setPreference('gallery.pageSize', 48)
+    setPreference('gallery.masonryImageWidth', 310)
 
     expect(getPreference('gallery.cardWidth')).toBe(225)
-    expect(getPreference('gallery.pageSize')).toBe(48)
+    expect(getPreference('gallery.masonryImageWidth')).toBe(310)
     expect(localStorage.getItem('piperch.preferences.gallery.cardWidth')).toBe('225')
-    expect(localStorage.getItem('piperch.preferences.gallery.pageSize')).toBe('48')
+    expect(localStorage.getItem('piperch.preferences.gallery.masonryImageWidth')).toBe('310')
   })
 
   it('同一偏好键在不同调用方之间共享响应式状态', () => {

@@ -4,12 +4,13 @@ import { computed, watch } from 'vue'
 
 import { GALLERY_RANDOM_SEED_MODULUS, useGalleryFilters } from '@/features/gallery/gallery-filter'
 import { useGalleryFilterOptions } from '@/features/gallery/useGalleryFilterOptions'
-import CollapsibleFilterOptions from '@/pages/gallery/CollapsibleFilterOptions.vue'
-import FilterMatchToggle from '@/pages/gallery/FilterMatchToggle.vue'
-import FilterOptionButton from '@/pages/gallery/FilterOptionButton.vue'
 import { Button } from '@ui/button'
 import { Dialog } from '@ui/dialog'
 import { SearchInput } from '@ui/search-input'
+
+import CollapsibleFilterOptions from './CollapsibleFilterOptions.vue'
+import FilterMatchToggle from './FilterMatchToggle.vue'
+import FilterOptionButton from './FilterOptionButton.vue'
 
 const open = defineModel<boolean>('open', { required: true })
 const { filters, update: updateFilters } = useGalleryFilters()

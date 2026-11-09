@@ -123,8 +123,9 @@ const createAndAddGroupMutation = useMutation({
 })
 
 const pageIndexes = computed(() =>
-  props.artwork.media
-    .map((media) => media.pageIndex)
+  props.artwork.images
+    .filter((image) => image.role === 'page')
+    .map((image) => image.pageIndex)
     .filter((page): page is number => page !== null)
     .sort((left, right) => left - right),
 )

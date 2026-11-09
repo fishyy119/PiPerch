@@ -6,6 +6,8 @@ from contextlib import asynccontextmanager
 from threading import Lock
 from typing import TYPE_CHECKING
 
+from anyio import to_thread
+
 from piperch.application.container import AppContainer
 from piperch.database import Database, run_migrations
 from piperch.fanbox import FanboxClient
@@ -17,6 +19,7 @@ from piperch.services.favorite_sync import FavoriteSyncService
 from piperch.services.library import LibraryService
 from piperch.services.library_commits import LibraryCommitCoordinator
 from piperch.services.library_files import LibraryFileOperations
+from piperch.services.media_metadata import backfill_media_dimensions
 from piperch.services.storage import StorageMigrationService
 from piperch.services.tag_search import TagSearchIndex
 from piperch.services.thumbnails import ArtworkThumbnailCache
@@ -78,7 +81,6 @@ async def lifespan(app: FastAPI, *, paths: AppPaths, control: AppControl) -> Asy
     run_migrations(paths)
     database = Database(paths.database)
     tag_search_index = TagSearchIndex(database)
-    tag_search_index.synchronize()
     settings_manager = SettingsManager(paths.settings, paths.default_library)
     settings_manager.initialize()
     current_settings = settings_manager.get()
@@ -117,6 +119,7 @@ async def lifespan(app: FastAPI, *, paths: AppPaths, control: AppControl) -> Asy
         thumbnail_cache,
         library_files,
         fanbox=fanbox,
+        animations=animation_cache,
     )
     supervisor = DownloadSupervisor(download_repository, download_service, events, settings_manager)
     mutation_lock = Lock()
@@ -162,8 +165,10 @@ async def lifespan(app: FastAPI, *, paths: AppPaths, control: AppControl) -> Asy
         instance_id=control.instance_id,
     )
     app.state.container = container
-    await supervisor.start()
     try:
+        await to_thread.run_sync(tag_search_index.synchronize)
+        await to_thread.run_sync(backfill_media_dimensions, database, settings_manager.get().library_root)
+        await supervisor.start()
         yield
     finally:
         await shutdown_resources(supervisor, pixiv, database, fanbox=fanbox)

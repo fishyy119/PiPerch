@@ -18,11 +18,14 @@ from piperch.domain.groups import validate_imported_group_names
 from piperch.domain.sources import ArtworkSource, artwork_directory
 from piperch.errors import AppError, UpstreamError
 from piperch.services.library_files import LibraryFileOperations
+from piperch.services.media_metadata import image_dimensions, ugoira_dimensions
 from piperch.services.thumbnails import ArtworkThumbnailCache
+from piperch.services.ugoira import UgoiraAnimationCache
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
+    from piperch.domain.artworks import UgoiraFrame
     from piperch.fanbox import FanboxClient
     from piperch.paths import AppPaths
     from piperch.pixiv import PixivClient
@@ -48,6 +51,7 @@ class ArtworkDownloadService:
         files: LibraryFileOperations | None = None,
         *,
         fanbox: FanboxClient | None = None,
+        animations: UgoiraAnimationCache | None = None,
     ) -> None:
         self._settings = settings
         self._artworks = artworks
@@ -56,6 +60,7 @@ class ArtworkDownloadService:
         self._commits = commits
         self._favorites = favorites
         self._thumbnails = thumbnails or ArtworkThumbnailCache(paths)
+        self._animations = animations or UgoiraAnimationCache(paths)
         self._files = files or LibraryFileOperations()
 
     async def download_artwork(
@@ -75,6 +80,17 @@ class ArtworkDownloadService:
             local_id,
             settings.library_root,
         ):
+            cancellation.raise_if_requested()
+            detail = await to_thread.run_sync(self._artworks.get_detail, local_id)
+            if detail.summary.artwork_type is ArtworkType.UGOIRA:
+                await to_thread.run_sync(
+                    self._create_animation,
+                    local_id,
+                    settings.library_root,
+                    detail.media,
+                    detail.ugoira_frames,
+                    settings.webp_quality,
+                )
             return ItemState.SKIPPED
         cancellation.raise_if_requested()
 
@@ -134,6 +150,8 @@ class ArtworkDownloadService:
                     ).replace("\\", "/"),
                     mime_type=item.mime_type,
                     byte_size=item.byte_size,
+                    width=item.width,
+                    height=item.height,
                 )
                 for item in media
             )
@@ -159,6 +177,15 @@ class ArtworkDownloadService:
                 logger.exception("作品 %d 缩略图缓存生成失败，将在访问时重试。", artwork_id)
             if source is ArtworkSource.PIXIV and is_new_artwork and settings.auto_bookmark_on_download:
                 await self._auto_bookmark(artwork_id, local_id, settings.pixiv_cookie)
+            if artwork.artwork_type is ArtworkType.UGOIRA:
+                await to_thread.run_sync(
+                    self._create_animation,
+                    local_id,
+                    settings.library_root,
+                    final_media,
+                    artwork.ugoira_frames,
+                    settings.webp_quality,
+                )
             return ItemState.SUCCEEDED
         finally:
             await to_thread.run_sync(self._files.cleanup_download_stage, settings.library_root, stage)
@@ -248,17 +275,18 @@ class ArtworkDownloadService:
             )
             if reused_archive is not None:
                 archive = stage / Path(reused_archive.relative_path).name
-                records.append(reused_archive)
+                mime, size = reused_archive.mime_type, reused_archive.byte_size
             else:
                 cancellation.raise_if_requested()
                 mime, size = await self._pixiv.download(artwork.ugoira_zip_url, archive)
                 cancellation.raise_if_requested()
                 if mime not in {"application/zip", "application/octet-stream"}:
                     raise UpstreamError("invalid_media_type", "Ugoira ZIP 的媒体类型无效。")
-                records.append(MediaRecord("ugoiraZip", archive.name, mime, size))
             cancellation.raise_if_requested()
             await to_thread.run_sync(self._validate_zip, archive, artwork)
             cancellation.raise_if_requested()
+            width, height = await to_thread.run_sync(ugoira_dimensions, archive, artwork.ugoira_frames[0].file_name)
+            records.append(MediaRecord("ugoiraZip", archive.name, mime, size, width=width, height=height))
             metadata_path = stage / "ugoira.json"
             payload = {
                 "artworkId": artwork.remote_id,
@@ -358,7 +386,8 @@ class ArtworkDownloadService:
                 webp_quality,
             )
             mime_type = "image/webp"
-        return MediaRecord(role, source.name, mime_type, byte_size, page_index)
+        width, height = await to_thread.run_sync(image_dimensions, source)
+        return MediaRecord(role, source.name, mime_type, byte_size, page_index, width, height)
 
     @staticmethod
     def _transcode_to_webp(source: Path, quality: int) -> tuple[Path, int]:
@@ -414,6 +443,8 @@ class ArtworkDownloadService:
             relative_path=target.name,
             mime_type=record.mime_type,
             byte_size=record.byte_size,
+            width=record.width,
+            height=record.height,
         )
 
     @staticmethod
@@ -429,6 +460,8 @@ class ArtworkDownloadService:
 
     @staticmethod
     def _validate_zip(archive: Path, artwork: RemoteArtwork) -> None:
+        if not artwork.ugoira_frames:
+            raise UpstreamError("invalid_ugoira_zip", "Ugoira 缺少帧信息。")
         try:
             with zipfile.ZipFile(archive) as handle:
                 names = set(handle.namelist())
@@ -446,6 +479,17 @@ class ArtworkDownloadService:
         files = [path for path in stage.iterdir() if path.is_file()]
         if not files or any(path.stat().st_size <= 0 for path in files):
             raise UpstreamError("incomplete_stage", f"作品 {artwork.remote_id} 的临时文件不完整。")
+
+    def _create_animation(
+        self,
+        artwork_id: int,
+        library_root: Path,
+        media: Sequence[MediaRecord],
+        frames: Sequence[UgoiraFrame],
+        quality: int,
+    ) -> None:
+        archive = next(item for item in media if item.role == "ugoiraZip")
+        self._animations.ensure_animation(artwork_id, library_root / archive.relative_path, frames, quality)
 
     def _create_thumbnails(
         self,

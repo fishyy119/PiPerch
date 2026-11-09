@@ -19,14 +19,9 @@ import {
 } from '@/features/gallery/gallery-filter'
 import { useGallerySelectionStore } from '@/features/gallery/gallery-selection'
 import { artworkQueryKeys } from '@/features/library/library-query-cache'
-import GalleryBulkSelectionBar from '@/pages/gallery/GalleryBulkSelectionBar.vue'
-import GalleryFilterPopup from '@/pages/gallery/GalleryFilterPopup.vue'
-import GalleryPreferencesPopover from '@/pages/gallery/GalleryPreferencesPopover.vue'
-import LibraryArtworkCard from '@/pages/gallery/LibraryArtworkCard.vue'
-import TopbarActions from '@/pages/gallery/TopbarActions.vue'
+import TopbarActions from '@/shared/components/layout/TopbarActions.vue'
 import { errorMessage } from '@/shared/errors'
 import { firstQueryValue } from '@/shared/lib/route-query'
-import { useMarqueeSelection } from '@/shared/lib/useMarqueeSelection'
 import { usePageKeyboardShortcuts } from '@/shared/lib/usePageKeyboardShortcuts'
 import { Button } from '@ui/button'
 import { Card } from '@ui/card'
@@ -35,6 +30,12 @@ import { Pagination } from '@ui/pagination'
 import { SearchInput } from '@ui/search-input'
 import { toast } from '@ui/toast'
 
+import GalleryBulkSelectionBar from './components/GalleryBulkSelectionBar.vue'
+import GalleryFilterPopup from './components/GalleryFilterPopup.vue'
+import GalleryPreferencesPopover from './components/GalleryPreferencesPopover.vue'
+import GalleryGrid from './layouts/GalleryGrid.vue'
+import GalleryMasonry from './layouts/GalleryMasonry.vue'
+
 const route = useRoute()
 const router = useRouter()
 const queryClient = useQueryClient()
@@ -42,16 +43,8 @@ const selection = useGallerySelectionStore()
 const routeSearch = computed(() => firstQueryValue(route.query.search))
 const searchInput = ref(routeSearch.value)
 const filterOpen = ref(false)
-const preferredCardWidth = usePreference('gallery.cardWidth')
+const layout = usePreference('gallery.layout')
 const preferredPageSize = usePreference('gallery.pageSize')
-const galleryGrid = ref<HTMLElement | null>(null)
-const marquee = useMarqueeSelection(galleryGrid, {
-  enabled: () => selection.enabled,
-  selectedItems: () => selection.selectedIds,
-  setSelectedItems: selection.setSelected,
-  getKey: (id) => String(id),
-  resolveItem: (element) => positiveInt(element.dataset.selectionId),
-})
 
 function positiveInt(value: string | null | undefined) {
   const parsed = Number(value)
@@ -151,7 +144,6 @@ const refreshAuthorSummarysMutation = useMutation({
   mutationFn: () => listFollowedUsers(true),
   onSuccess: async () => {
     await queryClient.invalidateQueries({ queryKey: ['artworks', 'list'], refetchType: 'none' })
-    marquee.reset()
     selection.clear()
     if (pageNumber() === 0) await artworksQuery.refetch()
     else pushQuery({})
@@ -194,11 +186,11 @@ watch(routeSearch, (search) => {
 watch(
   () => route.fullPath,
   () => {
-    marquee.reset()
     selection.clear()
   },
 )
 watch(preferredPageSize, () => pushQuery({}))
+watch(layout, selection.reset)
 onBeforeUnmount(selection.reset)
 
 function pushQuery(changes: Record<string, string | string[] | undefined>, resetPage = true) {
@@ -271,7 +263,6 @@ usePageKeyboardShortcuts((event) => {
   if (currentPage + 1 < totalPages) setPage(currentPage + 1)
 })
 </script>
-<!-- TODO: 瀑布流 -->
 <template>
   <TopbarActions>
     <form
@@ -296,6 +287,7 @@ usePageKeyboardShortcuts((event) => {
       />
 
       <Button
+        v-if="layout === 'grid'"
         :variant="selection.enabled ? 'primary' : 'secondary'"
         class="hidden shrink-0 md:inline-flex"
         @click="selection.toggleMode"
@@ -321,7 +313,7 @@ usePageKeyboardShortcuts((event) => {
 
   <GalleryFilterPopup v-model:open="filterOpen" />
 
-  <div :class="selection.enabled ? 'pb-40 sm:pb-28' : ''">
+  <div :class="layout === 'grid' && selection.enabled ? 'pb-40 sm:pb-28' : ''">
     <div class="mb-5 grid gap-3 sm:hidden">
       <div class="flex gap-2">
         <FilterButton
@@ -330,6 +322,7 @@ usePageKeyboardShortcuts((event) => {
           @clear="clearFilters"
         />
         <Button
+          v-if="layout === 'grid'"
           :variant="selection.enabled ? 'primary' : 'secondary'"
           @click="selection.toggleMode"
         >
@@ -363,21 +356,14 @@ usePageKeyboardShortcuts((event) => {
     <div v-else-if="artworksQuery.error.value" class="py-20 text-center text-destructive">
       {{ artworksQuery.error.value.message }}
     </div>
-    <div
-      v-else-if="artworksQuery.data.value?.items.length"
-      ref="galleryGrid"
-      class="gallery-grid"
-      :class="{ 'select-none': selection.enabled }"
-      :style="{ '--gallery-card-width': `${String(preferredCardWidth)}px` }"
-      @click.capture="marquee.handleClick"
-    >
-      <LibraryArtworkCard
-        v-for="artwork in artworksQuery.data.value.items"
-        :key="artwork.localArtworkId"
-        :artwork="artwork"
-        :navigation-artwork-ids="navigationArtworkIds"
+    <template v-else-if="artworksQuery.data.value?.items.length">
+      <GalleryMasonry
+        v-if="layout === 'masonry'"
+        :key="route.fullPath"
+        :artworks="artworksQuery.data.value.items"
       />
-    </div>
+      <GalleryGrid v-else :key="route.fullPath" :artworks="artworksQuery.data.value.items" />
+    </template>
     <Card v-else class="py-20 text-center text-muted-foreground"> 图库中没有符合条件的作品。 </Card>
 
     <nav class="mt-8 flex justify-center">
@@ -391,16 +377,5 @@ usePageKeyboardShortcuts((event) => {
     </nav>
   </div>
 
-  <GalleryBulkSelectionBar :visible-artwork-ids="navigationArtworkIds" />
+  <GalleryBulkSelectionBar v-if="layout === 'grid'" :visible-artwork-ids="navigationArtworkIds" />
 </template>
-
-<style scoped>
-.gallery-grid {
-  display: grid;
-  grid-template-columns: repeat(
-    auto-fill,
-    minmax(min(100%, var(--gallery-card-width, 220px)), 1fr)
-  );
-  gap: 1.5rem 0.875rem;
-}
-</style>

@@ -180,6 +180,7 @@ async def test_download_writes_configured_image_format(
     assert qualities == ([67, 67, 67] if webp_enabled else [])
     assert commits.saved_media is not None
     media = commits.saved_media[0]
+    assert all((item.width, item.height) == (8, 8) for item in commits.saved_media)
     assert Path(media.relative_path).suffix == expected_suffix
     assert media.mime_type == ("image/webp" if webp_enabled else "image/png")
     saved = settings.library_root / media.relative_path

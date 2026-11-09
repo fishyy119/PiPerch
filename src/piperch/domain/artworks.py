@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import StrEnum
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 from piperch.domain.sources import ArtworkSource
 
@@ -65,6 +65,17 @@ class MediaRecord:
     mime_type: str
     byte_size: int
     page_index: int | None = None
+    width: int | None = None
+    height: int | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class ArtworkImageSummary:
+    artwork_id: int
+    role: Literal["page", "ugoira"]
+    page_index: int | None
+    width: int | None
+    height: int | None
 
 
 @dataclass(frozen=True, slots=True)

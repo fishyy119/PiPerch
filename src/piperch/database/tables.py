@@ -158,6 +158,8 @@ media_files = Table(
     Column("relative_path", Text, nullable=False, unique=True),
     Column("mime_type", String(100), nullable=False),
     Column("byte_size", BigInteger, nullable=False),
+    Column("width", Integer, nullable=True),
+    Column("height", Integer, nullable=True),
     Column("downloaded_at", String(40), nullable=False),
     UniqueConstraint("artwork_id", "role", "page_index", name="uq_media_artwork_role_page"),
     CheckConstraint("byte_size > 0", name="ck_media_files_size"),
