@@ -7,6 +7,7 @@ from sqlalchemy import Select, and_, case, delete, func, insert, literal, or_, s
 
 from piperch.database.tables import (
     artwork_group_items,
+    artwork_groups,
     artwork_tags,
     artworks,
     authors,
@@ -30,6 +31,7 @@ from piperch.domain.artworks import (
     TagSummary,
     UgoiraFrame,
 )
+from piperch.domain.groups import ArtworkGroupRecord
 from piperch.domain.sources import ArtworkSource
 from piperch.errors import NotFoundError
 from piperch.repositories._rows import (
@@ -503,6 +505,7 @@ class ArtworkRepository:
                 raise NotFoundError("未找到该作品。")
             summary = self._summaries_with_favorites(connection, [self._summary_from_row(row)])[0]
             local_tags = self._tags_for_artwork(connection, artwork_id)
+            local_groups = self._groups_for_artwork(connection, artwork_id)
             media_rows = connection.execute(
                 select(media_files)
                 .where(media_files.c.artwork_id == artwork_id)
@@ -517,6 +520,7 @@ class ArtworkRepository:
                 summary=summary,
                 description=_string(row["description"]),
                 tags=local_tags,
+                groups=local_groups,
                 media=tuple(
                     MediaRecord(
                         role=_string(item["role"]),
@@ -754,6 +758,18 @@ class ArtworkRepository:
             .order_by(tags.c.name.asc())
         ).mappings()
         return tuple(TagRecord(tag_id=_integer(row["id"]), name=_string(row["name"])) for row in rows)
+
+    @staticmethod
+    def _groups_for_artwork(connection: Connection, artwork_id: int) -> tuple[ArtworkGroupRecord, ...]:
+        rows = connection.execute(
+            select(artwork_groups.c.id, artwork_groups.c.name)
+            .select_from(
+                artwork_group_items.join(artwork_groups, artwork_group_items.c.group_id == artwork_groups.c.id)
+            )
+            .where(artwork_group_items.c.artwork_id == artwork_id)
+            .order_by(artwork_groups.c.name.asc(), artwork_groups.c.id.asc())
+        ).mappings()
+        return tuple(ArtworkGroupRecord(group_id=_integer(row["id"]), name=_string(row["name"])) for row in rows)
 
     @staticmethod
     def _summaries_with_favorites(

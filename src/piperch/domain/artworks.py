@@ -8,6 +8,7 @@ from piperch.domain.sources import ArtworkSource
 
 if TYPE_CHECKING:
     from piperch.domain.bookmarks import RemoteBookmarkReference
+    from piperch.domain.groups import ArtworkGroupRecord
 
 
 class ArtworkType(StrEnum):
@@ -103,6 +104,7 @@ class ArtworkDetail:
     summary: ArtworkSummary
     description: str
     tags: tuple[TagRecord, ...]
+    groups: tuple[ArtworkGroupRecord, ...]
     media: tuple[MediaRecord, ...]
     ugoira_frames: tuple[UgoiraFrame, ...]
 

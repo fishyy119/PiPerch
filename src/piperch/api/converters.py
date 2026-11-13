@@ -4,6 +4,7 @@ from collections.abc import Sequence
 
 from piperch.api.models import (
     ArtworkDetailResponse,
+    ArtworkGroupRecordResponse,
     ArtworkImageResponse,
     ArtworkSummaryResponse,
     DownloadItemResponse,
@@ -64,6 +65,7 @@ def artwork_detail_response(
             )
             for tag in detail.tags
         ],
+        groups=[ArtworkGroupRecordResponse(group_id=group.group_id, name=group.name) for group in detail.groups],
         images=[artwork_image_response(image) for image in images],
         ugoira_frames=[
             UgoiraFrameResponse(file_name=item.file_name, delay_ms=item.delay_ms) for item in detail.ugoira_frames

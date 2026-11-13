@@ -10,9 +10,18 @@ import { cn } from '@ui/cn'
 
 defineProps<{ artwork: ArtworkDetail }>()
 const router = useRouter()
+const capsuleClasses = cn(
+  'inline-flex cursor-pointer items-center gap-[0.35rem] rounded-full',
+  'px-[0.7rem] py-[0.35rem] text-xs',
+  'text-secondary-foreground transition-colors',
+)
 
 function filterByTag(tagId: number) {
   void router.push({ path: '/gallery', query: { tagId: String(tagId) } })
+}
+
+function filterByGroup(groupId: number) {
+  void router.push({ path: '/gallery', query: { groupId: String(groupId) } })
 }
 </script>
 
@@ -49,24 +58,28 @@ function filterByTag(tagId: number) {
     />
     <p v-else class="mt-5 text-sm text-muted-foreground">作者没有为这件作品添加说明。</p>
 
-    <div v-if="artwork.tags.length" class="mt-5 border-t pt-4">
+    <div v-if="artwork.tags.length || artwork.groups.length" class="mt-5 border-t pt-4">
       <h3 class="mb-2 text-xs font-medium text-muted-foreground">标签</h3>
       <div class="flex flex-wrap gap-2">
         <button
           v-for="tag in artwork.tags"
           :key="tag.tagId"
           type="button"
-          :class="
-            cn(
-              'inline-flex cursor-pointer items-center gap-[0.35rem] rounded-full',
-              'bg-secondary px-[0.7rem] py-[0.35rem] text-xs text-secondary-foreground',
-              'transition-colors hover:bg-accent hover:text-accent-foreground',
-            )
-          "
+          :class="cn(capsuleClasses, 'bg-secondary hover:bg-accent hover:text-accent-foreground')"
           @click="filterByTag(tag.tagId)"
           @contextmenu.prevent="writeToClipboard(tag.name)"
         >
           <span>{{ tag.name }}</span>
+        </button>
+        <button
+          v-for="group in artwork.groups"
+          :key="group.groupId"
+          type="button"
+          :class="cn(capsuleClasses, 'bg-success/10 hover:bg-success/15 hover:text-success')"
+          @click="filterByGroup(group.groupId)"
+          @contextmenu.prevent="writeToClipboard(group.name)"
+        >
+          <span>{{ group.name }}</span>
         </button>
       </div>
     </div>

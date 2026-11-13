@@ -650,6 +650,11 @@ def test_local_groups_can_organize_non_favorite_artworks(
     local_group = client.post("/api/groups", json={"name": "本地分组"})
     assert local_group.status_code == 200
     local_group_id = local_group.json()["groupId"]
+    container.groups.create_group("其他分组")
+
+    detail = client.get(f"/api/artworks/{local_id}")
+    assert detail.status_code == 200
+    assert detail.json()["groups"] == []
 
     grouped = client.put(
         f"/api/artworks/{local_id}/groups",
@@ -658,12 +663,28 @@ def test_local_groups_can_organize_non_favorite_artworks(
     assert grouped.status_code == 200
     assert grouped.json() == {"artworkId": local_id, "groupIds": [local_group_id]}
 
+    detail = client.get(f"/api/artworks/{local_id}")
+    assert detail.status_code == 200
+    assert detail.json()["groups"] == [{"groupId": local_group_id, "name": "本地分组"}]
+
     filtered = client.get(
         "/api/artworks",
         params=[("favorite", "no"), ("groupId", local_group_id)],
     )
     assert filtered.status_code == 200
     assert [item["artworkId"] for item in filtered.json()["items"]] == [local_id]
+
+    renamed = client.patch(f"/api/groups/{local_group_id}", json={"name": "重命名分组"})
+    assert renamed.status_code == 200
+    assert client.get(f"/api/artworks/{local_id}").json()["groups"] == [
+        {"groupId": local_group_id, "name": "重命名分组"}
+    ]
+
+    removed = client.put(f"/api/artworks/{local_id}/groups", json={"groupIds": []})
+    assert removed.status_code == 200
+    detail = client.get(f"/api/artworks/{local_id}").json()
+    assert detail["groupIds"] == []
+    assert detail["groups"] == []
 
 
 def test_artwork_deletion_protects_favorites_and_keeps_bulk_progress(

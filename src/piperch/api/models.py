@@ -328,6 +328,11 @@ class TagResponse(ApiModel):
     artwork_count: int | None = None
 
 
+class ArtworkGroupRecordResponse(ApiModel):
+    group_id: int
+    name: str
+
+
 class ArtworkSummaryResponse(ApiModel):
     artwork_id: int
     source: ArtworkSource
@@ -372,6 +377,7 @@ class ArtworkDetailResponse(ArtworkSummaryResponse):
     description: str
     local_linked_artworks: dict[int, int]
     tags: list[TagResponse]
+    groups: list[ArtworkGroupRecordResponse]
     images: list[ArtworkImageResponse]
     ugoira_frames: list[UgoiraFrameResponse]
 
@@ -417,9 +423,7 @@ class GroupNameRequest(ApiModel):
         return value.strip() if isinstance(value, str) else value
 
 
-class ArtworkGroupResponse(ApiModel):
-    group_id: int
-    name: str
+class ArtworkGroupResponse(ArtworkGroupRecordResponse):
     artwork_count: int
 
 

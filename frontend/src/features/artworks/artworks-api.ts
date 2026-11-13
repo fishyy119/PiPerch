@@ -2,6 +2,7 @@ import { z } from 'zod'
 
 import { artworkTypeSchema } from '@/features/artworks/artwork'
 import { artworkSourceSchema } from '@/features/artworks/artwork-source'
+import { artworkGroupSchema } from '@/features/groups/groups-api'
 import { api } from '@/shared/api/http'
 
 export const tagSchema = z.object({
@@ -74,6 +75,7 @@ export const artworkDetailSchema = artworkSummaryWireSchema
     description: z.string(),
     localLinkedArtworks: z.record(z.string(), z.number().int().positive()),
     tags: z.array(tagSchema),
+    groups: z.array(artworkGroupSchema.pick({ groupId: true, name: true })),
     images: z.array(artworkImageSchema),
     ugoiraFrames: z.array(z.object({ fileName: z.string(), delayMs: z.number().int() })),
   })

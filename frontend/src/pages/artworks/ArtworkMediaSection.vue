@@ -92,11 +92,7 @@ const favoriteMutation = useMutation({
 const groupMutation = useMutation({
   mutationFn: (request: { localArtworkId: number; groupIds: number[]; selected: boolean }) =>
     replaceArtworkGroups(request.localArtworkId, request.groupIds),
-  onSuccess: async (membership, request) => {
-    updateArtworkDetail(queryClient, membership.localArtworkId, (artwork) => ({
-      ...artwork,
-      groupIds: membership.groupIds,
-    }))
+  onSuccess: async (_, request) => {
     await invalidateArtworkGroupData(queryClient)
     toast.success(request.selected ? '已添加到本地分组' : '已从本地分组移除')
   },
@@ -107,12 +103,8 @@ const groupMutation = useMutation({
 
 const createAndAddGroupMutation = useMutation({
   mutationFn: createGroupAndAddArtwork,
-  onSuccess: async (membership) => {
+  onSuccess: async () => {
     createGroupOpen.value = false
-    updateArtworkDetail(queryClient, membership.localArtworkId, (artwork) => ({
-      ...artwork,
-      groupIds: membership.groupIds,
-    }))
     await invalidateArtworkGroupData(queryClient)
     toast.success('已创建本地分组并添加作品')
   },

@@ -16,9 +16,13 @@ MAX_ARTWORK_GROUPS = 10
 
 
 @dataclass(frozen=True, slots=True)
-class ArtworkGroup:
+class ArtworkGroupRecord:
     group_id: int
     name: str
+
+
+@dataclass(frozen=True, slots=True)
+class ArtworkGroup(ArtworkGroupRecord):
     artwork_count: int
 
 
