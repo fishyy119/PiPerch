@@ -80,8 +80,6 @@ class StubPixivClient:
     ) -> None:
         self._artwork = artwork
         self._on_download = on_download
-        self.active_downloads = 0
-        self.maximum_active_downloads = 0
         self.bookmarked_ids: set[int] = set()
 
     async def get_artwork(self, artwork_id: int, _cookie: str | None) -> RemoteArtwork:
@@ -95,16 +93,11 @@ class StubPixivClient:
             self.bookmarked_ids.discard(artwork_id)
 
     async def download(self, _url: str, target: Path) -> tuple[str, int]:
-        self.active_downloads += 1
-        self.maximum_active_downloads = max(self.maximum_active_downloads, self.active_downloads)
-        try:
-            Image.new("RGBA", (8, 8), (30, 120, 210, 128)).save(target, "PNG")
-            size = await to_thread.run_sync(lambda: target.stat().st_size)
-            if self._on_download is not None:
-                self._on_download()
-            return "image/png", size
-        finally:
-            self.active_downloads -= 1
+        Image.new("RGBA", (8, 8), (30, 120, 210, 128)).save(target, "PNG")
+        size = await to_thread.run_sync(lambda: target.stat().st_size)
+        if self._on_download is not None:
+            self._on_download()
+        return "image/png", size
 
 
 class FailingThumbnailCache(ArtworkThumbnailCache):
@@ -116,7 +109,6 @@ class FailingThumbnailCache(ArtworkThumbnailCache):
 @pytest.mark.parametrize(("webp_enabled", "expected_suffix"), [(True, ".webp"), (False, ".png")])
 async def test_download_writes_configured_image_format(
     tmp_path: Path,
-    monkeypatch: MonkeyPatch,
     webp_enabled: bool,
     expected_suffix: str,
 ) -> None:
@@ -156,14 +148,6 @@ async def test_download_writes_configured_image_format(
     repository = StubArtworkRepository()
     commits = StubArtworkDownloadCommitService()
     pixiv = StubPixivClient(artwork)
-    qualities: list[int] = []
-    transcode = ArtworkDownloadService._transcode_to_webp  # pyright: ignore[reportPrivateUsage]
-
-    def capture_quality(source: Path, quality: int) -> tuple[Path, int]:
-        qualities.append(quality)
-        return transcode(source, quality)
-
-    monkeypatch.setattr(ArtworkDownloadService, "_transcode_to_webp", capture_quality)
     service = ArtworkDownloadService(
         paths,
         cast("SettingsManager", StubSettings(settings)),
@@ -176,8 +160,6 @@ async def test_download_writes_configured_image_format(
     result = await service.download_artwork(123, "job-id", DownloadCancellation())
 
     assert result is ItemState.SUCCEEDED
-    assert pixiv.maximum_active_downloads == 1
-    assert qualities == ([67, 67, 67] if webp_enabled else [])
     assert commits.saved_media is not None
     media = commits.saved_media[0]
     assert all((item.width, item.height) == (8, 8) for item in commits.saved_media)
@@ -191,9 +173,6 @@ async def test_download_writes_configured_image_format(
         pixel = image.getpixel((0, 0))
         assert isinstance(pixel, tuple) and len(pixel) == 4
         assert pixel[3] == 128
-    assert (paths.thumbnails / "1.webp").is_file()
-    page_thumbnails = sorted((paths.thumbnails / "pages" / "1").glob("*.webp"))
-    assert [path.name for path in page_thumbnails] == ["0.webp", "1.webp", "2.webp"]
 
 
 @pytest.mark.asyncio

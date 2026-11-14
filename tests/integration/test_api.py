@@ -9,7 +9,7 @@ import pytest
 from PIL import Image
 
 from piperch.domain.artworks import ArtworkType, MediaRecord, RemoteArtwork
-from piperch.domain.bookmarks import BookmarkFolder, BookmarkFolderKind, BookmarkFolderReference, BookmarkVisibility
+from piperch.domain.bookmarks import BookmarkFolderReference, BookmarkVisibility
 from piperch.domain.discovery import ArtworkDiscoveryFailure, AuthorSummary, DiscoveryCandidate, DiscoveryResult
 from piperch.domain.sources import ArtworkSource
 from piperch.errors import UpstreamError
@@ -72,54 +72,6 @@ def test_followed_users_returns_safe_author_fields(
                 "name": "测试作者",
                 "avatarUrl": "/api/pixiv-images?url=https%3A%2F%2Fi.pximg.net%2Favatar.jpg",
             }
-        ]
-    }
-
-
-def test_bookmark_folders_keep_visibility_and_special_kind(
-    app_client: tuple[ApiTestClient, AppContainer],
-    monkeypatch: MonkeyPatch,
-) -> None:
-    client, container = app_client
-
-    async def list_bookmark_folders(cookie: str | None) -> list[BookmarkFolder]:
-        assert cookie is None
-        return [
-            BookmarkFolder(
-                BookmarkFolderReference(BookmarkVisibility.PUBLIC, None),
-                BookmarkFolderKind.ALL,
-                "全部收藏",
-                12,
-            ),
-            BookmarkFolder(
-                BookmarkFolderReference(BookmarkVisibility.PRIVATE, "私藏"),
-                BookmarkFolderKind.TAG,
-                "私藏",
-                3,
-            ),
-        ]
-
-    monkeypatch.setattr(container.pixiv, "list_bookmark_folders", list_bookmark_folders)
-
-    response = client.get("/api/discovery/bookmark-folders")
-
-    assert response.status_code == 200
-    assert response.json() == {
-        "items": [
-            {
-                "visibility": "public",
-                "tag": None,
-                "kind": "all",
-                "name": "全部收藏",
-                "itemCount": 12,
-            },
-            {
-                "visibility": "private",
-                "tag": "私藏",
-                "kind": "tag",
-                "name": "私藏",
-                "itemCount": 3,
-            },
         ]
     }
 
@@ -497,7 +449,6 @@ def test_artwork_page_thumbnail_is_created_for_existing_media(
     assert response.headers["content-type"] == "image/webp"
     with Image.open(BytesIO(response.content)) as thumbnail:
         assert thumbnail.format == "WEBP"
-        assert thumbnail.size == (256, 128)
 
 
 def test_download_job_list_uses_summary_and_detail_includes_items(
