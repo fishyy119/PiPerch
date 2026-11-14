@@ -21,8 +21,8 @@ export const dialogContentVariants = cva('fixed z-50 border-border shadow-2xl', 
 export const dialogOverlayVariants = cva('fixed inset-0 z-40', {
   variants: {
     position: {
-      center: 'bg-overlay/55',
-      top: 'bg-overlay/20',
+      center: 'bg-foreground/55 dark:bg-background/55',
+      top: 'bg-foreground/20 dark:bg-background/20',
     },
   },
   defaultVariants: { position: 'center' },

@@ -281,7 +281,7 @@ async function submitSelection() {
         <Download :size="18" />
         {{ submission.isPending ? '提交中…' : '创建下载任务' }}
       </Button>
-      <p v-if="notice" class="mt-3 text-sm text-success">{{ notice }}</p>
+      <p v-if="notice" class="mt-3 text-sm text-muted-foreground">{{ notice }}</p>
       <p v-if="submissionError" class="mt-3 text-sm text-destructive">
         {{ submissionError }}
       </p>

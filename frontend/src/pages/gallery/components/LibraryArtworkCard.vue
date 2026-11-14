@@ -100,7 +100,8 @@ function handleCardDragStart(event: DragEvent) {
           :class="
             cn(
               'absolute top-2 left-2 z-10 size-5',
-              'border-overlay-foreground/80 bg-overlay/55 shadow-sm backdrop-blur-sm transition',
+              'border-background/80 bg-foreground/55 shadow-sm backdrop-blur-sm transition',
+              'dark:border-foreground/80 dark:bg-background/55',
             )
           "
           :model-value="selection.isSelected(artwork.localArtworkId)"
@@ -122,10 +123,7 @@ function handleCardDragStart(event: DragEvent) {
           :disabled="favoriteMutation.isPending.value"
           @click.prevent.stop="favoriteMutation.mutate()"
         >
-          <Heart
-            :size="28"
-            :class="artwork.isFavorite ? 'fill-red-500 dark:fill-red-400' : 'fill-card'"
-          />
+          <Heart :size="28" :class="artwork.isFavorite ? 'fill-destructive' : 'fill-card'" />
         </button>
       </template>
 

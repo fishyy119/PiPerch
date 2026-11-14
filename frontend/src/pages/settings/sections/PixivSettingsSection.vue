@@ -60,7 +60,9 @@ const validationMutation = useMutation({
       <template #status>
         <span
           class="rounded-full px-2.5 py-0.5 text-xs"
-          :class="configured ? 'bg-success/15 text-success' : 'bg-warning/15 text-warning'"
+          :class="
+            configured ? 'bg-secondary text-secondary-foreground' : 'bg-muted text-muted-foreground'
+          "
         >
           {{ configured ? '已配置' : '未配置' }}
         </span>

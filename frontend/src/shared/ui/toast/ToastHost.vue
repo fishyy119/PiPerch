@@ -13,16 +13,16 @@ const toastOptions = {
       'bg-popover text-popover-foreground [&_[data-icon]]:text-primary',
     ].join(' '),
     success: [
-      'border-border border-l-4 border-l-success',
-      'bg-popover text-popover-foreground [&_[data-icon]]:text-success',
+      'border-border border-l-4 border-l-secondary',
+      'bg-popover text-popover-foreground [&_[data-icon]]:text-secondary',
     ].join(' '),
     info: [
       'border-border border-l-4 border-l-primary',
       'bg-popover text-popover-foreground [&_[data-icon]]:text-primary',
     ].join(' '),
     warning: [
-      'border-border border-l-4 border-l-warning',
-      'bg-popover text-popover-foreground [&_[data-icon]]:text-warning',
+      'border-border border-l-4 border-l-accent',
+      'bg-popover text-popover-foreground [&_[data-icon]]:text-accent',
     ].join(' '),
     error: [
       'border-border border-l-4 border-l-destructive',

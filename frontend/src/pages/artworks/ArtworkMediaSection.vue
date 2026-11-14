@@ -263,7 +263,7 @@ usePageKeyboardShortcuts(
       :active-index="lightboxInitialIndex"
       @change="handleLightboxIndexChange"
     >
-      <div class="h-80 bg-muted sm:h-120">
+      <div class="h-80 bg-muted/40 sm:h-120">
         <button
           type="button"
           class="flex size-full items-center justify-center p-2 sm:p-4"
@@ -300,7 +300,7 @@ usePageKeyboardShortcuts(
             decoding="async"
           />
           <span
-            class="absolute right-1 bottom-1 rounded bg-overlay/65 px-1.5 text-xs text-overlay-foreground"
+            class="absolute right-1 bottom-1 rounded bg-foreground/65 px-1.5 text-xs text-background dark:bg-background/65 dark:text-foreground"
           >
             {{ page + 1 }}
           </span>

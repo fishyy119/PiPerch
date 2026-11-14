@@ -20,14 +20,14 @@ withDefaults(
     </TooltipTrigger>
     <TooltipPortal>
       <TooltipContent
-        class="z-70 max-w-72 origin-(--reka-tooltip-content-transform-origin) rounded-lg bg-overlay px-2.5 py-1.5 text-xs text-overlay-foreground shadow-lg"
+        class="z-70 max-w-72 origin-(--reka-tooltip-content-transform-origin) rounded-lg bg-foreground px-2.5 py-1.5 text-xs text-background shadow-lg"
         data-app-floating-content
         :side="side"
         :align="align"
         :side-offset="6"
       >
         <slot name="content">{{ content }}</slot>
-        <TooltipArrow class="fill-overlay" :width="8" :height="4" />
+        <TooltipArrow class="fill-foreground" :width="8" :height="4" />
       </TooltipContent>
     </TooltipPortal>
   </TooltipRoot>

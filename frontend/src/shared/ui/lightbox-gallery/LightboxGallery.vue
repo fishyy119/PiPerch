@@ -123,9 +123,9 @@ watch(lightboxOpen, (open) => {
     <slot :open="openLightbox" />
 
     <DialogPortal>
-      <DialogOverlay class="fixed inset-0 z-40 bg-overlay/80" />
+      <DialogOverlay class="fixed inset-0 z-40 bg-foreground/80 dark:bg-background/80" />
       <DialogContent
-        class="artwork-lightbox fixed inset-0 z-50 overflow-hidden text-overlay-foreground outline-none"
+        class="artwork-lightbox fixed inset-0 z-50 overflow-hidden text-background outline-none dark:text-foreground"
       >
         <DialogTitle class="sr-only">作品预览</DialogTitle>
         <DialogDescription class="sr-only">全屏查看当前作品</DialogDescription>
@@ -143,7 +143,7 @@ watch(lightboxOpen, (open) => {
             draggable="false"
           />
           <output
-            class="absolute top-4 left-4 rounded-full bg-overlay/65 px-3 py-1 text-sm text-overlay-foreground tabular-nums sm:top-6 sm:left-6"
+            class="absolute top-4 left-4 rounded-full bg-foreground/65 px-3 py-1 text-sm text-background tabular-nums sm:top-6 sm:left-6 dark:bg-background/65 dark:text-foreground"
           >
             {{ currentIndex + 1 }} / {{ items.length }}
           </output>

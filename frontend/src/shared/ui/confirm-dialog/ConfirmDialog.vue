@@ -38,7 +38,11 @@ function updateOpen(open: boolean) {
         leave-from-class="opacity-100"
         leave-to-class="opacity-0"
       >
-        <AlertDialogOverlay v-if="open" force-mount class="fixed inset-0 z-40 bg-overlay/55" />
+        <AlertDialogOverlay
+          v-if="open"
+          force-mount
+          class="fixed inset-0 z-40 bg-foreground/55 dark:bg-background/55"
+        />
       </Transition>
       <Transition
         enter-active-class="transition duration-150 ease-out"

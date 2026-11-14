@@ -92,13 +92,13 @@ function handleCardClick(event: MouseEvent) {
     <template #trailing-action>
       <span
         v-if="inLibrary"
-        class="absolute right-2 bottom-2 z-10 rounded-lg bg-success px-2 py-1 text-xs font-medium text-success-foreground shadow-sm"
+        class="absolute right-2 bottom-2 z-10 rounded-lg bg-secondary px-2 py-1 text-xs font-medium text-secondary-foreground shadow-sm"
       >
         已在图库
       </span>
       <span
         v-else-if="artwork.previewOnly"
-        class="absolute right-2 bottom-2 z-10 rounded-lg bg-overlay/75 px-2 py-1 text-xs font-medium text-overlay-foreground shadow-sm"
+        class="absolute right-2 bottom-2 z-10 rounded-lg bg-foreground/75 px-2 py-1 text-xs font-medium text-background shadow-sm dark:bg-background/75 dark:text-foreground"
       >
         仅预览图
       </span>

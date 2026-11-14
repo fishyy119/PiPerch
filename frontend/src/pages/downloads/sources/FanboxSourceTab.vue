@@ -170,7 +170,7 @@ if (request?.sourceType === 'user') {
       </Button>
     </template>
     <template v-if="notice || selectAllMutation.error.value" #errors>
-      <p v-if="notice" class="px-4 pb-3 text-sm text-success">{{ notice }}</p>
+      <p v-if="notice" class="px-4 pb-3 text-sm text-muted-foreground">{{ notice }}</p>
       <p v-if="selectAllMutation.error.value" class="px-4 pb-3 text-sm text-destructive">
         {{ errorMessage(selectAllMutation.error.value) }}
       </p>

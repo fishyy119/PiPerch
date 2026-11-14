@@ -15,7 +15,7 @@ useSettingsLoadFeedback()
 <template>
   <div class="grid min-h-[calc(100vh-4rem)] grid-cols-[14rem_minmax(0,1fr)] items-start">
     <aside
-      class="sticky top-16 flex h-[calc(100vh-4rem)] flex-col border-r border-sidebar-border bg-sidebar p-4 text-sidebar-foreground"
+      class="sticky top-16 flex h-[calc(100vh-4rem)] flex-col border-r border-border bg-card p-4 text-card-foreground"
     >
       <nav class="grid gap-1">
         <button
@@ -26,8 +26,8 @@ useSettingsLoadFeedback()
             cn(
               'flex cursor-pointer items-center gap-2.5 rounded-xl px-3 py-2.5 text-left text-sm transition',
               activeSection === section.id
-                ? 'bg-sidebar-accent text-sidebar-accent-foreground'
-                : 'text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
+                ? 'bg-accent/15 text-foreground'
+                : 'text-muted-foreground hover:bg-accent/10 hover:text-foreground',
             )
           "
           @click="scrollToSection(section.id)"

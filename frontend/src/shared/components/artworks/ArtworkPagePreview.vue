@@ -120,7 +120,7 @@ function hidePreviewOnFocusOut(event: FocusEvent) {
             'absolute top-2 right-2 z-10',
             'max-w-[calc(100%-2rem)]',
             'grid grid-cols-[repeat(auto-fit,0.625rem)] justify-between gap-0.5 rounded-md p-1',
-            'bg-overlay/55 shadow-sm backdrop-blur-sm transition',
+            'bg-foreground/55 shadow-sm backdrop-blur-sm transition dark:bg-background/55',
             previewOpen
               ? 'opacity-100'
               : 'opacity-0 group-hover:opacity-100 focus-within:opacity-100',
@@ -135,7 +135,7 @@ function hidePreviewOnFocusOut(event: FocusEvent) {
           :class="
             cn(
               'size-2.5 rounded-full',
-              'bg-overlay-foreground/70 ring-1 ring-overlay/20 transition',
+              'bg-background/70 ring-1 ring-foreground/20 transition dark:bg-foreground/70 dark:ring-background/20',
               'hover:scale-125 hover:bg-primary focus-visible:scale-125 focus-visible:bg-primary',
               { 'bg-primary!': previewOpen && previewPage === page - 1 },
             )
@@ -177,7 +177,7 @@ function hidePreviewOnFocusOut(event: FocusEvent) {
         />
       </div>
       <span
-        class="absolute right-3 bottom-3 rounded-lg bg-overlay/65 px-2 py-1 text-xs text-overlay-foreground backdrop-blur-sm"
+        class="absolute right-3 bottom-3 rounded-lg bg-foreground/65 px-2 py-1 text-xs text-background backdrop-blur-sm dark:bg-background/65 dark:text-foreground"
       >
         {{ previewPage + 1 }} / {{ pageCount }}
       </span>

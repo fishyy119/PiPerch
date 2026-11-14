@@ -13,7 +13,7 @@ const router = useRouter()
 const capsuleClasses = cn(
   'inline-flex cursor-pointer items-center gap-[0.35rem] rounded-full',
   'px-[0.7rem] py-[0.35rem] text-xs',
-  'text-secondary-foreground transition-colors',
+  'text-foreground transition-colors hover:bg-accent hover:text-accent-foreground',
 )
 
 function filterByTag(tagId: number) {
@@ -65,7 +65,7 @@ function filterByGroup(groupId: number) {
           v-for="tag in artwork.tags"
           :key="tag.tagId"
           type="button"
-          :class="cn(capsuleClasses, 'bg-secondary hover:bg-accent hover:text-accent-foreground')"
+          :class="cn(capsuleClasses, 'bg-muted')"
           @click="filterByTag(tag.tagId)"
           @contextmenu.prevent="writeToClipboard(tag.name)"
         >
@@ -75,7 +75,7 @@ function filterByGroup(groupId: number) {
           v-for="group in artwork.groups"
           :key="group.groupId"
           type="button"
-          :class="cn(capsuleClasses, 'bg-success/10 hover:bg-success/15 hover:text-success')"
+          :class="cn(capsuleClasses, 'bg-primary/20')"
           @click="filterByGroup(group.groupId)"
           @contextmenu.prevent="writeToClipboard(group.name)"
         >

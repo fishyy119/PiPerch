@@ -237,7 +237,7 @@ function toggleAllWorks() {
       </Button>
     </template>
     <template v-if="selectionNotice || selectAllMutation.error.value" #errors>
-      <p v-if="selectionNotice" class="px-4 pb-3 text-sm text-success">
+      <p v-if="selectionNotice" class="px-4 pb-3 text-sm text-muted-foreground">
         {{ selectionNotice }}
       </p>
       <p v-if="selectAllMutation.error.value" class="px-4 pb-3 text-sm text-destructive">

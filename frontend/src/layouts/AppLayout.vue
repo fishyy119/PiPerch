@@ -59,7 +59,7 @@ const navigation = [
   <div class="min-h-screen lg:grid lg:grid-cols-[15rem_1fr]">
     <div
       v-if="mobileOpen"
-      class="fixed inset-0 z-30 bg-overlay/45 lg:hidden"
+      class="fixed inset-0 z-30 bg-foreground/45 lg:hidden dark:bg-background/45"
       @click="mobileOpen = false"
     />
     <aside
@@ -67,7 +67,7 @@ const navigation = [
         cn(
           'fixed inset-y-0 left-0 z-40 w-60 -translate-x-full lg:sticky lg:top-0 lg:h-screen lg:translate-x-0',
           'flex flex-col transition',
-          'border-r border-sidebar-border bg-sidebar text-sidebar-foreground',
+          'border-r border-border bg-card text-card-foreground',
           mobileOpen ? 'translate-x-0' : '',
         )
       "
@@ -75,7 +75,7 @@ const navigation = [
       <div class="flex h-16 items-center justify-between border-b px-5">
         <RouterLink to="/gallery" class="flex items-center gap-3" @click="mobileOpen = false">
           <span
-            class="grid size-9 place-items-center rounded-xl bg-sidebar-primary font-bold text-sidebar-primary-foreground"
+            class="grid size-9 place-items-center rounded-xl bg-primary font-bold text-primary-foreground"
             >P</span
           >
           <span>
@@ -92,8 +92,8 @@ const navigation = [
           v-for="item in navigation"
           :key="item.to"
           :to="item.to"
-          class="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-muted-foreground transition hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-          active-class="bg-sidebar-accent! text-sidebar-accent-foreground!"
+          class="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-muted-foreground transition hover:bg-accent/10 hover:text-foreground"
+          active-class="bg-accent/15! text-foreground!"
           @click="mobileOpen = false"
         >
           <component :is="item.icon" :size="19" />
