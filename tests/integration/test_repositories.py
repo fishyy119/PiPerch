@@ -251,46 +251,38 @@ def test_download_commit_initializes_bookmark_state_only_for_new_artwork(tmp_pat
     assert [(group.name, group.artwork_count) for group in imported_groups] == [("Pixiv标签", 1)]
 
 
-def test_related_artworks_combine_author_and_shared_tags(tmp_path: Path) -> None:
+def test_related_artworks_recall_all_relations_and_prefer_rare_tags(tmp_path: Path) -> None:
     _, database, _, artworks, commits, _ = _repositories(tmp_path)
-    target = _artwork(1, ("风景", "蓝天"))
-    candidates = (
-        _artwork(2, ("人物",)),
-        replace(
-            _artwork(3, target.tags),
-            author_id=200,
-            author_name="其他作者",
-        ),
-        replace(
-            _artwork(4, ("风景",)),
-            author_id=201,
-            author_name="第三作者",
-        ),
-        replace(
-            _artwork(5, ("无关",)),
-            author_id=202,
-            author_name="无关作者",
-        ),
+    records = (
+        (1, 100, ("常见标签", "稀有标签")),
+        (2, 100, ("常见标签",)),
+        (3, 200, ("稀有标签",)),
+        (4, 201, ("常见标签",)),
+        (5, 202, ()),
+        (6, 100, ()),
+        (7, 203, ("无关标签",)),
     )
+    local_ids: dict[int, int] = {}
     try:
-        for artwork in (target, *candidates):
-            commits.commit(
+        for remote_id, author_id, tags in records:
+            artwork = replace(_artwork(remote_id, tags), author_id=author_id)
+            local_ids[remote_id] = commits.commit(
                 artwork,
-                [
-                    MediaRecord(
-                        "page",
-                        f"{artwork.author_id}/{artwork.remote_id}/{artwork.remote_id}_p0.jpg",
-                        "image/jpeg",
-                        10,
-                        0,
-                    )
-                ],
+                [MediaRecord("page", f"{author_id}/{remote_id}/{remote_id}_p0.jpg", "image/jpeg", 10, 0)],
             )
-        related = artworks.list_related_artworks(1, 10)
+        groups = ArtworkGroupRepository(database)
+        group = groups.create_group("共同分组")
+        for remote_id in (1, 2, 5):
+            groups.replace_groups(local_ids[remote_id], group_ids=(group.group_id,))
+        artworks.initialize_related_artwork_baselines()
+        related = artworks.list_related_artworks(local_ids[1], 10)
     finally:
         database.close()
 
-    assert [item.artwork_id for item in related] == [2, 3, 4]
+    related_ids = [item.remote_id for item in related]
+    assert sorted(related_ids) == [2, 3, 4, 5, 6]
+    assert related_ids.index(2) < related_ids.index(4)
+    assert related_ids.index(3) < related_ids.index(4)
 
 
 def test_same_remote_id_stays_isolated_through_pixiv_sync_and_fanbox_deletion(tmp_path: Path) -> None:

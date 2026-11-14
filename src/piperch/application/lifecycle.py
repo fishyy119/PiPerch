@@ -168,6 +168,7 @@ async def lifespan(app: FastAPI, *, paths: AppPaths, control: AppControl) -> Asy
     try:
         await to_thread.run_sync(tag_search_index.synchronize)
         await to_thread.run_sync(backfill_media_dimensions, database, settings_manager.get().library_root)
+        await to_thread.run_sync(artwork_repository.initialize_related_artwork_baselines)
         await supervisor.start()
         yield
     finally:

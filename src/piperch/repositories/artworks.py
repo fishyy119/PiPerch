@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from dataclasses import replace
 from typing import TYPE_CHECKING, ClassVar, Literal, cast
 
@@ -32,6 +33,12 @@ from piperch.domain.artworks import (
     UgoiraFrame,
 )
 from piperch.domain.groups import ArtworkGroupRecord
+from piperch.domain.recommendations import (
+    SAME_AUTHOR_EQUIVALENT_TAGS,
+    SHARED_GROUP_EQUIVALENT_TAGS,
+    inverse_document_frequency,
+    shared_idf_baseline,
+)
 from piperch.domain.sources import ArtworkSource
 from piperch.errors import NotFoundError
 from piperch.repositories._rows import (
@@ -58,6 +65,9 @@ if TYPE_CHECKING:
     from piperch.database import Database
 
 
+logger = logging.getLogger(__name__)
+
+
 class ArtworkRepository:
     _RANDOM_MODULUS: ClassVar[int] = 2_147_483_647
     _SORT_COLUMNS: ClassVar[dict[str, ColumnElement[object]]] = {
@@ -69,6 +79,36 @@ class ArtworkRepository:
 
     def __init__(self, database: Database) -> None:
         self._database = database
+        self._tag_idf_baseline = 1.0
+        self._group_idf_baseline = 1.0
+
+    def initialize_related_artwork_baselines(self) -> None:
+        """仅在启动时统计推荐分值基准，运行期间保留该尺度。"""
+        with self._database.connect() as connection:
+            artwork_count = int(connection.scalar(select(func.count()).select_from(artworks)) or 0)
+            self._tag_idf_baseline = shared_idf_baseline(
+                artwork_count,
+                (
+                    int(frequency)
+                    for frequency in connection.scalars(
+                        select(func.count()).select_from(artwork_tags).group_by(artwork_tags.c.tag_id)
+                    )
+                ),
+            )
+            self._group_idf_baseline = shared_idf_baseline(
+                artwork_count,
+                (
+                    int(frequency)
+                    for frequency in connection.scalars(
+                        select(func.count()).select_from(artwork_group_items).group_by(artwork_group_items.c.group_id)
+                    )
+                ),
+            )
+        logger.info(
+            "相关作品 IDF 基准计算完成: 标签 %.6f，分组 %.6f。",
+            self._tag_idf_baseline,
+            self._group_idf_baseline,
+        )
 
     def find_existing_ids(self, artwork_ids: Sequence[int], source: ArtworkSource = ArtworkSource.PIXIV) -> set[int]:
         """返回指定来源已经入库的原始作品 ID，供远端预览与选择使用。"""
@@ -420,7 +460,7 @@ class ArtworkRepository:
         return int(artwork_id) if artwork_id is not None else None
 
     def list_related_artworks(self, artwork_id: int, limit: int) -> list[ArtworkSummary]:
-        """按同作者和共享标签的加权分数返回本地相关作品。"""
+        """以基准标签为评分单位，累计作者关联和标签、分组的实时 IDF。"""
         with self._database.connect() as connection:
             target_author_id = connection.scalar(select(artworks.c.author_id).where(artworks.c.id == artwork_id))
             if target_author_id is None:
@@ -428,51 +468,69 @@ class ArtworkRepository:
             target_tag_ids = tuple(
                 connection.scalars(select(artwork_tags.c.tag_id).where(artwork_tags.c.artwork_id == artwork_id))
             )
-
-            author_score = case(
-                (artworks.c.author_id == target_author_id, 10),
-                else_=0,
+            target_group_ids = tuple(
+                connection.scalars(
+                    select(artwork_group_items.c.group_id).where(artwork_group_items.c.artwork_id == artwork_id)
+                )
             )
-            if target_tag_ids:
-                shared_tag_count = func.count(
-                    func.distinct(
-                        case(
-                            (
-                                artwork_tags.c.tag_id.in_(target_tag_ids),
-                                artwork_tags.c.tag_id,
-                            ),
-                            else_=None,
-                        )
-                    )
-                )
-                candidate_condition = or_(
-                    artworks.c.author_id == target_author_id,
-                    artwork_tags.c.tag_id.in_(target_tag_ids),
-                )
-            else:
-                shared_tag_count = literal(0)
-                candidate_condition = artworks.c.author_id == target_author_id
 
-            candidate_scores = (
+            artwork_count = int(connection.scalar(select(func.count()).select_from(artworks)) or 0)
+            tag_weights = {
+                int(tag_id): inverse_document_frequency(artwork_count, int(frequency)) / self._tag_idf_baseline
+                for tag_id, frequency in connection.execute(
+                    select(artwork_tags.c.tag_id, func.count())
+                    .where(artwork_tags.c.tag_id.in_(target_tag_ids))
+                    .group_by(artwork_tags.c.tag_id)
+                )
+            }
+            group_weights = {
+                int(group_id): inverse_document_frequency(artwork_count, int(frequency)) / self._group_idf_baseline
+                for group_id, frequency in connection.execute(
+                    select(artwork_group_items.c.group_id, func.count())
+                    .where(artwork_group_items.c.group_id.in_(target_group_ids))
+                    .group_by(artwork_group_items.c.group_id)
+                )
+            }
+            tag_weight = case(tag_weights, value=artwork_tags.c.tag_id, else_=0.0) if tag_weights else literal(0.0)
+            group_weight = (
+                case(group_weights, value=artwork_group_items.c.group_id, else_=0.0) if group_weights else literal(0.0)
+            )
+            # 各自先聚合再关联，确保不同标签或分组即使权重相同也分别计分。
+            tag_scores = (
                 select(
-                    artworks.c.id.label("artwork_id"),
-                    (author_score + shared_tag_count * 2).label("score"),
+                    artwork_tags.c.artwork_id,
+                    func.sum(tag_weight).label("score"),
                 )
-                .select_from(
-                    artworks.outerjoin(
-                        artwork_tags,
-                        artworks.c.id == artwork_tags.c.artwork_id,
-                    )
-                )
-                .where(artworks.c.id != artwork_id, candidate_condition)
-                .group_by(artworks.c.id)
+                .where(artwork_tags.c.tag_id.in_(target_tag_ids))
+                .group_by(artwork_tags.c.artwork_id)
                 .subquery()
             )
-            base = (
-                candidate_scores.join(
-                    artworks,
-                    candidate_scores.c.artwork_id == artworks.c.id,
+            group_scores = (
+                select(
+                    artwork_group_items.c.artwork_id,
+                    func.sum(group_weight).label("score"),
                 )
+                .where(artwork_group_items.c.group_id.in_(target_group_ids))
+                .group_by(artwork_group_items.c.artwork_id)
+                .subquery()
+            )
+            author_score = case(
+                (artworks.c.author_id == target_author_id, SAME_AUTHOR_EQUIVALENT_TAGS),
+                else_=0.0,
+            )
+            score = (
+                author_score
+                + func.coalesce(tag_scores.c.score, 0.0)
+                + func.coalesce(group_scores.c.score, 0.0) * SHARED_GROUP_EQUIVALENT_TAGS
+            )
+            candidate_condition = or_(
+                artworks.c.author_id == target_author_id,
+                tag_scores.c.artwork_id.is_not(None),
+                group_scores.c.artwork_id.is_not(None),
+            )
+            base = (
+                artworks.outerjoin(tag_scores, tag_scores.c.artwork_id == artworks.c.id)
+                .outerjoin(group_scores, group_scores.c.artwork_id == artworks.c.id)
                 .join(authors, artworks.c.author_id == authors.c.id)
                 .outerjoin(series, artworks.c.series_id == series.c.id)
             )
@@ -483,8 +541,9 @@ class ArtworkRepository:
                     series.c.title.label("series_title"),
                 )
                 .select_from(base)
+                .where(artworks.c.id != artwork_id, candidate_condition)
                 .order_by(
-                    candidate_scores.c.score.desc(),
+                    score.desc(),
                     artworks.c.downloaded_at.desc(),
                     artworks.c.id.desc(),
                 )

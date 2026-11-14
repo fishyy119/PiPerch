@@ -35,7 +35,9 @@ const gridStyle = computed(() => ({
     <div class="mb-4 flex items-start justify-between gap-3">
       <div>
         <h2 class="font-semibold">相关作品</h2>
-        <p class="mt-1 text-xs text-muted-foreground">根据本地作品的作者和共享标签推荐。</p>
+        <p class="mt-1 text-xs text-muted-foreground">
+          根据本地作品的作者、共享标签和共享分组推荐。
+        </p>
       </div>
       <SettingsPopover title="相关作品显示设置">
         <div class="w-64 space-y-4">
