@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { CheckSquare, RefreshCw } from '@lucide/vue'
+import { CheckSquare, LayoutDashboard, LayoutGrid, RefreshCw } from '@lucide/vue'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query'
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
@@ -316,7 +316,17 @@ usePageKeyboardShortcuts((event) => {
       />
       <span class="hidden lg:inline">刷新关注</span>
     </Button>
-    <div class="ml-auto shrink-0"><GalleryPreferencesPopover /></div>
+    <div class="ml-auto flex shrink-0 items-center gap-2">
+      <Button
+        variant="secondary"
+        size="icon"
+        :title="layout === 'grid' ? '切换为瀑布流视图' : '切换为网格视图'"
+        @click="layout = layout === 'grid' ? 'masonry' : 'grid'"
+      >
+        <component :is="layout === 'grid' ? LayoutDashboard : LayoutGrid" :size="18" />
+      </Button>
+      <GalleryPreferencesPopover />
+    </div>
   </TopbarActions>
 
   <GalleryFilterPopup v-model:open="filterOpen" />

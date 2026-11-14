@@ -25,15 +25,6 @@ const pageSizeOptions = [24, 48, 96].map((size) => ({
   value: String(size),
   label: `${String(size)} 项`,
 }))
-const layoutOptions = [
-  { value: 'grid', label: '网格' },
-  { value: 'masonry', label: '瀑布流' },
-]
-
-function setLayout(value: string) {
-  if (value === 'grid' || value === 'masonry') layout.value = value
-}
-
 function setPageSize(value: string) {
   const selected = pageSizeOptions.find((option) => option.value === value)
   if (selected !== undefined) pageSize.value = Number(selected.value)
@@ -43,15 +34,6 @@ function setPageSize(value: string) {
 <template>
   <SettingsPopover title="图库显示设置">
     <div class="space-y-5">
-      <div class="flex items-center justify-between gap-3">
-        <p class="text-sm font-medium">视图布局</p>
-        <Select
-          size="small"
-          :options="layoutOptions"
-          :model-value="layout"
-          @update:model-value="setLayout"
-        />
-      </div>
       <div class="space-y-2">
         <p class="text-sm font-medium">{{ layout === 'masonry' ? '图片大小' : '卡片大小' }}</p>
         <div class="flex items-center gap-3">
