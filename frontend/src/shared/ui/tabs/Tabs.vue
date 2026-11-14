@@ -32,6 +32,7 @@ const model = defineModel<string>({ required: true })
               'min-h-8 cursor-pointer rounded-lg px-3',
               'text-sm font-medium text-muted-foreground transition',
               'data-[state=active]:bg-background data-[state=active]:text-foreground',
+              'data-[state=inactive]:enabled:hover:bg-background/60 data-[state=inactive]:enabled:hover:text-foreground',
               'data-disabled:cursor-not-allowed data-disabled:opacity-50',
             )
           "
