@@ -52,6 +52,7 @@ function jump() {
       :size="compact ? 'icon' : 'default'"
       title="上一页"
       :disabled="page === 0 || pending"
+      @pointerdown.prevent
       @click="emit('loadPage', page - 1)"
     >
       <ChevronLeft :size="17" /><template v-if="!compact">上一页</template>
@@ -69,6 +70,7 @@ function jump() {
           inputmode="numeric"
           pattern="[0-9]+"
           :disabled="pending || totalPages <= 1"
+          @blur="jump"
         />
         / {{ Math.max(1, totalPages) }} 页
       </label>
@@ -81,6 +83,7 @@ function jump() {
       :size="compact ? 'icon' : 'default'"
       title="下一页"
       :disabled="nextPage === null || pending"
+      @pointerdown.prevent
       @click="nextPage !== null && emit('loadPage', nextPage)"
     >
       <template v-if="!compact">下一页</template><ChevronRight :size="17" />

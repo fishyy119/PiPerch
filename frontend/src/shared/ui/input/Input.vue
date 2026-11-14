@@ -7,7 +7,10 @@ const props = withDefaults(
   { modelValue: '', modelModifiers: () => ({}) },
 )
 
-const emit = defineEmits<{ 'update:modelValue': [value: string | number] }>()
+const emit = defineEmits<{
+  'update:modelValue': [value: string | number]
+  blur: [event: FocusEvent]
+}>()
 
 function updateValue(event: Event) {
   const input = event.currentTarget
@@ -24,5 +27,6 @@ function updateValue(event: Event) {
     :value="modelValue"
     class="min-h-10 w-full rounded-xl border border-input bg-background px-3 py-2 text-foreground disabled:cursor-not-allowed disabled:opacity-50"
     @input="updateValue"
+    @blur="emit('blur', $event)"
   />
 </template>
