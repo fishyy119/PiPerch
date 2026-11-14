@@ -51,7 +51,7 @@ def artwork_image_response(image: ArtworkImageSummary) -> ArtworkImageResponse:
 
 def artwork_detail_response(
     detail: ArtworkDetail,
-    local_linked_artworks: dict[int, int],
+    local_linked_artworks: dict[str, int],
     images: Sequence[ArtworkImageSummary],
 ) -> ArtworkDetailResponse:
     return ArtworkDetailResponse(

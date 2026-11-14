@@ -26,7 +26,7 @@ from piperch.api.models import (
 from piperch.application.container import AppContainer
 from piperch.domain.artworks import ArtworkType
 from piperch.errors import ConflictError, NotFoundError
-from piperch.pixiv.parsing import parse_artwork_ids
+from piperch.services.artwork_links import parse_artwork_links
 
 router = APIRouter(tags=["gallery"])
 PositiveId = Annotated[int, Field(gt=0)]
@@ -102,8 +102,12 @@ def get_artwork(
     container: AppContainer = Depends(get_container),
 ) -> ArtworkDetailResponse:
     detail = container.artworks.get_detail(artwork_id)
-    linked_artwork_ids = parse_artwork_ids([detail.description])
-    local_linked_artworks = container.artworks.find_local_ids(linked_artwork_ids)
+    local_linked_artworks: dict[str, int] = {}
+    for source, links in parse_artwork_links(detail.description).items():
+        local_ids = container.artworks.find_local_ids(list(links.values()), source)
+        local_linked_artworks.update(
+            {href: local_ids[remote_id] for href, remote_id in links.items() if remote_id in local_ids}
+        )
     return artwork_detail_response(
         detail,
         local_linked_artworks,

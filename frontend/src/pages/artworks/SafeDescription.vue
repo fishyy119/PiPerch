@@ -3,8 +3,6 @@ import DOMPurify from 'dompurify'
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 
-import { pixivArtworkIdFromUrl } from '@/features/artworks/pixiv-artwork-link'
-
 const props = defineProps<{
   html: string
   localArtworks: Record<string, number>
@@ -20,9 +18,8 @@ const clean = computed(() => {
     const href = anchor.getAttribute('href')
     if (href === null) return
 
-    const artworkId = pixivArtworkIdFromUrl(href)
-    const localId = artworkId === null ? undefined : props.localArtworks[String(artworkId)]
-    if (localId !== undefined) {
+    const localId = props.localArtworks[href]
+    if (typeof localId === 'number') {
       anchor.href = `/artworks/${String(localId)}`
       anchor.dataset.localArtworkId = String(localId)
       anchor.removeAttribute('target')
@@ -52,7 +49,7 @@ function navigateToLocalArtwork(event: MouseEvent) {
 </script>
 
 <template>
-  <!-- Pixiv 简介经 DOMPurify 清理后才允许渲染。 -->
+  <!-- 作品简介经 DOMPurify 清理后才允许渲染。 -->
   <!-- eslint-disable-next-line vue/no-v-html -->
   <div class="safe-description" @click="navigateToLocalArtwork" v-html="clean" />
 </template>

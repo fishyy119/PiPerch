@@ -375,7 +375,7 @@ class UgoiraFrameResponse(ApiModel):
 
 class ArtworkDetailResponse(ArtworkSummaryResponse):
     description: str
-    local_linked_artworks: dict[int, int]
+    local_linked_artworks: dict[str, int]
     tags: list[TagResponse]
     groups: list[ArtworkGroupRecordResponse]
     images: list[ArtworkImageResponse]
