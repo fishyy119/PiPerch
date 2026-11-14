@@ -2,6 +2,7 @@
 import { Search } from '@lucide/vue'
 import { computed, ref } from 'vue'
 
+import { useDownloadWorkspaceStore } from '@/features/downloads/download-workspace'
 import DiscoverySourceLayout from '@/pages/downloads/DiscoverySourceLayout.vue'
 import { errorMessage } from '@/shared/errors'
 import { Button } from '@ui/button'
@@ -10,6 +11,7 @@ import { Textarea } from '@ui/textarea'
 import { useDiscoveryPagination } from './useDiscoveryPagination'
 
 const sourceInput = ref('')
+const { takePreviewRequest } = useDownloadWorkspaceStore()
 const { candidates, page, nextPage, totalPages, emptyMessage, mutation, loadPage } =
   useDiscoveryPagination((targetPage) => {
     const inputs = sourceInput.value
@@ -21,6 +23,12 @@ const { candidates, page, nextPage, totalPages, emptyMessage, mutation, loadPage
     return { sourceType: 'artwork', inputs, page: targetPage }
   })
 const failures = computed(() => mutation.data.value?.failures ?? [])
+
+const previewRequest = takePreviewRequest('artwork')
+if (previewRequest?.sourceType === 'artwork') {
+  sourceInput.value = previewRequest.inputs.join('\n')
+  loadPage(previewRequest.page)
+}
 </script>
 
 <template>

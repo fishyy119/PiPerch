@@ -54,7 +54,7 @@ function filterByGroup(groupId: number) {
       v-if="artwork.description"
       class="mt-5 text-sm leading-7"
       :html="artwork.description"
-      :local-artworks="artwork.localLinkedArtworks"
+      :links="artwork.artworkLinks"
     />
     <p v-else class="mt-5 text-sm text-muted-foreground">作者没有为这件作品添加说明。</p>
 

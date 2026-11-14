@@ -6,6 +6,7 @@ from piperch.api.models import (
     ArtworkDetailResponse,
     ArtworkGroupRecordResponse,
     ArtworkImageResponse,
+    ArtworkLinkResponse,
     ArtworkSummaryResponse,
     DownloadItemResponse,
     DownloadJobDetailResponse,
@@ -51,13 +52,13 @@ def artwork_image_response(image: ArtworkImageSummary) -> ArtworkImageResponse:
 
 def artwork_detail_response(
     detail: ArtworkDetail,
-    local_linked_artworks: dict[str, int],
+    artwork_links: dict[str, ArtworkLinkResponse],
     images: Sequence[ArtworkImageSummary],
 ) -> ArtworkDetailResponse:
     return ArtworkDetailResponse(
         **artwork_summary_response(detail.summary).model_dump(),
         description=detail.description,
-        local_linked_artworks=local_linked_artworks,
+        artwork_links=artwork_links,
         tags=[
             TagResponse(
                 tag_id=tag.tag_id,

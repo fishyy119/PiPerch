@@ -70,10 +70,17 @@ const namedCountPageSchema = z.object({
 })
 export type NamedCount = z.infer<typeof namedCountSchema>
 
+const artworkLinkSchema = z.object({
+  source: artworkSourceSchema,
+  remoteId: z.number().int().positive(),
+  localArtworkId: z.number().int().positive().nullable(),
+})
+export type ArtworkLink = z.infer<typeof artworkLinkSchema>
+
 export const artworkDetailSchema = artworkSummaryWireSchema
   .extend({
     description: z.string(),
-    localLinkedArtworks: z.record(z.string(), z.number().int().positive()),
+    artworkLinks: z.record(z.string(), artworkLinkSchema),
     tags: z.array(tagSchema),
     groups: z.array(artworkGroupSchema.pick({ groupId: true, name: true })),
     images: z.array(artworkImageSchema),

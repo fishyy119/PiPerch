@@ -16,6 +16,7 @@ from piperch.api.models import (
     ArtworkDeleteResponse,
     ArtworkDetailResponse,
     ArtworkImageResponse,
+    ArtworkLinkResponse,
     ArtworkPage,
     ArtworkSummaryResponse,
     BulkDeleteRequest,
@@ -102,15 +103,22 @@ def get_artwork(
     container: AppContainer = Depends(get_container),
 ) -> ArtworkDetailResponse:
     detail = container.artworks.get_detail(artwork_id)
-    local_linked_artworks: dict[str, int] = {}
+    artwork_links: dict[str, ArtworkLinkResponse] = {}
     for source, links in parse_artwork_links(detail.description).items():
         local_ids = container.artworks.find_local_ids(list(links.values()), source)
-        local_linked_artworks.update(
-            {href: local_ids[remote_id] for href, remote_id in links.items() if remote_id in local_ids}
+        artwork_links.update(
+            {
+                href: ArtworkLinkResponse(
+                    source=source,
+                    remote_id=remote_id,
+                    local_artwork_id=local_ids.get(remote_id),
+                )
+                for href, remote_id in links.items()
+            }
         )
     return artwork_detail_response(
         detail,
-        local_linked_artworks,
+        artwork_links,
         container.artworks.list_artwork_images([artwork_id]),
     )
 

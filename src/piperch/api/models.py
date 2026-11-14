@@ -373,9 +373,15 @@ class UgoiraFrameResponse(ApiModel):
     delay_ms: int
 
 
+class ArtworkLinkResponse(ApiModel):
+    source: ArtworkSource
+    remote_id: int
+    local_artwork_id: int | None
+
+
 class ArtworkDetailResponse(ArtworkSummaryResponse):
     description: str
-    local_linked_artworks: dict[str, int]
+    artwork_links: dict[str, ArtworkLinkResponse]
     tags: list[TagResponse]
     groups: list[ArtworkGroupRecordResponse]
     images: list[ArtworkImageResponse]
