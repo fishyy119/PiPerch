@@ -360,6 +360,10 @@ class ArtworkPage(ApiModel):
     total_pages: int
 
 
+class RandomArtworkResponse(ApiModel):
+    artwork_id: int | None
+
+
 class ArtworkImageResponse(ApiModel):
     artwork_id: int
     role: Literal["page", "ugoira"]

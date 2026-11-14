@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Compass, Download, Folders, Images, Menu, Settings, X } from '@lucide/vue'
+import { Compass, Dices, Download, Folders, Images, Menu, Settings, X } from '@lucide/vue'
 import { useQueryClient } from '@tanstack/vue-query'
 import { computed, nextTick, onScopeDispose, ref } from 'vue'
 import {
@@ -12,7 +12,9 @@ import {
 } from 'vue-router'
 
 import { useAppEvents } from '@/app/useAppEvents'
+import { useRandomArtwork } from '@/features/artworks/useRandomArtwork'
 import { imageRequests } from '@/shared/lib/image-loading'
+import { Button } from '@ui/button'
 import { cn } from '@ui/cn'
 
 useAppEvents()
@@ -42,6 +44,16 @@ onScopeDispose(
 onScopeDispose(router.onError(retryUnfinishedImages))
 
 const mobileOpen = ref(false)
+const { openRandomArtwork } = useRandomArtwork()
+const showRandomShortcut = computed(
+  () => route.path === '/gallery' || route.params.artworkId !== undefined,
+)
+
+function selectRandomArtwork() {
+  mobileOpen.value = false
+  void openRandomArtwork()
+}
+
 const pageTitle = computed(() =>
   typeof route.meta.title === 'string' ? route.meta.title : 'PiPerch',
 )
@@ -100,6 +112,21 @@ const navigation = [
           {{ item.label }}
         </RouterLink>
       </nav>
+      <div class="mx-3 border-t pt-3">
+        <Button
+          variant="ghost"
+          class="w-full justify-start gap-3 px-3 py-2.5 font-normal text-muted-foreground hover:bg-accent/10 hover:text-foreground"
+          @click="selectRandomArtwork"
+        >
+          <Dices :size="19" />
+          随机作品
+          <kbd
+            v-if="showRandomShortcut"
+            class="ml-auto rounded border px-1.5 text-xs text-muted-foreground"
+            >R</kbd
+          >
+        </Button>
+      </div>
     </aside>
 
     <div class="min-w-0">

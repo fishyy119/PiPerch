@@ -410,6 +410,15 @@ class ArtworkRepository:
             summaries = self._summaries_with_favorites(connection, summaries)
         return summaries, total
 
+    def get_random_artwork_id(self, exclude_artwork_id: int | None = None) -> int | None:
+        """从整个馆藏随机选取一件作品，排除当前作品后为空时返回 None。"""
+        statement = select(artworks.c.id)
+        if exclude_artwork_id is not None:
+            statement = statement.where(artworks.c.id != exclude_artwork_id)
+        with self._database.connect() as connection:
+            artwork_id = connection.scalar(statement.order_by(func.random()).limit(1))
+        return int(artwork_id) if artwork_id is not None else None
+
     def list_related_artworks(self, artwork_id: int, limit: int) -> list[ArtworkSummary]:
         """按同作者和共享标签的加权分数返回本地相关作品。"""
         with self._database.connect() as connection:

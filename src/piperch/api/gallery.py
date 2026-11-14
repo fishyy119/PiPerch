@@ -22,6 +22,7 @@ from piperch.api.models import (
     BulkDeleteRequest,
     NamedCountPage,
     NamedCountResponse,
+    RandomArtworkResponse,
     TagResponse,
 )
 from piperch.application.container import AppContainer
@@ -95,6 +96,14 @@ def list_artwork_images(
     container: AppContainer = Depends(get_container),
 ) -> list[ArtworkImageResponse]:
     return [artwork_image_response(image) for image in container.artworks.list_artwork_images(artwork_ids)]
+
+
+@router.get("/artworks/random", response_model=RandomArtworkResponse)
+def get_random_artwork(
+    exclude_artwork_id: int | None = Query(default=None, gt=0, alias="excludeArtworkId"),
+    container: AppContainer = Depends(get_container),
+) -> RandomArtworkResponse:
+    return RandomArtworkResponse(artwork_id=container.artworks.get_random_artwork_id(exclude_artwork_id))
 
 
 @router.get("/artworks/{artwork_id}", response_model=ArtworkDetailResponse)

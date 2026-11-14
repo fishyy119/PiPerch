@@ -10,6 +10,7 @@ import {
   listArtworks,
   type MultiValueMatch,
 } from '@/features/artworks/artworks-api'
+import { useRandomArtwork } from '@/features/artworks/useRandomArtwork'
 import { listFollowedUsers } from '@/features/authors/author-api'
 import type { GalleryFilterValues } from '@/features/gallery/gallery-filter'
 import {
@@ -38,6 +39,7 @@ import GalleryMasonry from './layouts/GalleryMasonry.vue'
 
 const route = useRoute()
 const router = useRouter()
+const { openRandomArtwork } = useRandomArtwork()
 const queryClient = useQueryClient()
 const selection = useGallerySelectionStore()
 const routeSearch = computed(() => firstQueryValue(route.query.search))
@@ -248,6 +250,12 @@ function setPage(page: number) {
 }
 
 usePageKeyboardShortcuts((event) => {
+  if (event.key.toLowerCase() === 'r') {
+    event.preventDefault()
+    if (!event.repeat) void openRandomArtwork()
+    return
+  }
+
   const previousPage = event.key === 'PageUp' || event.key === 'ArrowLeft'
   const nextPage = event.key === 'PageDown' || event.key === 'ArrowRight'
   if (!previousPage && !nextPage) return

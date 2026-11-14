@@ -4,6 +4,7 @@ import { computed, ref, shallowRef, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import { type ArtworkDetail, getArtwork } from '@/features/artworks/artworks-api'
+import { useRandomArtwork } from '@/features/artworks/useRandomArtwork'
 import {
   galleryNavigationRouteState,
   type GalleryNavigationState,
@@ -19,6 +20,7 @@ import { usePageKeyboardShortcuts } from '@/shared/lib/usePageKeyboardShortcuts'
 
 const route = useRoute()
 const router = useRouter()
+const { openRandomArtwork } = useRandomArtwork()
 const localArtworkId = computed(() => Number(route.params.artworkId))
 const galleryNavigation = ref<GalleryNavigationState | null>(
   parseGalleryNavigationState(router.options.history.state),
@@ -77,6 +79,12 @@ function selectAdjacentArtwork(offset: -1 | 1) {
     })
     .then(() => window.scrollTo({ top: 0 }))
 }
+
+usePageKeyboardShortcuts((event) => {
+  if (event.key.toLowerCase() !== 'r') return
+  event.preventDefault()
+  if (!event.repeat) void openRandomArtwork()
+})
 
 usePageKeyboardShortcuts(
   (event) => {

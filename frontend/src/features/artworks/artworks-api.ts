@@ -172,6 +172,17 @@ export async function getArtwork(artworkId: number) {
   return artworkDetailSchema.parse(await api.get<unknown>(`/api/artworks/${String(artworkId)}`))
 }
 
+const randomArtworkSchema = z.object({ artworkId: z.number().int().positive().nullable() })
+
+export async function getRandomArtworkId(excludeArtworkId?: number) {
+  const params = new URLSearchParams()
+  if (excludeArtworkId !== undefined) params.set('excludeArtworkId', String(excludeArtworkId))
+  const result = randomArtworkSchema.parse(
+    await api.get<unknown>(`/api/artworks/random?${params.toString()}`, { cache: 'no-store' }),
+  )
+  return result.artworkId
+}
+
 export async function listRelatedArtworks(artworkId: number, limit = 12) {
   return z
     .array(artworkSummarySchema)
