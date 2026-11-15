@@ -4,7 +4,7 @@ import { useMutation, useQueryClient } from '@tanstack/vue-query'
 import { computed, ref } from 'vue'
 
 import { usePreference } from '@/app/usePreference'
-import { type ArtworkCardTarget, localArtworkPreviewUrl } from '@/features/artworks/artwork-card'
+import { artworkMediaUrl } from '@/features/artworks/artwork'
 import type { ArtworkSummary } from '@/features/artworks/artworks-api'
 import { notifyFavoriteUpdate } from '@/features/favorites/favorite-feedback'
 import { replaceFavoriteState } from '@/features/favorites/favorites-api'
@@ -12,7 +12,7 @@ import { useGalleryFilters } from '@/features/gallery/gallery-filter'
 import { galleryNavigationRouteState } from '@/features/gallery/gallery-navigation'
 import { useGallerySelectionStore } from '@/features/gallery/gallery-selection'
 import { invalidateArtworkData } from '@/features/library/library-query-cache'
-import ArtworkCard from '@/shared/components/artworks/ArtworkCard.vue'
+import ArtworkCard, { type ArtworkCardTarget } from '@/shared/components/artworks/ArtworkCard.vue'
 import { errorMessage } from '@/shared/errors'
 import { Checkbox } from '@ui/checkbox'
 import { cn } from '@ui/cn'
@@ -54,7 +54,7 @@ const favoriteMutation = useMutation({
 })
 
 function resolvePreviewUrl(pageIndex: number) {
-  return localArtworkPreviewUrl(props.artwork.localArtworkId, props.artwork.artworkType, pageIndex)
+  return artworkMediaUrl(props.artwork.localArtworkId, props.artwork.artworkType, pageIndex)
 }
 
 function handleCardClick(event: MouseEvent) {

@@ -1,7 +1,14 @@
 <script lang="ts">
 export interface LightboxItem {
+  key: string
   src: string
   alt: string
+}
+
+export interface LightboxAction {
+  title: string
+  icon: string
+  action: (item: LightboxItem) => void
 }
 </script>
 
@@ -14,46 +21,46 @@ import {
   DialogRoot,
   DialogTitle,
 } from 'reka-ui'
-import { computed, ref, watch } from 'vue'
+import { computed, useTemplateRef, watch } from 'vue'
+
+import { type KeyboardShortcut, useKeyboardShortcuts } from '@/shared/lib/useKeyboardShortcuts'
+import { Button } from '@ui/button'
 
 const WHEEL_NAVIGATION_THRESHOLD_PX = 40
 
 const props = withDefaults(
   defineProps<{
     items: readonly LightboxItem[]
-    activeIndex?: number
+    actions?: readonly LightboxAction[]
+    shortcuts?: readonly KeyboardShortcut[]
   }>(),
-  { activeIndex: 0 },
+  { actions: () => [], shortcuts: () => [] },
 )
 
 defineSlots<{
-  default(props: { open: (index?: number) => void }): unknown
+  default(props: { open: (key?: string) => void }): unknown
 }>()
 
-const emit = defineEmits<{
-  change: [index: number]
-}>()
-
-const lightboxOpen = ref(false)
-const currentIndex = ref(0)
+const lightboxOpen = defineModel<boolean>('open', { default: false })
+const activeKey = defineModel<string | null>('activeKey', { default: null })
+const content = useTemplateRef<HTMLElement>('content')
+const itemKeys = computed(() => props.items.map((item) => item.key))
+const currentIndex = computed(() =>
+  Math.max(
+    props.items.findIndex((item) => item.key === activeKey.value),
+    0,
+  ),
+)
 const currentItem = computed(() => props.items[currentIndex.value])
 
 let wheelDelta = 0
 let wheelDirection = 0
 
-function normalizedIndex(index: number) {
-  if (!Number.isInteger(index)) return 0
-  return Math.min(Math.max(index, 0), Math.max(props.items.length - 1, 0))
-}
-
-function openLightbox(index = 0) {
-  if (props.items.length === 0) return
-
-  const nextIndex = normalizedIndex(index)
-  currentIndex.value = nextIndex
+function openLightbox(key = activeKey.value ?? undefined) {
+  const item = props.items.find((item) => item.key === key) ?? props.items[0]
+  if (!item) return
+  activeKey.value = item.key
   lightboxOpen.value = true
-
-  if (nextIndex !== normalizedIndex(props.activeIndex)) emit('change', nextIndex)
 }
 
 function closeLightbox() {
@@ -65,6 +72,12 @@ function resetWheelNavigation() {
   wheelDirection = 0
 }
 
+function selectAdjacentItem(offset: -1 | 1) {
+  resetWheelNavigation()
+  const next = props.items[currentIndex.value + offset]
+  if (next) activeKey.value = next.key
+}
+
 function normalizedWheelDelta(event: WheelEvent) {
   if (event.deltaMode === WheelEvent.DOM_DELTA_LINE) return event.deltaY * 16
   if (event.deltaMode === WheelEvent.DOM_DELTA_PAGE) return event.deltaY * window.innerHeight
@@ -72,9 +85,10 @@ function normalizedWheelDelta(event: WheelEvent) {
 }
 
 function handleWheel(event: WheelEvent) {
-  if (props.items.length <= 1 || event.deltaY === 0) return
+  if (!isActive() || event.deltaY === 0 || event.ctrlKey) return
 
   event.preventDefault()
+  if (props.items.length <= 1) return
 
   const delta = normalizedWheelDelta(event)
   const direction = Math.sign(delta)
@@ -86,38 +100,37 @@ function handleWheel(event: WheelEvent) {
   wheelDelta += delta
   if (Math.abs(wheelDelta) < WHEEL_NAVIGATION_THRESHOLD_PX) return
 
-  const nextIndex = currentIndex.value + (wheelDelta < 0 ? -1 : 1)
-  resetWheelNavigation()
-  if (nextIndex < 0 || nextIndex >= props.items.length) return
-
-  currentIndex.value = nextIndex
-  emit('change', nextIndex)
+  selectAdjacentItem(wheelDelta < 0 ? -1 : 1)
 }
 
-watch(
-  () => props.activeIndex,
-  (index) => {
-    currentIndex.value = normalizedIndex(index)
-  },
+const isActive = useKeyboardShortcuts(
+  () => [
+    { key: 'ArrowLeft', action: () => selectAdjacentItem(-1) },
+    { key: 'ArrowRight', action: () => selectAdjacentItem(1) },
+    ...props.shortcuts,
+  ],
+  content,
 )
 
 watch(
-  () => props.items,
+  [itemKeys, activeKey, lightboxOpen],
   () => {
-    if (props.items.length === 0) {
+    const first = props.items[0]
+    if (!first) {
+      activeKey.value = null
       closeLightbox()
       return
     }
-
-    currentIndex.value = normalizedIndex(props.activeIndex)
+    if (activeKey.value === null || !itemKeys.value.includes(activeKey.value)) {
+      activeKey.value = first.key
+    }
   },
+  { immediate: true },
 )
 
-watch(lightboxOpen, (open) => {
-  if (!open) resetWheelNavigation()
-})
+watch([activeKey, lightboxOpen, itemKeys], resetWheelNavigation)
 </script>
-
+<!-- TODO: 图片可缩放、更多信息 -->
 <template>
   <DialogRoot v-model:open="lightboxOpen">
     <slot :open="openLightbox" />
@@ -125,12 +138,15 @@ watch(lightboxOpen, (open) => {
     <DialogPortal>
       <DialogOverlay class="fixed inset-0 z-40 bg-foreground/80 dark:bg-background/80" />
       <DialogContent
-        class="artwork-lightbox fixed inset-0 z-50 overflow-hidden text-background outline-none dark:text-foreground"
+        class="fixed inset-0 z-50 overflow-hidden text-background outline-none dark:text-foreground"
+        @open-auto-focus.prevent="content?.focus({ preventScroll: true })"
       >
         <DialogTitle class="sr-only">作品预览</DialogTitle>
         <DialogDescription class="sr-only">全屏查看当前作品</DialogDescription>
         <div
-          class="relative flex size-full items-center justify-center p-4 sm:p-8"
+          ref="content"
+          tabindex="-1"
+          class="relative flex size-full items-center justify-center p-4 outline-none sm:p-8"
           @click.self="closeLightbox"
           @wheel="handleWheel"
         >
@@ -147,6 +163,22 @@ watch(lightboxOpen, (open) => {
           >
             {{ currentIndex + 1 }} / {{ items.length }}
           </output>
+          <div
+            v-if="currentItem && actions.length > 0"
+            class="absolute top-4 right-4 flex items-center sm:top-6 sm:right-6"
+          >
+            <Button
+              v-for="action in actions"
+              :key="action.title"
+              variant="ghost"
+              size="icon"
+              :title="action.title"
+              class="rounded-none opacity-75 hover:bg-transparent hover:text-inherit hover:opacity-100"
+              @click="currentItem && action.action(currentItem)"
+            >
+              <span class="size-6" :class="action.icon" />
+            </Button>
+          </div>
         </div>
       </DialogContent>
     </DialogPortal>

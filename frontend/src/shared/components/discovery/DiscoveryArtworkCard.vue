@@ -2,15 +2,12 @@
 import { useQueryClient } from '@tanstack/vue-query'
 import { computed } from 'vue'
 
-import {
-  type ArtworkCardTarget,
-  type ArtworkPreviewUrlResolver,
-  localArtworkPreviewUrl,
-} from '@/features/artworks/artwork-card'
+import { artworkMediaUrl } from '@/features/artworks/artwork'
 import { artworkOriginalUrl, artworkReferenceKey } from '@/features/artworks/artwork-source'
 import { type DiscoveryItem, listArtworkPreviewUrls } from '@/features/discovery/discovery-api'
 import { useLibraryMembershipStore } from '@/features/library/library-membership'
-import ArtworkCard from '@/shared/components/artworks/ArtworkCard.vue'
+import ArtworkCard, { type ArtworkCardTarget } from '@/shared/components/artworks/ArtworkCard.vue'
+import type { ArtworkPreviewUrlResolver } from '@/shared/components/artworks/ArtworkPagePreview.vue'
 
 const props = withDefaults(
   defineProps<{
@@ -47,10 +44,10 @@ const resolvePreviewUrl = computed<ArtworkPreviewUrlResolver>(() => {
   const { remoteId, artworkType, source, authorId } = props.artwork
   if (inLibrary.value && localId.value !== null) {
     const id = localId.value
-    return (pageIndex) => localArtworkPreviewUrl(id, artworkType, pageIndex)
+    return (pageIndex: number) => artworkMediaUrl(id, artworkType, pageIndex)
   }
 
-  return async (pageIndex) => {
+  return async (pageIndex: number) => {
     const urls = await queryClient.query({
       queryKey: ['discovery-artwork-preview', source, remoteId, authorId],
       queryFn: () => listArtworkPreviewUrls(props.artwork),

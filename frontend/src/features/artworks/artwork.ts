@@ -13,3 +13,8 @@ const artworkTypeLabels: Record<ArtworkType, string> = {
 export function artworkTypeLabel(type: ArtworkType) {
   return artworkTypeLabels[type]
 }
+
+export function artworkMediaUrl(artworkId: number, artworkType: ArtworkType, pageIndex: number) {
+  const base = `/api/artworks/${String(artworkId)}`
+  return artworkType === 'ugoira' ? `${base}/ugoira` : `${base}/pages/${String(pageIndex)}`
+}

@@ -16,7 +16,7 @@ import ArtworkInfoSidebar from '@/pages/artworks/ArtworkInfoSidebar.vue'
 import ArtworkMediaSection from '@/pages/artworks/ArtworkMediaSection.vue'
 import RecommendedArtworksSection from '@/pages/artworks/RecommendedArtworksSection.vue'
 import RelatedArtworksSection from '@/pages/artworks/RelatedArtworksSection.vue'
-import { usePageKeyboardShortcuts } from '@/shared/lib/usePageKeyboardShortcuts'
+import { type KeyboardShortcut, useKeyboardShortcuts } from '@/shared/lib/useKeyboardShortcuts'
 
 const route = useRoute()
 const router = useRouter()
@@ -80,23 +80,23 @@ function selectAdjacentArtwork(offset: -1 | 1) {
     .then(() => window.scrollTo({ top: 0 }))
 }
 
-usePageKeyboardShortcuts((event) => {
-  if (event.key.toLowerCase() !== 'r') return
-  event.preventDefault()
-  if (!event.repeat) void openRandomArtwork()
-})
-
-usePageKeyboardShortcuts(
-  (event) => {
-    if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return
-    const navigation = galleryNavigation.value
-    if (!navigation?.localArtworkIds.includes(localArtworkId.value)) return
-
-    event.preventDefault()
-    selectAdjacentArtwork(event.key === 'ArrowUp' ? -1 : 1)
+const artworkNavigationShortcuts: readonly KeyboardShortcut[] = [
+  {
+    key: 'ArrowUp',
+    action: () => selectAdjacentArtwork(-1),
+    enabled: () => galleryNavigation.value?.localArtworkIds.includes(localArtworkId.value) ?? false,
   },
-  { allowOverlay: (overlay) => overlay.classList.contains('artwork-lightbox') },
-)
+  {
+    key: 'ArrowDown',
+    action: () => selectAdjacentArtwork(1),
+    enabled: () => galleryNavigation.value?.localArtworkIds.includes(localArtworkId.value) ?? false,
+  },
+]
+
+useKeyboardShortcuts([
+  { key: 'r', action: () => void openRandomArtwork(), repeat: false },
+  ...artworkNavigationShortcuts,
+])
 </script>
 
 <template>
@@ -115,7 +115,10 @@ usePageKeyboardShortcuts(
       <div class="min-w-0 space-y-5">
         <!-- 查询下一件作品时保留组件实例，使 Teleport 中已打开的 Lightbox 不被销毁。 -->
         <div v-show="artworkQuery.data.value !== undefined">
-          <ArtworkMediaSection :artwork="displayedArtwork" />
+          <ArtworkMediaSection
+            :artwork="displayedArtwork"
+            :lightbox-shortcuts="artworkNavigationShortcuts"
+          />
         </div>
         <template v-if="artworkQuery.data.value">
           <ArtworkDescriptionSection :artwork="artworkQuery.data.value" />

@@ -1,8 +1,13 @@
+<script lang="ts">
+export type ArtworkPreviewUrlResolver = (
+  pageIndex: number,
+) => string | null | Promise<string | null>
+</script>
+
 <script setup lang="ts">
 import { ImageOff, LoaderCircle } from '@lucide/vue'
 import { nextTick, ref, watch } from 'vue'
 
-import type { ArtworkPreviewUrlResolver } from '@/features/artworks/artwork-card'
 import { cn } from '@ui/cn'
 import { HoverCard } from '@ui/hover-card'
 import { ManagedImage } from '@ui/image'

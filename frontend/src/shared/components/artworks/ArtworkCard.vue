@@ -1,13 +1,18 @@
+<script lang="ts">
+import type { RouteLocationRaw } from 'vue-router'
+
+export type ArtworkCardTarget =
+  { kind: 'route'; to: RouteLocationRaw } | { kind: 'external'; href: string }
+</script>
+
 <script setup lang="ts">
 import { ImageOff } from '@lucide/vue'
 import { computed, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 
-import {
-  type ArtworkCardTarget,
+import ArtworkPagePreview, {
   type ArtworkPreviewUrlResolver,
-} from '@/features/artworks/artwork-card'
-import ArtworkPagePreview from '@/shared/components/artworks/ArtworkPagePreview.vue'
+} from '@/shared/components/artworks/ArtworkPagePreview.vue'
 import { SmartCropImage } from '@ui/image'
 
 const props = withDefaults(

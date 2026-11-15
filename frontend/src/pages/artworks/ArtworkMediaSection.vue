@@ -14,7 +14,7 @@ import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 
-import { artworkTypeLabel } from '@/features/artworks/artwork'
+import { artworkMediaUrl, artworkTypeLabel } from '@/features/artworks/artwork'
 import { artworkOriginalUrl } from '@/features/artworks/artwork-source'
 import { type ArtworkDetail, deleteArtworks } from '@/features/artworks/artworks-api'
 import { notifyFavoriteUpdate } from '@/features/favorites/favorite-feedback'
@@ -30,7 +30,7 @@ import {
 } from '@/features/library/library-query-cache'
 import CreateGroupDialog from '@/shared/components/groups/CreateGroupDialog.vue'
 import { errorMessage } from '@/shared/errors'
-import { usePageKeyboardShortcuts } from '@/shared/lib/usePageKeyboardShortcuts'
+import { type KeyboardShortcut, useKeyboardShortcuts } from '@/shared/lib/useKeyboardShortcuts'
 import { Button } from '@ui/button'
 import { Card } from '@ui/card'
 import { Checkbox } from '@ui/checkbox'
@@ -41,11 +41,14 @@ import { Popover } from '@ui/popover'
 const PAGE_SELECTOR_ITEM_SIZE_PX = 80
 const PAGE_SELECTOR_GAP_PX = 8
 
-const props = defineProps<{ artwork: ArtworkDetail }>()
+const props = withDefaults(
+  defineProps<{ artwork: ArtworkDetail; lightboxShortcuts?: readonly KeyboardShortcut[] }>(),
+  { lightboxShortcuts: () => [] },
+)
 
 const router = useRouter()
 const queryClient = useQueryClient()
-const selectedPage = ref<number | null>(null)
+const selectedMediaKey = ref<string | null>(null)
 const pageSelectorExpanded = ref(false)
 const pageSelectorGrid = ref<HTMLElement | null>(null)
 const pageSelectorColumns = ref(Number.POSITIVE_INFINITY)
@@ -121,28 +124,28 @@ const pageIndexes = computed(() =>
     .filter((page): page is number => page !== null)
     .sort((left, right) => left - right),
 )
-const currentPage = computed(() => selectedPage.value ?? pageIndexes.value[0] ?? null)
+const currentPage = computed(
+  () =>
+    pageIndexes.value.find((page) => mediaUrl(page) === selectedMediaKey.value) ??
+    pageIndexes.value[0] ??
+    null,
+)
 const previewUrl = computed(() => {
-  if (props.artwork.artworkType === 'ugoira') {
-    return `/api/artworks/${String(props.artwork.localArtworkId)}/ugoira`
-  }
-  return currentPage.value === null ? '' : mediaUrl(currentPage.value)
+  if (props.artwork.artworkType !== 'ugoira' && currentPage.value === null) return ''
+  return mediaUrl(currentPage.value ?? 0)
 })
 const lightboxItems = computed<LightboxItem[]>(() => {
   if (props.artwork.artworkType === 'ugoira') {
-    return [{ src: previewUrl.value, alt: props.artwork.title }]
+    return [{ key: previewUrl.value, src: previewUrl.value, alt: props.artwork.title }]
   }
   return pageIndexes.value.map((page, index) => ({
+    key: mediaUrl(page),
     src: mediaUrl(page),
     alt:
       pageIndexes.value.length > 1
         ? `${props.artwork.title} 第 ${String(index + 1)} 页`
         : props.artwork.title,
   }))
-})
-const lightboxInitialIndex = computed(() => {
-  if (props.artwork.artworkType === 'ugoira' || currentPage.value === null) return 0
-  return Math.max(pageIndexes.value.indexOf(currentPage.value), 0)
 })
 const visiblePageIndexes = computed(() =>
   pageSelectorExpanded.value
@@ -158,7 +161,7 @@ const pageSelectorCanExpand = computed(
 watch(
   () => props.artwork.localArtworkId,
   () => {
-    selectedPage.value = null
+    selectedMediaKey.value = null
     pageSelectorExpanded.value = false
     groupsOpen.value = false
     createGroupOpen.value = false
@@ -192,17 +195,11 @@ watch(
 )
 
 function mediaUrl(page: number) {
-  return `/api/artworks/${String(props.artwork.localArtworkId)}/pages/${String(page)}`
+  return artworkMediaUrl(props.artwork.localArtworkId, props.artwork.artworkType, page)
 }
 
 function mediaThumbnailUrl(page: number) {
   return `${mediaUrl(page)}/thumbnail`
-}
-
-function handleLightboxIndexChange(index: number) {
-  if (props.artwork.artworkType === 'ugoira') return
-  const page = pageIndexes.value[index]
-  if (page !== undefined) selectedPage.value = page
 }
 
 function selectAdjacentPage(offset: -1 | 1) {
@@ -210,7 +207,7 @@ function selectAdjacentPage(offset: -1 | 1) {
 
   const currentIndex = pageIndexes.value.indexOf(currentPage.value ?? -1)
   const nextPage = pageIndexes.value[currentIndex + offset]
-  if (nextPage !== undefined) selectedPage.value = nextPage
+  if (nextPage !== undefined) selectedMediaKey.value = mediaUrl(nextPage)
 }
 
 function toggleFavorite() {
@@ -243,15 +240,13 @@ function createAndAddGroup(name: string) {
   })
 }
 
-usePageKeyboardShortcuts(
-  (event) => {
-    if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return
-    if (props.artwork.artworkType === 'ugoira' || pageIndexes.value.length <= 1) return
-
-    event.preventDefault()
-    selectAdjacentPage(event.key === 'ArrowLeft' ? -1 : 1)
-  },
-  { allowOverlay: (overlay) => overlay.classList.contains('artwork-lightbox') },
+useKeyboardShortcuts(() =>
+  props.artwork.artworkType === 'ugoira' || pageIndexes.value.length <= 1
+    ? []
+    : [
+        { key: 'ArrowLeft', action: () => selectAdjacentPage(-1) },
+        { key: 'ArrowRight', action: () => selectAdjacentPage(1) },
+      ],
 )
 </script>
 
@@ -259,15 +254,15 @@ usePageKeyboardShortcuts(
   <Card as="section" class="overflow-hidden">
     <LightboxGallery
       v-slot="{ open }"
+      v-model:active-key="selectedMediaKey"
       :items="lightboxItems"
-      :active-index="lightboxInitialIndex"
-      @change="handleLightboxIndexChange"
+      :shortcuts="lightboxShortcuts"
     >
       <div class="h-80 bg-muted/40 sm:h-120">
         <button
           type="button"
           class="flex size-full items-center justify-center p-2 sm:p-4"
-          @click="open(lightboxInitialIndex)"
+          @click="open()"
         >
           <img
             class="block h-auto max-h-full w-auto max-w-full object-contain"
@@ -290,7 +285,7 @@ usePageKeyboardShortcuts(
           type="button"
           class="relative size-20 overflow-hidden rounded-lg bg-muted ring-primary transition"
           :class="currentPage === page ? 'ring-2' : 'opacity-65 hover:opacity-100'"
-          @click="selectedPage = page"
+          @click="selectedMediaKey = mediaUrl(page)"
         >
           <img
             class="size-full object-cover"

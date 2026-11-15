@@ -23,7 +23,7 @@ import { artworkQueryKeys } from '@/features/library/library-query-cache'
 import TopbarActions from '@/shared/components/layout/TopbarActions.vue'
 import { errorMessage } from '@/shared/errors'
 import { firstQueryValue } from '@/shared/lib/route-query'
-import { usePageKeyboardShortcuts } from '@/shared/lib/usePageKeyboardShortcuts'
+import { useKeyboardShortcuts } from '@/shared/lib/useKeyboardShortcuts'
 import { Button } from '@ui/button'
 import { Card } from '@ui/card'
 import { FilterButton } from '@ui/filter-button'
@@ -249,27 +249,17 @@ function setPage(page: number) {
   window.scrollTo({ top: 0 })
 }
 
-usePageKeyboardShortcuts((event) => {
-  if (event.key.toLowerCase() === 'r') {
-    event.preventDefault()
-    if (!event.repeat) void openRandomArtwork()
-    return
-  }
-
-  const previousPage = event.key === 'PageUp' || event.key === 'ArrowLeft'
-  const nextPage = event.key === 'PageDown' || event.key === 'ArrowRight'
-  if (!previousPage && !nextPage) return
-
-  event.preventDefault()
-  const currentPage = pageNumber()
-  if (previousPage) {
-    if (currentPage > 0) setPage(currentPage - 1)
-    return
-  }
-
+function selectAdjacentPage(offset: -1 | 1) {
+  const next = pageNumber() + offset
   const totalPages = artworksQuery.data.value?.totalPages ?? 0
-  if (currentPage + 1 < totalPages) setPage(currentPage + 1)
-})
+  if (next >= 0 && next < totalPages) setPage(next)
+}
+
+useKeyboardShortcuts([
+  { key: 'r', action: () => void openRandomArtwork(), repeat: false },
+  { key: ['ArrowLeft', 'PageUp'], action: () => selectAdjacentPage(-1) },
+  { key: ['ArrowRight', 'PageDown'], action: () => selectAdjacentPage(1) },
+])
 </script>
 <template>
   <TopbarActions>
