@@ -13,6 +13,7 @@ import { toast } from '@ui/toast'
 const props = defineProps<{
   open: boolean
   groups: ArtworkGroup[]
+  removableGroups: readonly ArtworkGroup[]
   selectionCount: number
   busy?: boolean
 }>()
@@ -36,6 +37,13 @@ watch(
     }
     addGroupIds.value = []
     removeGroupIds.value = []
+  },
+)
+watch(
+  () => props.removableGroups,
+  (groups) => {
+    const groupIds = new Set(groups.map((group) => group.groupId))
+    removeGroupIds.value = removeGroupIds.value.filter((id) => groupIds.has(id))
   },
 )
 
@@ -70,12 +78,15 @@ async function createGroup(name: string) {
     :open="open"
     title="批量修改本地分组"
     :description="`将修改 ${String(selectionCount)} 件作品的本地分组，不影响收藏状态，也不会请求 Pixiv。`"
+    content-class="flex max-h-[80vh] flex-col overflow-y-auto"
     @update:open="!$event && emit('close')"
   >
-    <div class="mt-5 grid gap-4 sm:grid-cols-2">
-      <section>
+    <div class="mt-5 grid min-h-0 gap-4 sm:grid-cols-2">
+      <section class="flex min-h-0 flex-col">
         <h3 class="mb-2 text-sm font-medium">添加到分组</h3>
-        <div class="max-h-64 space-y-1 overflow-y-auto rounded-xl border border-border p-2">
+        <div
+          class="min-h-0 space-y-1 overflow-y-auto overscroll-contain rounded-xl border border-border p-2"
+        >
           <button
             type="button"
             class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2 py-2 text-left hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
@@ -101,11 +112,19 @@ async function createGroup(name: string) {
           </button>
         </div>
       </section>
-      <section>
+      <section class="flex min-h-0 flex-col">
         <h3 class="mb-2 text-sm font-medium">从分组移除</h3>
-        <div class="max-h-64 space-y-1 overflow-y-auto rounded-xl border border-border p-2">
+        <div
+          class="min-h-0 space-y-1 overflow-y-auto overscroll-contain rounded-xl border border-border p-2"
+        >
+          <p
+            v-if="groups.length && !removableGroups.length"
+            class="px-2 py-2 text-sm text-muted-foreground"
+          >
+            所选作品尚未加入任何分组。
+          </p>
           <button
-            v-for="group in groups"
+            v-for="group in removableGroups"
             :key="group.groupId"
             type="button"
             class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2 py-2 text-left hover:bg-accent"

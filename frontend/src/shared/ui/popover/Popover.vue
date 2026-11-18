@@ -9,8 +9,9 @@ withDefaults(
     align?: 'start' | 'center' | 'end'
     modal?: boolean
     contentClass?: string
+    prioritizePosition?: boolean
   }>(),
-  { side: 'bottom', align: 'center', modal: false, contentClass: '' },
+  { side: 'bottom', align: 'center', modal: false, contentClass: '', prioritizePosition: false },
 )
 
 const open = defineModel<boolean>('open', { default: false })
@@ -34,6 +35,7 @@ const open = defineModel<boolean>('open', { default: false })
         :side="side"
         :align="align"
         :side-offset="6"
+        :prioritize-position="prioritizePosition"
       >
         <slot :close="() => (open = false)" />
       </PopoverContent>

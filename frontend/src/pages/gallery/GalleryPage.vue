@@ -179,9 +179,6 @@ const resultRange = computed(() => {
   const last = Math.min((data.page + 1) * data.size, data.totalElements)
   return `共 ${String(data.totalElements)} 项，第 ${String(first)}–${String(last)} 项`
 })
-const navigationArtworkIds = computed(() =>
-  (artworksQuery.data.value?.items ?? []).map((artwork) => artwork.localArtworkId),
-)
 watch(routeSearch, (search) => {
   searchInput.value = search
 })
@@ -385,5 +382,8 @@ useKeyboardShortcuts([
     </nav>
   </div>
 
-  <GalleryBulkSelectionBar v-if="layout === 'grid'" :visible-artwork-ids="navigationArtworkIds" />
+  <GalleryBulkSelectionBar
+    v-if="layout === 'grid'"
+    :visible-artworks="artworksQuery.data.value?.items ?? []"
+  />
 </template>

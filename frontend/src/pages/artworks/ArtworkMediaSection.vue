@@ -334,7 +334,13 @@ useKeyboardShortcuts(() =>
           <Heart :size="16" :fill="artwork.isFavorite ? 'currentColor' : 'none'" />
           {{ artwork.isFavorite ? '取消收藏' : '收藏' }}
         </Button>
-        <Popover v-model:open="groupsOpen" align="end" content-class="p-2">
+        <Popover
+          v-model:open="groupsOpen"
+          side="left"
+          align="end"
+          content-class="flex max-h-[max(80vh,18rem)] flex-col p-2"
+          prioritize-position
+        >
           <template #trigger>
             <Button
               variant="secondary"
@@ -348,7 +354,7 @@ useKeyboardShortcuts(() =>
             </Button>
           </template>
 
-          <div class="max-h-72 overflow-y-auto">
+          <div class="min-h-0 overflow-y-auto overscroll-contain">
             <button
               type="button"
               class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2 py-2 text-left hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"

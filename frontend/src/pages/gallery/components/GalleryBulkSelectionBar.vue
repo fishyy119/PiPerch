@@ -3,7 +3,7 @@ import { Tags, Trash2 } from '@lucide/vue'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query'
 import { computed, ref } from 'vue'
 
-import { deleteArtworks } from '@/features/artworks/artworks-api'
+import { type ArtworkSummary, deleteArtworks } from '@/features/artworks/artworks-api'
 import { useGallerySelectionStore } from '@/features/gallery/gallery-selection'
 import { bulkUpdateArtworkGroups, listGroups } from '@/features/groups/groups-api'
 import {
@@ -20,23 +20,34 @@ import { toast } from '@ui/toast'
 import BulkGroupsDialog from './BulkGroupsDialog.vue'
 
 const props = defineProps<{
-  visibleArtworkIds: readonly number[]
+  visibleArtworks: readonly ArtworkSummary[]
 }>()
 
 const selection = useGallerySelectionStore()
 const queryClient = useQueryClient()
 const deleteOpen = ref(false)
 const bulkGroupsOpen = ref(false)
+const visibleArtworkIds = computed(() =>
+  props.visibleArtworks.map((artwork) => artwork.localArtworkId),
+)
 const visibleFullySelected = computed(
   () =>
-    props.visibleArtworkIds.length > 0 &&
-    props.visibleArtworkIds.every((localArtworkId) => selection.isSelected(localArtworkId)),
+    visibleArtworkIds.value.length > 0 &&
+    visibleArtworkIds.value.every((localArtworkId) => selection.isSelected(localArtworkId)),
 )
 
 const groupsQuery = useQuery({
   queryKey: groupQueryKeys.list(),
   queryFn: listGroups,
   enabled: computed(() => bulkGroupsOpen.value),
+})
+const removableGroups = computed(() => {
+  const selectedGroupIds = new Set(
+    props.visibleArtworks
+      .filter((artwork) => selection.isSelected(artwork.localArtworkId))
+      .flatMap((artwork) => artwork.groupIds),
+  )
+  return groupsQuery.data.value?.filter((group) => selectedGroupIds.has(group.groupId)) ?? []
 })
 
 const bulkGroupsMutation = useMutation({
@@ -156,6 +167,7 @@ function saveBulkGroups(addGroupIds: number[], removeGroupIds: number[]) {
     v-if="bulkGroupsOpen"
     :open="true"
     :groups="groupsQuery.data.value ?? []"
+    :removable-groups="removableGroups"
     :selection-count="selection.selectedCount"
     :busy="bulkGroupsMutation.isPending.value"
     @close="bulkGroupsOpen = false"
