@@ -3,8 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, ClassVar
 
-from piperch.cli import run_server, watch_terminal_interrupts
-from piperch.paths import AppPaths
+from piperch.cli import Args, run_server, watch_terminal_interrupts
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -13,6 +12,7 @@ if TYPE_CHECKING:
     from pytest import MonkeyPatch
 
     from piperch.application.control import AppControl
+    from piperch.paths import AppPaths
 
 
 class FakeServer:
@@ -51,7 +51,7 @@ def test_run_server_uses_bounded_graceful_shutdown(
 
     monkeypatch.setattr("piperch.cli._start_terminal_interrupt_watcher", ignore_watcher)
 
-    run_server(AppPaths.from_data_dir(tmp_path), 7000)
+    run_server(Args(command="serve", data_dir=tmp_path, port=7000))
 
     assert configs[0]["host"] == "127.0.0.1"
     assert configs[0]["port"] == 7000
@@ -86,9 +86,7 @@ def test_run_server_adds_explicit_hosts_to_loopback_listener(
     monkeypatch.setattr("piperch.cli._start_terminal_interrupt_watcher", ignore_watcher)
 
     run_server(
-        AppPaths.from_data_dir(tmp_path),
-        7000,
-        additional_hosts=("192.168.1.10", "127.0.0.1", "192.168.1.10"),
+        Args(command="serve", data_dir=tmp_path, port=7000, hosts=["192.168.1.10", "127.0.0.1", "192.168.1.10"]),
     )
 
     sockets = FakeServer.instances[0].sockets or []
@@ -126,7 +124,7 @@ def test_run_server_recreates_application_after_restart_request(
     monkeypatch.setattr("piperch.cli.uvicorn.Server", RestartingServer)
     monkeypatch.setattr("piperch.cli._start_terminal_interrupt_watcher", record_watcher)
 
-    run_server(AppPaths.from_data_dir(tmp_path), 7000)
+    run_server(Args(command="serve", data_dir=tmp_path, port=7000))
 
     assert len(RestartingServer.instances) == 2
     assert len(controls) == 2

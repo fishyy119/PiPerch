@@ -3,13 +3,14 @@ from __future__ import annotations
 import argparse
 import logging
 import os
+import re
 import socket
 import sys
 import threading
 import webbrowser
 from contextlib import ExitStack
 from copy import deepcopy
-from dataclasses import dataclass, field
+from dataclasses import InitVar, dataclass, field
 from ipaddress import AddressValueError, IPv4Address
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal, NoReturn, Protocol
@@ -46,7 +47,12 @@ class Args:
     port: int = 9303
     hosts: list[str] = field(default_factory=list[str])
     verbose: bool = False
+    http2: bool = False
+    cert_dir: InitVar[Path | None] = None
     action: Literal["upgrade"] | None = None
+    browser_host: str = field(init=False, default=_LOOPBACK_HOST)
+    ssl_certfile: Path | None = field(init=False, default=None)
+    ssl_keyfile: Path | None = field(init=False, default=None)
 
     @staticmethod
     def add_arguments(parser: argparse.ArgumentParser) -> None:
@@ -63,6 +69,8 @@ class Args:
         )
         serve.add_argument("--data-dir")
         serve.add_argument("--verbose", action="store_true", help="输出每个 HTTP 请求的访问日志")
+        serve.add_argument("--http2", action="store_true", help="在 HTTPS 上启用实验性 HTTP/2，需要 --cert-dir")
+        serve.add_argument("--cert-dir", type=Path, metavar="DIR", help="包含 PEM 证书链和私钥的 HTTPS 目录")
 
         database = commands.add_parser("db", help="数据库管理", argument_default=argparse.SUPPRESS)
         database.add_argument("action", choices=["upgrade"])
@@ -72,7 +80,7 @@ class Args:
     def from_ns(cls, namespace: argparse.Namespace) -> Args:
         return cls(**vars(namespace))
 
-    def __post_init__(self) -> None:
+    def __post_init__(self, cert_dir: Path | None) -> None:
         if self.data_dir is not None:
             self.data_dir = Path(self.data_dir)
 
@@ -93,6 +101,42 @@ class Args:
                 raise ValueError("请指定具体的 IPv4 地址，不能使用 0.0.0.0。")
             hosts.append(str(address))
         self.hosts = hosts
+
+        if cert_dir is not None:
+            self.browser_host, self.ssl_certfile, self.ssl_keyfile = self._find_certificate(cert_dir)
+        elif self.http2:
+            raise ValueError("启用 HTTP/2 需要通过 --cert-dir 指定 HTTPS 证书目录。")
+
+    @staticmethod
+    def _find_certificate(cert_dir: Path) -> tuple[str, Path, Path]:
+        if not cert_dir.is_dir():
+            raise ValueError(f"无法访问 HTTPS 证书目录 {cert_dir}。")
+
+        for chain in sorted(cert_dir.glob("*-chain.pem", case_sensitive=True), key=lambda path: path.name):
+            prefix = chain.name.removesuffix("-chain.pem")
+            key = chain.with_name(f"{prefix}-key.pem")
+            if chain.is_file() and key.is_file():
+                return Args._certificate_host(chain), chain, key
+
+        raise ValueError("HTTPS 证书目录必须包含至少一组 <前缀>-chain.pem 和 <前缀>-key.pem。")
+
+    @staticmethod
+    def _certificate_host(chain: Path) -> str:
+        from cryptography import x509
+
+        try:
+            certificate = x509.load_pem_x509_certificate(chain.read_bytes())
+            names = certificate.extensions.get_extension_for_class(x509.SubjectAlternativeName).value
+        except (OSError, ValueError, x509.ExtensionNotFound, x509.DuplicateExtension) as error:
+            raise ValueError(f"无法读取 HTTPS 站点证书 {chain} 的 SAN。{error}") from error
+
+        for name in names:
+            if isinstance(name, x509.DNSName) and re.fullmatch(r"[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*", name.value):
+                return name.value
+            if isinstance(name, x509.IPAddress) and isinstance(name.value, IPv4Address):
+                return str(name.value)
+
+        raise ValueError(f"HTTPS 站点证书 {chain} 的 SAN 中没有具体的域名或 IPv4 地址。")
 
     @classmethod
     def parse(cls) -> Args:
@@ -221,16 +265,11 @@ def _bind_sockets(hosts: Sequence[str], port: int) -> list[socket.socket]:
     return sockets
 
 
-def run_server(
-    paths: AppPaths,
-    port: int,
-    *,
-    additional_hosts: Sequence[str] = (),
-    open_browser: bool = False,
-    verbose: bool = False,
-) -> None:
+def run_server(args: Args, *, open_browser: bool = False) -> None:
+    paths = AppPaths.from_data_dir(args.data_dir)
+    scheme = "https" if args.ssl_certfile is not None else "http"
     lifecycle = _ServerLifecycle()
-    hosts = tuple(dict.fromkeys((_LOOPBACK_HOST, *additional_hosts)))
+    hosts = tuple(dict.fromkeys((_LOOPBACK_HOST, *args.hosts)))
     watcher_started = False
     while True:
         control = AppControl(
@@ -241,27 +280,36 @@ def run_server(
         config = uvicorn.Config(
             create_app(paths, control),
             host=_LOOPBACK_HOST,
-            port=port,
+            port=args.port,
+            http="zttp" if args.http2 else "auto",
+            http2=args.http2,
+            ssl_certfile=args.ssl_certfile,
+            ssl_keyfile=args.ssl_keyfile,
             workers=1,
             timeout_graceful_shutdown=_GRACEFUL_SHUTDOWN_TIMEOUT_SECONDS,
-            log_config=_logging_config(verbose=verbose),
+            log_config=_logging_config(verbose=args.verbose),
             access_log=True,
         )
+        if args.ssl_certfile is not None:
+            try:
+                config.load()
+            except OSError as error:
+                raise SystemExit(f"无法加载 HTTPS 证书或私钥。{error}") from None
         server = uvicorn.Server(config)
         try:
-            sockets = _bind_sockets(hosts, port) if len(hosts) > 1 else []
+            sockets = _bind_sockets(hosts, args.port) if len(hosts) > 1 else []
         except OSError as error:
             logging.getLogger("uvicorn.error").error(error)
             raise SystemExit(3) from None
         if sockets:
             logger = logging.getLogger("uvicorn.error")
             for host in hosts:
-                logger.info("Uvicorn running on http://%s:%d (Press CTRL+C to quit)", host, port)
+                logger.info("Uvicorn running on %s://%s:%d (Press CTRL+C to quit)", scheme, host, args.port)
         if open_browser:
             threading.Timer(
                 1,
                 webbrowser.open,
-                args=(f"http://{_LOOPBACK_HOST}:{config.port}",),
+                args=(f"{scheme}://{args.browser_host}:{config.port}",),
             ).start()
         open_browser = False
         lifecycle.bind(server)
@@ -284,16 +332,10 @@ def run_server(
 
 def main() -> NoReturn:
     arguments = Args.parse()
-    paths = AppPaths.from_data_dir(arguments.data_dir)
     if arguments.command == "db":
+        paths = AppPaths.from_data_dir(arguments.data_dir)
         paths.ensure_directories()
         run_migrations(paths)
         raise SystemExit(0)
-    run_server(
-        paths,
-        arguments.port,
-        additional_hosts=arguments.hosts,
-        open_browser=True,
-        verbose=arguments.verbose,
-    )
+    run_server(arguments, open_browser=True)
     raise SystemExit(0)
