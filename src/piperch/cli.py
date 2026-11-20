@@ -26,7 +26,11 @@ from piperch.paths import AppPaths
 
 _GRACEFUL_SHUTDOWN_TIMEOUT_SECONDS = 5
 _LOOPBACK_HOST = "127.0.0.1"
+
 _PIPERCH_LOGGING_CONFIG = deepcopy(LOGGING_CONFIG)
+for formatter in _PIPERCH_LOGGING_CONFIG["formatters"].values():
+    formatter["fmt"] = "%(asctime)s " + formatter["fmt"]
+    formatter["datefmt"] = "%m%d %H:%M:%S"
 _PIPERCH_LOGGING_CONFIG["loggers"]["piperch"] = {
     "handlers": ["default"],
     "level": "INFO",
