@@ -90,7 +90,7 @@ const validationMutation = useMutation({
     </SettingItem>
     <SettingItem
       title="入库后自动收藏 Pixiv"
-      description="首次入库后自动公开收藏到 Pixiv，并同步本地收藏"
+      description="首次入库后自动公开收藏到 Pixiv，并同步本地收藏；FANBOX 作品仅加入本地收藏。"
       control-id="auto-bookmark-on-download"
     >
       <div class="flex justify-end">
