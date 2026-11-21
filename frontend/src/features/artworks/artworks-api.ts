@@ -169,7 +169,13 @@ export async function listSeries(page: number, search: string) {
 }
 
 export async function getArtwork(artworkId: number) {
-  return artworkDetailSchema.parse(await api.get<unknown>(`/api/artworks/${String(artworkId)}`))
+  const artwork = artworkDetailSchema.parse(
+    await api.get<unknown>(`/api/artworks/${String(artworkId)}`),
+  )
+  artwork.groups.sort((left, right) =>
+    left.name.localeCompare(right.name, undefined, { numeric: true, sensitivity: 'base' }),
+  )
+  return artwork
 }
 
 const randomArtworkSchema = z.object({ artworkId: z.number().int().positive().nullable() })

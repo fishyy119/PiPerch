@@ -38,7 +38,7 @@ class ArtworkGroupRepository:
                 )
             )
             .group_by(artwork_groups.c.id)
-            .order_by(artwork_groups.c.name.asc(), artwork_groups.c.id.asc())
+            .order_by(artwork_groups.c.id.asc())
         )
         with self._database.connect() as connection:
             return [

@@ -17,7 +17,10 @@ const artworkGroupsSchema = z
   .transform(({ artworkId, ...item }) => ({ ...item, localArtworkId: artworkId }))
 
 export async function listGroups() {
-  return z.array(artworkGroupSchema).parse(await api.get<unknown>('/api/groups'))
+  const groups = z.array(artworkGroupSchema).parse(await api.get<unknown>('/api/groups'))
+  return groups.sort((left, right) =>
+    left.name.localeCompare(right.name, undefined, { numeric: true, sensitivity: 'base' }),
+  )
 }
 
 export async function createGroup(name: string) {

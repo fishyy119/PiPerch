@@ -835,7 +835,7 @@ class ArtworkRepository:
                 artwork_group_items.join(artwork_groups, artwork_group_items.c.group_id == artwork_groups.c.id)
             )
             .where(artwork_group_items.c.artwork_id == artwork_id)
-            .order_by(artwork_groups.c.name.asc(), artwork_groups.c.id.asc())
+            .order_by(artwork_groups.c.id.asc())
         ).mappings()
         return tuple(ArtworkGroupRecord(group_id=_integer(row["id"]), name=_string(row["name"])) for row in rows)
 
