@@ -1,15 +1,15 @@
 <script setup lang="ts">
 import { useQuery } from '@tanstack/vue-query'
 import { computed } from 'vue'
-import { RouterLink } from 'vue-router'
 
 import { usePreference } from '@/app/usePreference'
 import { listRelatedArtworks } from '@/features/artworks/artworks-api'
 import { artworkQueryKeys } from '@/features/library/library-query-cache'
 import { Card } from '@ui/card'
-import { SmartCropImage } from '@ui/image'
 import { SettingsPopover } from '@ui/settings-popover'
 import { Slider } from '@ui/slider'
+
+import RelatedArtworkCard from './RelatedArtworkCard.vue'
 
 const props = defineProps<{ localArtworkId: number }>()
 
@@ -72,21 +72,11 @@ const gridStyle = computed(() => ({
       class="grid justify-between gap-4"
       :style="gridStyle"
     >
-      <RouterLink
+      <RelatedArtworkCard
         v-for="related in relatedQuery.data.value"
         :key="related.localArtworkId"
-        class="group block min-w-0"
-        :to="`/artworks/${String(related.localArtworkId)}`"
-      >
-        <div class="aspect-square w-full overflow-hidden rounded-xl bg-muted">
-          <SmartCropImage
-            class="size-full object-cover transition duration-300 group-hover:scale-[1.025]"
-            :src="`/api/artworks/${String(related.localArtworkId)}/thumbnail`"
-            :alt="related.title"
-            loading="lazy"
-          />
-        </div>
-      </RouterLink>
+        :artwork="related"
+      />
     </div>
     <p v-else class="py-8 text-sm text-muted-foreground">本地图库中暂无相关作品。</p>
   </Card>

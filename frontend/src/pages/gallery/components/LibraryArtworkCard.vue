@@ -13,11 +13,10 @@ import { galleryNavigationRouteState } from '@/features/gallery/gallery-navigati
 import { useGallerySelectionStore } from '@/features/gallery/gallery-selection'
 import { invalidateArtworkData } from '@/features/library/library-query-cache'
 import ArtworkCard, { type ArtworkCardTarget } from '@/shared/components/artworks/ArtworkCard.vue'
+import LibraryArtworkContextMenu from '@/shared/components/artworks/LibraryArtworkContextMenu.vue'
 import { errorMessage } from '@/shared/errors'
 import { cn } from '@ui/cn'
 import { toast } from '@ui/toast'
-
-import LibraryArtworkContextMenu from './LibraryArtworkContextMenu.vue'
 
 const props = defineProps<{
   artwork: ArtworkSummary
