@@ -9,33 +9,14 @@ import sys
 import threading
 import webbrowser
 from contextlib import ExitStack
-from copy import deepcopy
 from dataclasses import InitVar, dataclass, field
 from ipaddress import AddressValueError, IPv4Address
 from pathlib import Path
-from typing import TYPE_CHECKING, Literal, NoReturn, Protocol
+from typing import TYPE_CHECKING, NoReturn, Protocol
 from uuid import uuid4
-
-import uvicorn
-from uvicorn.config import LOGGING_CONFIG
-
-from piperch.app import create_app
-from piperch.application.control import AppControl
-from piperch.database import run_migrations
-from piperch.paths import AppPaths
 
 _GRACEFUL_SHUTDOWN_TIMEOUT_SECONDS = 5
 _LOOPBACK_HOST = "127.0.0.1"
-
-_PIPERCH_LOGGING_CONFIG = deepcopy(LOGGING_CONFIG)
-for formatter in _PIPERCH_LOGGING_CONFIG["formatters"].values():
-    formatter["fmt"] = "%(asctime)s " + formatter["fmt"]
-    formatter["datefmt"] = "%m%d %H:%M:%S"
-_PIPERCH_LOGGING_CONFIG["loggers"]["piperch"] = {
-    "handlers": ["default"],
-    "level": "INFO",
-    "propagate": False,
-}
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Sequence
@@ -46,39 +27,30 @@ if TYPE_CHECKING:
 class Args:
     """声明并校验命令行参数，向程序提供类型明确的配置。"""
 
-    command: Literal["serve", "db"]
     data_dir: Path | None = None
     port: int = 9303
     hosts: list[str] = field(default_factory=list[str])
     verbose: bool = False
     http2: bool = False
     cert_dir: InitVar[Path | None] = None
-    action: Literal["upgrade"] | None = None
     browser_host: str = field(init=False, default=_LOOPBACK_HOST)
     ssl_certfile: Path | None = field(init=False, default=None)
     ssl_keyfile: Path | None = field(init=False, default=None)
 
     @staticmethod
     def add_arguments(parser: argparse.ArgumentParser) -> None:
-        commands = parser.add_subparsers(dest="command", required=True)
-
-        serve = commands.add_parser("serve", help="迁移数据库并启动本地服务", argument_default=argparse.SUPPRESS)
-        serve.add_argument("--port")
-        serve.add_argument(
+        parser.add_argument("--port")
+        parser.add_argument(
             "--host",
             dest="hosts",
             action="append",
             metavar="IP",
             help="追加监听的本机 IPv4 地址，可重复传入，始终监听 127.0.0.1",
         )
-        serve.add_argument("--data-dir")
-        serve.add_argument("--verbose", action="store_true", help="输出每个 HTTP 请求的访问日志")
-        serve.add_argument("--http2", action="store_true", help="在 HTTPS 上启用实验性 HTTP/2，需要 --cert-dir")
-        serve.add_argument("--cert-dir", type=Path, metavar="DIR", help="包含 PEM 证书链和私钥的 HTTPS 目录")
-
-        database = commands.add_parser("db", help="数据库管理", argument_default=argparse.SUPPRESS)
-        database.add_argument("action", choices=["upgrade"])
-        database.add_argument("--data-dir")
+        parser.add_argument("--data-dir", help="程序数据目录，用于保存数据库、设置和缓存等，默认为 ~/.piperch")
+        parser.add_argument("--verbose", action="store_true", help="输出每个 HTTP 请求的访问日志")
+        parser.add_argument("--http2", action="store_true", help="在 HTTPS 上启用实验性 HTTP/2，需要 --cert-dir")
+        parser.add_argument("--cert-dir", type=Path, metavar="DIR", help="包含 PEM 证书链和私钥的 HTTPS 目录")
 
     @classmethod
     def from_ns(cls, namespace: argparse.Namespace) -> Args:
@@ -144,7 +116,9 @@ class Args:
 
     @classmethod
     def parse(cls) -> Args:
-        parser = argparse.ArgumentParser(prog="piperch", description="PiPerch 本地 Pixiv 管理器")
+        parser = argparse.ArgumentParser(
+            prog="piperch", description="PiPerch 本地 Pixiv 管理器", argument_default=argparse.SUPPRESS
+        )
         cls.add_arguments(parser)
         namespace = parser.parse_args()
         try:
@@ -162,7 +136,19 @@ class _NonSuccessAccessFilter(logging.Filter):
 
 
 def _logging_config(*, verbose: bool) -> dict[str, Any]:
-    config = deepcopy(_PIPERCH_LOGGING_CONFIG)
+    from copy import deepcopy
+
+    from uvicorn.config import LOGGING_CONFIG
+
+    config = deepcopy(LOGGING_CONFIG)
+    for formatter in config["formatters"].values():
+        formatter["fmt"] = "%(asctime)s " + formatter["fmt"]
+        formatter["datefmt"] = "%m%d %H:%M:%S"
+    config["loggers"]["piperch"] = {
+        "handlers": ["default"],
+        "level": "INFO",
+        "propagate": False,
+    }
     if verbose:
         return config
     config.setdefault("filters", {})["non_success_access"] = {"()": _NonSuccessAccessFilter}
@@ -270,6 +256,12 @@ def _bind_sockets(hosts: Sequence[str], port: int) -> list[socket.socket]:
 
 
 def run_server(args: Args, *, open_browser: bool = False) -> None:
+    import uvicorn
+
+    from piperch.app import create_app
+    from piperch.application.control import AppControl
+    from piperch.paths import AppPaths
+
     paths = AppPaths.from_data_dir(args.data_dir)
     scheme = "https" if args.ssl_certfile is not None else "http"
     lifecycle = _ServerLifecycle()
@@ -336,10 +328,5 @@ def run_server(args: Args, *, open_browser: bool = False) -> None:
 
 def main() -> NoReturn:
     arguments = Args.parse()
-    if arguments.command == "db":
-        paths = AppPaths.from_data_dir(arguments.data_dir)
-        paths.ensure_directories()
-        run_migrations(paths)
-        raise SystemExit(0)
     run_server(arguments, open_browser=True)
     raise SystemExit(0)

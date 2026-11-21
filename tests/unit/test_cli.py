@@ -43,15 +43,15 @@ def test_run_server_uses_bounded_graceful_shutdown(
         return object()
 
     FakeServer.instances.clear()
-    monkeypatch.setattr("piperch.cli.uvicorn.Config", fake_config)
-    monkeypatch.setattr("piperch.cli.uvicorn.Server", FakeServer)
+    monkeypatch.setattr("uvicorn.Config", fake_config)
+    monkeypatch.setattr("uvicorn.Server", FakeServer)
 
     def ignore_watcher(_server: object) -> None:
         pass
 
     monkeypatch.setattr("piperch.cli._start_terminal_interrupt_watcher", ignore_watcher)
 
-    run_server(Args(command="serve", data_dir=tmp_path, port=7000))
+    run_server(Args(data_dir=tmp_path, port=7000))
 
     assert configs[0]["host"] == "127.0.0.1"
     assert configs[0]["port"] == 7000
@@ -77,7 +77,7 @@ def test_run_server_adds_explicit_hosts_to_loopback_listener(
         return [FakeSocket(host, port) for host in hosts]
 
     FakeServer.instances.clear()
-    monkeypatch.setattr("piperch.cli.uvicorn.Server", FakeServer)
+    monkeypatch.setattr("uvicorn.Server", FakeServer)
     monkeypatch.setattr("piperch.cli._bind_sockets", fake_bind_sockets)
 
     def ignore_watcher(_server: object) -> None:
@@ -86,7 +86,7 @@ def test_run_server_adds_explicit_hosts_to_loopback_listener(
     monkeypatch.setattr("piperch.cli._start_terminal_interrupt_watcher", ignore_watcher)
 
     run_server(
-        Args(command="serve", data_dir=tmp_path, port=7000, hosts=["192.168.1.10", "127.0.0.1", "192.168.1.10"]),
+        Args(data_dir=tmp_path, port=7000, hosts=["192.168.1.10", "127.0.0.1", "192.168.1.10"]),
     )
 
     sockets = FakeServer.instances[0].sockets or []
@@ -119,12 +119,12 @@ def test_run_server_recreates_application_after_restart_request(
                 controls[-1].request_restart()
 
     FakeServer.instances.clear()
-    monkeypatch.setattr("piperch.cli.create_app", fake_create_app)
-    monkeypatch.setattr("piperch.cli.uvicorn.Config", fake_config)
-    monkeypatch.setattr("piperch.cli.uvicorn.Server", RestartingServer)
+    monkeypatch.setattr("piperch.app.create_app", fake_create_app)
+    monkeypatch.setattr("uvicorn.Config", fake_config)
+    monkeypatch.setattr("uvicorn.Server", RestartingServer)
     monkeypatch.setattr("piperch.cli._start_terminal_interrupt_watcher", record_watcher)
 
-    run_server(Args(command="serve", data_dir=tmp_path, port=7000))
+    run_server(Args(data_dir=tmp_path, port=7000))
 
     assert len(RestartingServer.instances) == 2
     assert len(controls) == 2

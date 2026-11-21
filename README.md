@@ -8,7 +8,7 @@
 
 ```shell
 pip install piperch
-piperch serve
+piperch
 ```
 
 ### 开发模式
@@ -20,7 +20,7 @@ corepack enable pnpm
 pnpm install --frozen-lockfile
 
 # 终端一：启动后端程序
-piperch serve
+piperch
 
 # 终端二：启动前端开发服务器
 pnpm dev
