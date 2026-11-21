@@ -32,6 +32,7 @@ const props = withDefaults(
 )
 
 const thumbnailFailed = ref(false)
+const imageOnlySelected = computed(() => props.selected && !props.showTitle && !props.showAuthor)
 const linkComponent = computed(() => (props.target.kind === 'route' ? RouterLink : 'a'))
 const linkAttributes = computed(() =>
   props.target.kind === 'route'
@@ -72,6 +73,10 @@ watch(
         <ImageOff v-else class="absolute inset-0 m-auto text-muted-foreground" :size="28" />
       </component>
 
+      <div
+        v-if="imageOnlySelected"
+        class="pointer-events-none absolute inset-0 z-1 rounded-[inherit] inset-shadow-[0_0_24px_6px] inset-shadow-primary/50"
+      />
       <slot name="leading-action" />
       <ArtworkPagePreview
         v-if="showPagePreview"

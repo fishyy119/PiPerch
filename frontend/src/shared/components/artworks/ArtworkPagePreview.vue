@@ -147,7 +147,6 @@ function hidePreviewOnFocusOut(event: FocusEvent) {
           "
           @pointerenter="showPreviewFromPoint(page - 1)"
           @focus="showPreviewFromPoint(page - 1)"
-          @click.prevent.stop
         />
       </div>
     </template>

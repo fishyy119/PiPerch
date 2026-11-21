@@ -14,7 +14,6 @@ import { useGallerySelectionStore } from '@/features/gallery/gallery-selection'
 import { invalidateArtworkData } from '@/features/library/library-query-cache'
 import ArtworkCard, { type ArtworkCardTarget } from '@/shared/components/artworks/ArtworkCard.vue'
 import { errorMessage } from '@/shared/errors'
-import { Checkbox } from '@ui/checkbox'
 import { cn } from '@ui/cn'
 import { toast } from '@ui/toast'
 
@@ -90,24 +89,11 @@ function handleCardDragStart(event: DragEvent) {
       :selected="selection.isSelected(artwork.localArtworkId)"
       :show-title="showTitle"
       :show-author="showAuthor"
-      :show-page-preview="!selection.enabled && !contextMenuOpen"
+      :show-page-preview="!contextMenuOpen"
       @click.capture="handleCardClick"
       @dragstart.capture="handleCardDragStart"
     >
       <template v-if="selection.enabled || showFavoriteIndicator" #leading-action>
-        <Checkbox
-          v-if="selection.enabled"
-          :class="
-            cn(
-              'absolute top-2 left-2 z-10 size-5',
-              'border-background/80 bg-foreground/55 shadow-sm backdrop-blur-sm transition',
-              'dark:border-foreground/80 dark:bg-background/55',
-            )
-          "
-          :model-value="selection.isSelected(artwork.localArtworkId)"
-          @click.stop
-          @update:model-value="selection.toggleArtwork(artwork.localArtworkId)"
-        />
         <button
           type="button"
           data-artwork-card-favorite
