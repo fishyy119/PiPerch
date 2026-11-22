@@ -7,6 +7,8 @@
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-11-22
+
 ### Added
 
 - 作品详情页的本地相关作品卡片支持快速预览和右键菜单。
@@ -23,6 +25,8 @@
 - 入库后自动收藏设置现同时适用于 Pixiv 与 FANBOX，FANBOX 仅标记本地收藏。
 - 本地分组名称改为按浏览器语言规则排序。
 - 优化图库批量选择交互，增强纯图片卡片的选中提示。
+- 批量移除分组时，只列出所选作品已加入的分组。
+- 图库和下载候选列表输入页码后，离开输入框即可跳转。
 - 终端日志新增时间戳，便于定位事件发生时间。
 - 优化本地相关作品推荐，新增同分组作品。
 - 缩短下载后首次播放 Ugoira 动图的等待时间。
@@ -119,7 +123,8 @@
 - 提供图库筛选、随机展示、批量选择、作品详情、多页图片预览、灯箱和快捷键操作。
 - 支持本地收藏及与 Pixiv 的收藏同步。
 
-[Unreleased]: https://github.com/fishyy119/PiPerch/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/fishyy119/PiPerch/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/fishyy119/PiPerch/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/fishyy119/PiPerch/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/fishyy119/PiPerch/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/fishyy119/PiPerch/releases/tag/v0.1.0
