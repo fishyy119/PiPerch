@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import StrEnum
 
-from piperch.domain.sources import ArtworkSource
+from .sources import ArtworkSource
 
 
 class JobState(StrEnum):

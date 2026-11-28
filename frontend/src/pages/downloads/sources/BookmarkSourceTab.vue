@@ -11,10 +11,11 @@ import {
 import { useDownloadSelection } from '@/features/downloads/download-selection'
 import { useBookmarkPreview } from '@/features/downloads/useBookmarkPreview'
 import { useLibraryMembershipStore } from '@/features/library/library-membership'
-import BookmarkFolderSelector from '@/pages/downloads/BookmarkFolderSelector.vue'
-import DiscoverySourceLayout from '@/pages/downloads/DiscoverySourceLayout.vue'
 import { errorMessage } from '@/shared/errors'
 import { Button } from '@ui/button'
+
+import BookmarkFolderSelector from '../BookmarkFolderSelector.vue'
+import DiscoverySourceLayout from '../DiscoverySourceLayout.vue'
 
 interface LoadedBookmarkSelection {
   key: string

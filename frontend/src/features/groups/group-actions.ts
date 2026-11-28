@@ -1,4 +1,4 @@
-import { createGroup, replaceArtworkGroups } from '@/features/groups/groups-api'
+import { createGroup, replaceArtworkGroups } from './groups-api'
 
 export interface CreateGroupAndAddArtworkRequest {
   localArtworkId: number

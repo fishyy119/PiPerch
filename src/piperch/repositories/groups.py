@@ -8,9 +8,10 @@ from sqlalchemy.exc import IntegrityError
 from piperch.database.tables import artwork_group_items, artwork_groups, artworks
 from piperch.domain.groups import MAX_ARTWORK_GROUPS, ArtworkGroup, ArtworkGroupMembership, normalize_group_name
 from piperch.errors import AppError, ConflictError, NotFoundError
-from piperch.repositories._rows import integer as _integer
-from piperch.repositories._rows import string as _string
 from piperch.utils.datetime import utc_now_text
+
+from ._rows import integer as _integer
+from ._rows import string as _string
 
 if TYPE_CHECKING:
     from collections.abc import Sequence

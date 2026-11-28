@@ -41,19 +41,20 @@ from piperch.domain.recommendations import (
 )
 from piperch.domain.sources import ArtworkSource
 from piperch.errors import NotFoundError
-from piperch.repositories._rows import (
+from piperch.utils.text import normalize_search_text
+
+from ._rows import (
     integer as _integer,
 )
-from piperch.repositories._rows import (
+from ._rows import (
     optional_integer as _optional_integer,
 )
-from piperch.repositories._rows import (
+from ._rows import (
     optional_string as _optional_string,
 )
-from piperch.repositories._rows import (
+from ._rows import (
     string as _string,
 )
-from piperch.utils.text import normalize_search_text
 
 if TYPE_CHECKING:
     from collections.abc import Collection, Sequence

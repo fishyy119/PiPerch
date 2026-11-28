@@ -3,8 +3,10 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, Response, status
 from fastapi import Path as PathParameter
 
-from piperch.api.dependencies import get_container
-from piperch.api.models import (
+from piperch.application.container import AppContainer
+
+from .dependencies import get_container
+from .models import (
     ArtworkGroupResponse,
     ArtworkGroupsRequest,
     ArtworkGroupsResponse,
@@ -12,7 +14,6 @@ from piperch.api.models import (
     DeleteResponse,
     GroupNameRequest,
 )
-from piperch.application.container import AppContainer
 
 router = APIRouter(tags=["groups"])
 

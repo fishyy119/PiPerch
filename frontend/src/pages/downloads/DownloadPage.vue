@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import DownloadDiscoveryWorkspace from '@/pages/downloads/DownloadDiscoveryWorkspace.vue'
-import DownloadJobsSidebar from '@/pages/downloads/DownloadJobsSidebar.vue'
+import DownloadDiscoveryWorkspace from './DownloadDiscoveryWorkspace.vue'
+import DownloadJobsSidebar from './DownloadJobsSidebar.vue'
 </script>
 
 <template>

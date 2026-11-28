@@ -23,8 +23,9 @@ import {
 } from 'reka-ui'
 import { computed, useTemplateRef, watch } from 'vue'
 
-import { type KeyboardShortcut, useKeyboardShortcuts } from '@/shared/lib/useKeyboardShortcuts'
 import { Button } from '@ui/button'
+
+import { type KeyboardShortcut, useKeyboardShortcuts } from '../../lib/useKeyboardShortcuts'
 
 const WHEEL_NAVIGATION_THRESHOLD_PX = 40
 

@@ -6,7 +6,8 @@ import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 
 import { usePreference } from '@/app/usePreference'
-import type { GalleryMediaItem } from '@/features/gallery/gallery-media'
+
+import type { GalleryMediaItem } from './gallery-media'
 
 const IMAGE_GAP = 8
 // 为页面顶部的固定工具栏预留滚动空间，与图片内容无关。

@@ -15,8 +15,9 @@ import httpx
 from anyio import to_thread
 
 from piperch.errors import UpstreamError
-from piperch.pixiv.parsing import as_mapping, as_text
 from piperch.utils.http_client import HttpClientLifecycle
+
+from .parsing import as_mapping, as_text
 
 if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence

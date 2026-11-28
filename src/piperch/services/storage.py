@@ -14,7 +14,8 @@ from anyio import to_thread
 from pydantic import BaseModel, ConfigDict
 
 from piperch.errors import AppError, ConflictError
-from piperch.services.library_files import LIBRARY_WORKSPACE_NAME
+
+from .library_files import LIBRARY_WORKSPACE_NAME
 
 if TYPE_CHECKING:
     from piperch.application.control import AppControl

@@ -1,3 +1,3 @@
-from piperch.fanbox.client import FanboxClient
+from .client import FanboxClient
 
 __all__ = ["FanboxClient"]

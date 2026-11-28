@@ -10,10 +10,9 @@ import { ImageOff } from '@lucide/vue'
 import { computed, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 
-import ArtworkPagePreview, {
-  type ArtworkPreviewUrlResolver,
-} from '@/shared/components/artworks/ArtworkPagePreview.vue'
 import { SmartCropImage } from '@ui/image'
+
+import ArtworkPagePreview, { type ArtworkPreviewUrlResolver } from './ArtworkPagePreview.vue'
 
 const props = withDefaults(
   defineProps<{

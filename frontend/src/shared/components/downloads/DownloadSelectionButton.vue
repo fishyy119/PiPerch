@@ -3,10 +3,11 @@ import { Download, LoaderCircle } from '@lucide/vue'
 
 import { useDownloadSelection } from '@/features/downloads/download-selection'
 import { useDownloadSubmissionStore } from '@/features/downloads/download-submission'
-import { errorMessage } from '@/shared/errors'
 import { Button } from '@ui/button'
 import { cn } from '@ui/cn'
 import { toast } from '@ui/toast'
+
+import { errorMessage } from '../../errors'
 
 const props = defineProps<{ sourceLabel: string }>()
 

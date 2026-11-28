@@ -1,8 +1,9 @@
 import type { Ref } from 'vue'
 
-import { artworkReferenceKey } from '@/features/artworks/artwork-source'
-import { useDownloadSelection } from '@/features/downloads/download-selection'
 import { useMarqueeSelection } from '@/shared/lib/useMarqueeSelection'
+
+import { artworkReferenceKey } from '../artworks/artwork-source'
+import { useDownloadSelection } from './download-selection'
 
 export function useDownloadMarqueeSelection(root: Ref<HTMLElement | null>) {
   const selection = useDownloadSelection()

@@ -1,9 +1,10 @@
 import { z } from 'zod'
 
-import { artworkTypeSchema } from '@/features/artworks/artwork'
-import type { ArtworkSource, DownloadReference } from '@/features/artworks/artwork-source'
-import { authorSummarySchema } from '@/features/authors/author-api'
 import { api, type ApiRequestOptions } from '@/shared/api/http'
+
+import { artworkTypeSchema } from '../artworks/artwork'
+import type { ArtworkSource, DownloadReference } from '../artworks/artwork-source'
+import { authorSummarySchema } from '../authors/author-api'
 
 const discoveryItemFields = {
   artworkId: z.number().int().positive(),

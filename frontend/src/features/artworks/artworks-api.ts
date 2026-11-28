@@ -1,9 +1,10 @@
 import { z } from 'zod'
 
-import { artworkTypeSchema } from '@/features/artworks/artwork'
-import { artworkSourceSchema } from '@/features/artworks/artwork-source'
-import { artworkGroupSchema } from '@/features/groups/groups-api'
 import { api } from '@/shared/api/http'
+
+import { artworkGroupSchema } from '../groups/groups-api'
+import { artworkTypeSchema } from './artwork'
+import { artworkSourceSchema } from './artwork-source'
 
 export const tagSchema = z.object({
   tagId: z.number().int(),

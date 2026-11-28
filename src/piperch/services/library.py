@@ -7,9 +7,10 @@ from typing import TYPE_CHECKING
 
 from piperch.domain.sources import LibraryArtworkReference, artwork_directory
 from piperch.errors import AppError, NotFoundError
-from piperch.services.library_files import LibraryFileOperations
-from piperch.services.thumbnails import ArtworkThumbnailCache
-from piperch.services.ugoira import UgoiraAnimationCache
+
+from .library_files import LibraryFileOperations
+from .thumbnails import ArtworkThumbnailCache
+from .ugoira import UgoiraAnimationCache
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -17,8 +18,9 @@ if TYPE_CHECKING:
 
     from piperch.paths import AppPaths
     from piperch.repositories import ArtworkRepository
-    from piperch.services.library_commits import LibraryCommitCoordinator
     from piperch.settings import SettingsManager
+
+    from .library_commits import LibraryCommitCoordinator
 
 
 @dataclass(frozen=True, slots=True)

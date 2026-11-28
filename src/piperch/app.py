@@ -17,16 +17,16 @@ from sqlalchemy import text
 from starlette.exceptions import HTTPException
 from starlette.requests import ClientDisconnect
 
-from piperch import __version__
-from piperch.api import authors, discovery, downloads, fanbox_images, favorites, gallery, groups, pixiv_images, settings
-from piperch.api.models import ErrorBody, ErrorResponse, HealthResponse
-from piperch.application.control import AppControl
-from piperch.application.lifecycle import lifespan
-from piperch.errors import AppError, NotFoundError
-from piperch.paths import AppPaths
+from . import __version__
+from .api import authors, discovery, downloads, fanbox_images, favorites, gallery, groups, pixiv_images, settings
+from .api.models import ErrorBody, ErrorResponse, HealthResponse
+from .application.control import AppControl
+from .application.lifecycle import lifespan
+from .errors import AppError, NotFoundError
+from .paths import AppPaths
 
 if TYPE_CHECKING:
-    from piperch.application.container import AppContainer
+    from .application.container import AppContainer
 
 
 def create_app(paths: AppPaths | None = None, control: AppControl | None = None) -> FastAPI:

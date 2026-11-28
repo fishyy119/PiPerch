@@ -1,9 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query'
 import { type Ref, ref, watch } from 'vue'
 
-import { getSettings, patchSettings, type Settings } from '@/features/settings/settings-api'
 import { errorMessage } from '@/shared/errors'
 import { toast } from '@ui/toast'
+
+import { getSettings, patchSettings, type Settings } from './settings-api'
 
 const settingsQueryKey = ['settings'] as const
 

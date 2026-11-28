@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { writeToClipboard } from '@/shared/lib/clipboard'
+import { writeToClipboard } from '../../lib/clipboard'
 
 const props = defineProps<{
   userId: number

@@ -1,9 +1,9 @@
 import { useQuery } from '@tanstack/vue-query'
 import { computed, ref } from 'vue'
 
-import { listAuthors, listSeries, listTags } from '@/features/artworks/artworks-api'
-import { listGroups } from '@/features/groups/groups-api'
-import { artworkQueryKeys, groupQueryKeys } from '@/features/library/library-query-cache'
+import { listAuthors, listSeries, listTags } from '../artworks/artworks-api'
+import { listGroups } from '../groups/groups-api'
+import { artworkQueryKeys, groupQueryKeys } from '../library/library-query-cache'
 
 interface GalleryFilterOptionSources {
   open: () => boolean

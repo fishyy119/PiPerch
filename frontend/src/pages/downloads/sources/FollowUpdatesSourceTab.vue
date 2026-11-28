@@ -5,9 +5,10 @@ import { computed, nextTick, ref, watch } from 'vue'
 
 import { discover } from '@/features/discovery/discovery-api'
 import { useDownloadSelection } from '@/features/downloads/download-selection'
-import DiscoverySourceLayout from '@/pages/downloads/DiscoverySourceLayout.vue'
 import { errorMessage } from '@/shared/errors'
 import { Button } from '@ui/button'
+
+import DiscoverySourceLayout from '../DiscoverySourceLayout.vue'
 
 const selection = useDownloadSelection()
 const page = ref(0)

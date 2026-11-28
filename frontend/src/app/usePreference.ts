@@ -5,7 +5,7 @@ import {
   type PreferenceKey,
   type PreferenceValue,
   setPreference,
-} from '@/app/preferences'
+} from './preferences'
 
 const preferenceRefs = new Map<PreferenceKey, unknown>()
 

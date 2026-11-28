@@ -1,6 +1,6 @@
 import { useRoute, useRouter } from 'vue-router'
 
-import { getRandomArtworkId } from '@/features/artworks/artworks-api'
+import { getRandomArtworkId } from './artworks-api'
 
 export function useRandomArtwork() {
   const route = useRoute()

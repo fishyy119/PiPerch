@@ -1,9 +1,5 @@
-import type { ArtworkIdentity, DownloadReference } from '@/features/artworks/artwork-source'
-import {
-  discover,
-  type DiscoveryItem,
-  listArtworkPreviewUrls,
-} from '@/features/discovery/discovery-api'
+import type { ArtworkIdentity, DownloadReference } from '../artworks/artwork-source'
+import { discover, type DiscoveryItem, listArtworkPreviewUrls } from '../discovery/discovery-api'
 
 export interface DownloadPreview extends ArtworkIdentity {
   thumbnailUrl: string | null

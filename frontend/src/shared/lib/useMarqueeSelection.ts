@@ -1,7 +1,7 @@
 import SelectionArea, { type SelectionEvent } from '@viselect/vanilla'
 import { onBeforeUnmount, type Ref, watch } from 'vue'
 
-import { mergeMarqueeSelection } from '@/shared/lib/marquee-selection'
+import { mergeMarqueeSelection } from './marquee-selection'
 
 const SELECTABLE_SELECTOR = '[data-selection-id]'
 const REMOVING_CLASS = 'selection-area--removing'

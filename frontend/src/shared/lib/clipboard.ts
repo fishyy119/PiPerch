@@ -1,5 +1,6 @@
-import { errorMessage } from '@/shared/errors'
 import { toast } from '@ui/toast'
+
+import { errorMessage } from '../errors'
 
 export async function writeToClipboard(content: string) {
   try {

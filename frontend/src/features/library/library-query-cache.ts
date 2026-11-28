@@ -1,6 +1,6 @@
 import type { QueryClient } from '@tanstack/vue-query'
 
-import type { ArtworkDetail, ArtworkListFilters } from '@/features/artworks/artworks-api'
+import type { ArtworkDetail, ArtworkListFilters } from '../artworks/artworks-api'
 
 export const artworkQueryKeys = {
   all: ['artworks'] as const,

@@ -3,15 +3,16 @@ from __future__ import annotations
 from anyio import to_thread
 from fastapi import APIRouter, Depends, Path, Query, Request, Response, status
 
-from piperch.api.dependencies import get_container
-from piperch.api.models import (
+from piperch.application.container import AppContainer
+
+from .dependencies import get_container
+from .models import (
     AuthorResponse,
     AuthorsResponse,
     UserProfileResponse,
 )
-from piperch.api.pixiv_images import proxied_image_url
-from piperch.api.request_tasks import run_until_disconnect
-from piperch.application.container import AppContainer
+from .pixiv_images import proxied_image_url
+from .request_tasks import run_until_disconnect
 
 router = APIRouter(prefix="/authors", tags=["authors"])
 

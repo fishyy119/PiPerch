@@ -2,9 +2,9 @@ import { useQueryClient } from '@tanstack/vue-query'
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 
-import type { DownloadReference } from '@/features/artworks/artwork-source'
-import { createDownloadJob, type DownloadBatch } from '@/features/downloads/download-api'
-import { useDownloadSelection } from '@/features/downloads/download-selection'
+import type { DownloadReference } from '../artworks/artwork-source'
+import { createDownloadJob, type DownloadBatch } from './download-api'
+import { useDownloadSelection } from './download-selection'
 
 export interface DownloadSubmissionResult {
   createdJobCount: number

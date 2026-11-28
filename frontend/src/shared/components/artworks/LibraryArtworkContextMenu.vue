@@ -14,11 +14,12 @@ import {
   invalidateArtworkGroupData,
   removeArtworkData,
 } from '@/features/library/library-query-cache'
-import CreateGroupDialog from '@/shared/components/groups/CreateGroupDialog.vue'
-import { errorMessage } from '@/shared/errors'
 import { ConfirmDialog } from '@ui/confirm-dialog'
 import { ContextMenu, type ContextMenuOption } from '@ui/context-menu'
 import { toast } from '@ui/toast'
+
+import { errorMessage } from '../../errors'
+import CreateGroupDialog from '../groups/CreateGroupDialog.vue'
 
 const props = defineProps<{ artwork: ArtworkSummary }>()
 const open = defineModel<boolean>('open', { default: false })

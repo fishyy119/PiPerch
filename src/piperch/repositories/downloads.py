@@ -10,8 +10,9 @@ from piperch.database.tables import download_items, download_jobs
 from piperch.domain.downloads import DownloadItemRecord, DownloadJobDetail, DownloadJobSummary, ItemState, JobState
 from piperch.domain.sources import ArtworkSource
 from piperch.errors import ConflictError, NotFoundError
-from piperch.repositories._rows import integer, optional_integer, optional_string, string
 from piperch.utils.datetime import utc_now_text
+
+from ._rows import integer, optional_integer, optional_string, string
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Mapping

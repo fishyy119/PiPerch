@@ -5,8 +5,12 @@ from fastapi import APIRouter, Depends, status
 from fastapi.responses import JSONResponse
 from starlette.background import BackgroundTask
 
-from piperch.api.dependencies import get_container
-from piperch.api.models import (
+from piperch.application.container import AppContainer
+from piperch.settings.models import AppSettings
+from piperch.utils.urls import redact_url_password
+
+from .dependencies import get_container
+from .models import (
     CookieValidationRequest,
     CookieValidationResponse,
     LibraryMigrationCancelledResponse,
@@ -15,9 +19,6 @@ from piperch.api.models import (
     SettingsPatch,
     SettingsResponse,
 )
-from piperch.application.container import AppContainer
-from piperch.settings.models import AppSettings
-from piperch.utils.urls import redact_url_password
 
 router = APIRouter(prefix="/settings", tags=["settings"])
 

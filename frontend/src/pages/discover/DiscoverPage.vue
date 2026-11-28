@@ -11,7 +11,6 @@ import {
 } from '@/features/discovery/discovery-api'
 import { useDownloadSelection } from '@/features/downloads/download-selection'
 import { useDownloadMarqueeSelection } from '@/features/downloads/useDownloadMarqueeSelection'
-import DiscoverAuthorCard from '@/pages/discover/DiscoverAuthorCard.vue'
 import DiscoveryArtworkCard from '@/shared/components/discovery/DiscoveryArtworkCard.vue'
 import DownloadSelectionButton from '@/shared/components/downloads/DownloadSelectionButton.vue'
 import { errorMessage } from '@/shared/errors'
@@ -22,6 +21,8 @@ import { SettingsPopover } from '@ui/settings-popover'
 import { Slider } from '@ui/slider'
 import { Tabs } from '@ui/tabs'
 import { toast } from '@ui/toast'
+
+import DiscoverAuthorCard from './DiscoverAuthorCard.vue'
 
 type DiscoveryView = 'artworks' | 'authors'
 

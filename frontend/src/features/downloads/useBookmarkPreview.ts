@@ -4,8 +4,8 @@ import {
   type BookmarkFolderReference,
   discover,
   type DiscoveryItem,
-} from '@/features/discovery/discovery-api'
-import { useDownloadSelection } from '@/features/downloads/download-selection'
+} from '../discovery/discovery-api'
+import { useDownloadSelection } from './download-selection'
 
 interface BookmarkStreamProgress {
   folder: BookmarkFolderReference

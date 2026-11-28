@@ -3,11 +3,11 @@ import { Search } from '@lucide/vue'
 import { computed, ref } from 'vue'
 
 import { useDownloadWorkspaceStore } from '@/features/downloads/download-workspace'
-import DiscoverySourceLayout from '@/pages/downloads/DiscoverySourceLayout.vue'
 import { errorMessage } from '@/shared/errors'
 import { Button } from '@ui/button'
 import { Textarea } from '@ui/textarea'
 
+import DiscoverySourceLayout from '../DiscoverySourceLayout.vue'
 import { useDiscoveryPagination } from './useDiscoveryPagination'
 
 const sourceInput = ref('')

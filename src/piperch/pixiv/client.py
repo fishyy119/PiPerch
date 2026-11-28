@@ -25,31 +25,32 @@ from piperch.domain.discovery import (
     UserProfile,
 )
 from piperch.errors import UpstreamError
-from piperch.pixiv.parsing import (
+
+from .parsing import (
     artwork_type as _artwork_type,
 )
-from piperch.pixiv.parsing import (
+from .parsing import (
     as_integer as _integer,
 )
-from piperch.pixiv.parsing import (
+from .parsing import (
     as_mapping as _mapping,
 )
-from piperch.pixiv.parsing import (
+from .parsing import (
     as_optional_integer as _optional_integer,
 )
-from piperch.pixiv.parsing import (
+from .parsing import (
     as_sequence as _sequence,
 )
-from piperch.pixiv.parsing import (
+from .parsing import (
     as_text as _text,
 )
-from piperch.pixiv.parsing import (
+from .parsing import (
     candidate_from_artwork_body,
     candidate_from_mapping,
     parse_artwork_ids,
     parse_pixiv_user_id,
 )
-from piperch.pixiv.transport import PixivTransport
+from .transport import PixivTransport
 
 if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence

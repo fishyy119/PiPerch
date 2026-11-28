@@ -6,8 +6,9 @@ import { artworkMediaUrl } from '@/features/artworks/artwork'
 import { artworkOriginalUrl, artworkReferenceKey } from '@/features/artworks/artwork-source'
 import { type DiscoveryItem, listArtworkPreviewUrls } from '@/features/discovery/discovery-api'
 import { useLibraryMembershipStore } from '@/features/library/library-membership'
-import ArtworkCard, { type ArtworkCardTarget } from '@/shared/components/artworks/ArtworkCard.vue'
-import type { ArtworkPreviewUrlResolver } from '@/shared/components/artworks/ArtworkPagePreview.vue'
+
+import ArtworkCard, { type ArtworkCardTarget } from '../artworks/ArtworkCard.vue'
+import type { ArtworkPreviewUrlResolver } from '../artworks/ArtworkPagePreview.vue'
 
 const props = withDefaults(
   defineProps<{

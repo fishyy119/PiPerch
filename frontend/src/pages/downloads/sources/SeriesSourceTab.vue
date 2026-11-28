@@ -2,11 +2,11 @@
 import { Search } from '@lucide/vue'
 import { ref } from 'vue'
 
-import DiscoverySourceLayout from '@/pages/downloads/DiscoverySourceLayout.vue'
 import { errorMessage } from '@/shared/errors'
 import { Button } from '@ui/button'
 import { Input } from '@ui/input'
 
+import DiscoverySourceLayout from '../DiscoverySourceLayout.vue'
 import { useDiscoveryPagination } from './useDiscoveryPagination'
 
 const sourceInput = ref('')

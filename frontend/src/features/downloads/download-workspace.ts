@@ -1,7 +1,7 @@
 import { defineStore, storeToRefs } from 'pinia'
 import { computed, ref } from 'vue'
 
-import type { DiscoveryRequest } from '@/features/discovery/discovery-api'
+import type { DiscoveryRequest } from '../discovery/discovery-api'
 
 export const sourceOptions = [
   { value: 'artwork', label: '作品' },

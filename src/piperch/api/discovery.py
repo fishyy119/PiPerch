@@ -5,9 +5,15 @@ from collections.abc import Sequence
 from anyio import to_thread
 from fastapi import APIRouter, Depends, Path, Query, Request
 
-from piperch.api.dependencies import get_container
-from piperch.api.fanbox_images import proxied_image_url as fanbox_image_url
-from piperch.api.models import (
+from piperch.application.container import AppContainer
+from piperch.domain.bookmarks import BookmarkFolderReference
+from piperch.domain.discovery import DiscoveryCandidate
+from piperch.domain.sources import ArtworkSource
+from piperch.errors import AppError
+
+from .dependencies import get_container
+from .fanbox_images import proxied_image_url as fanbox_image_url
+from .models import (
     ArtworkDiscoveryFailureResponse,
     ArtworkDiscoveryRequest,
     ArtworkPreviewResponse,
@@ -28,13 +34,8 @@ from piperch.api.models import (
     UserArtworkIdsResponse,
     UserDiscoveryRequest,
 )
-from piperch.api.pixiv_images import proxied_image_url
-from piperch.api.request_tasks import run_until_disconnect
-from piperch.application.container import AppContainer
-from piperch.domain.bookmarks import BookmarkFolderReference
-from piperch.domain.discovery import DiscoveryCandidate
-from piperch.domain.sources import ArtworkSource
-from piperch.errors import AppError
+from .pixiv_images import proxied_image_url
+from .request_tasks import run_until_disconnect
 
 router = APIRouter(prefix="/discovery", tags=["discovery"])
 

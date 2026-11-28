@@ -9,7 +9,8 @@ if TYPE_CHECKING:
     from collections.abc import Callable, Sequence
 
     from piperch.domain.sources import ArtworkSource
-    from piperch.services.events import AppEventBroker
+
+    from .events import AppEventBroker
 
 
 class LibraryCommitCoordinator:

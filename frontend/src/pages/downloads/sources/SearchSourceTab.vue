@@ -2,12 +2,12 @@
 import { Search } from '@lucide/vue'
 import { computed, ref } from 'vue'
 
-import DiscoverySourceLayout from '@/pages/downloads/DiscoverySourceLayout.vue'
 import { errorMessage } from '@/shared/errors'
 import { useInputHistory } from '@/shared/lib/useInputHistory'
 import { Autocomplete } from '@ui/autocomplete'
 import { Button } from '@ui/button'
 
+import DiscoverySourceLayout from '../DiscoverySourceLayout.vue'
 import { useDiscoveryPagination } from './useDiscoveryPagination'
 
 const keywordInput = ref('')

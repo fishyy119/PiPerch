@@ -10,16 +10,18 @@ from anyio import to_thread
 
 from piperch.domain.downloads import DownloadItemRecord, ItemState
 from piperch.errors import AppError
-from piperch.services.downloads.cancellation import (
+
+from .cancellation import (
     DownloadCancellation,
     DownloadCancelledError,
 )
 
 if TYPE_CHECKING:
     from piperch.repositories import DownloadRepository
-    from piperch.services.downloads.artwork import ArtworkDownloadService
     from piperch.services.events import AppEventBroker
     from piperch.settings import SettingsManager
+
+    from .artwork import ArtworkDownloadService
 
 logger = logging.getLogger(__name__)
 

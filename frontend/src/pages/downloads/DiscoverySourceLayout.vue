@@ -6,12 +6,13 @@ import { usePreference } from '@/app/usePreference'
 import type { DiscoveryItem } from '@/features/discovery/discovery-api'
 import { useDownloadSelection } from '@/features/downloads/download-selection'
 import { useLibraryMembershipStore } from '@/features/library/library-membership'
-import DiscoveryCandidateResults from '@/pages/downloads/DiscoveryCandidateResults.vue'
 import { Button } from '@ui/button'
 import { Card } from '@ui/card'
 import { Pagination } from '@ui/pagination'
 import { SettingsPopover } from '@ui/settings-popover'
 import { Slider } from '@ui/slider'
+
+import DiscoveryCandidateResults from './DiscoveryCandidateResults.vue'
 
 const props = withDefaults(
   defineProps<{

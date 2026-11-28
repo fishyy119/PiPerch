@@ -8,7 +8,6 @@ from typing import TYPE_CHECKING
 
 from anyio import to_thread
 
-from piperch.application.container import AppContainer
 from piperch.database import Database, run_migrations
 from piperch.fanbox import FanboxClient
 from piperch.pixiv import PixivClient
@@ -26,13 +25,16 @@ from piperch.services.thumbnails import ArtworkThumbnailCache
 from piperch.services.ugoira import UgoiraAnimationCache
 from piperch.settings import SettingsManager
 
+from .container import AppContainer
+
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator, Awaitable
 
     from fastapi import FastAPI
 
-    from piperch.application.control import AppControl
     from piperch.paths import AppPaths
+
+    from .control import AppControl
 
 logger = logging.getLogger(__name__)
 

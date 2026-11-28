@@ -3,9 +3,10 @@ import { LoaderCircle, UserMinus, UserPlus } from '@lucide/vue'
 import { useMutation } from '@tanstack/vue-query'
 
 import { followUser, unfollowUser } from '@/features/authors/author-api'
-import { errorMessage } from '@/shared/errors'
 import { Button } from '@ui/button'
 import { toast } from '@ui/toast'
+
+import { errorMessage } from '../../errors'
 
 interface FollowChange {
   userId: number

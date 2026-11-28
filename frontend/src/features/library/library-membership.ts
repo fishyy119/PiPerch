@@ -5,7 +5,7 @@ import {
   artworkReferenceKey,
   type ArtworkSource,
   type LibraryArtworkReference,
-} from '@/features/artworks/artwork-source'
+} from '../artworks/artwork-source'
 
 export interface LibraryMembershipSnapshot {
   remoteId: number

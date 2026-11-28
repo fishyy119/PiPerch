@@ -4,11 +4,11 @@ from dataclasses import dataclass
 from enum import StrEnum
 from typing import TYPE_CHECKING, Literal
 
-from piperch.domain.sources import ArtworkSource
+from .sources import ArtworkSource
 
 if TYPE_CHECKING:
-    from piperch.domain.bookmarks import RemoteBookmarkReference
-    from piperch.domain.groups import ArtworkGroupRecord
+    from .bookmarks import RemoteBookmarkReference
+    from .groups import ArtworkGroupRecord
 
 
 class ArtworkType(StrEnum):

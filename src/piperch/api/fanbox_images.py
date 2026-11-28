@@ -4,9 +4,10 @@ from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, Request, Response
 
-from piperch.api.dependencies import get_container
-from piperch.api.request_tasks import run_until_disconnect
 from piperch.application.container import AppContainer
+
+from .dependencies import get_container
+from .request_tasks import run_until_disconnect
 
 router = APIRouter(prefix="/fanbox-images", tags=["fanbox"])
 

@@ -1,4 +1,4 @@
-import type { ArtworkImage, ArtworkSummary } from '@/features/artworks/artworks-api'
+import type { ArtworkImage, ArtworkSummary } from '../artworks/artworks-api'
 
 export interface GalleryMediaItem {
   key: string

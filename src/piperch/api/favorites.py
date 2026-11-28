@@ -6,17 +6,18 @@ from anyio import to_thread
 from fastapi import APIRouter, Depends
 from fastapi import Path as PathParameter
 
-from piperch.api.dependencies import get_container
-from piperch.api.models import (
+from piperch.application.container import AppContainer
+from piperch.domain.bookmarks import BookmarkFolderReference, BookmarkVisibility
+from piperch.domain.sources import ArtworkSource
+from piperch.errors import UpstreamError
+
+from .dependencies import get_container
+from .models import (
     FavoriteStateRequest,
     FavoriteStateResponse,
     FavoriteSyncPlanResponse,
     FavoriteSyncResultResponse,
 )
-from piperch.application.container import AppContainer
-from piperch.domain.bookmarks import BookmarkFolderReference, BookmarkVisibility
-from piperch.domain.sources import ArtworkSource
-from piperch.errors import UpstreamError
 
 router = APIRouter(tags=["favorites"])
 

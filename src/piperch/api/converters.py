@@ -2,7 +2,10 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
-from piperch.api.models import (
+from piperch.domain.artworks import ArtworkDetail, ArtworkImageSummary, ArtworkSummary
+from piperch.domain.downloads import DownloadJobDetail, DownloadJobSummary, ItemState
+
+from .models import (
     ArtworkDetailResponse,
     ArtworkGroupRecordResponse,
     ArtworkImageResponse,
@@ -15,8 +18,6 @@ from piperch.api.models import (
     TagResponse,
     UgoiraFrameResponse,
 )
-from piperch.domain.artworks import ArtworkDetail, ArtworkImageSummary, ArtworkSummary
-from piperch.domain.downloads import DownloadJobDetail, DownloadJobSummary, ItemState
 
 
 def artwork_summary_response(summary: ArtworkSummary) -> ArtworkSummaryResponse:

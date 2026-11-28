@@ -8,12 +8,12 @@ import { listSelectableUserArtworkIds } from '@/features/discovery/discovery-api
 import { useDownloadSelection } from '@/features/downloads/download-selection'
 import { useDownloadWorkspaceStore } from '@/features/downloads/download-workspace'
 import { useLibraryMembershipStore } from '@/features/library/library-membership'
-import AuthorSelector from '@/pages/downloads/AuthorSelector.vue'
-import DiscoverySourceLayout from '@/pages/downloads/DiscoverySourceLayout.vue'
 import { errorMessage } from '@/shared/errors'
 import { Button } from '@ui/button'
 import { Input } from '@ui/input'
 
+import AuthorSelector from '../AuthorSelector.vue'
+import DiscoverySourceLayout from '../DiscoverySourceLayout.vue'
 import { useDiscoveryPagination } from './useDiscoveryPagination'
 
 const { takePreviewRequest } = useDownloadWorkspaceStore()

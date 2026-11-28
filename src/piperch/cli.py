@@ -258,9 +258,9 @@ def _bind_sockets(hosts: Sequence[str], port: int) -> list[socket.socket]:
 def run_server(args: Args, *, open_browser: bool = False) -> None:
     import uvicorn
 
-    from piperch.app import create_app
-    from piperch.application.control import AppControl
-    from piperch.paths import AppPaths
+    from .app import create_app
+    from .application.control import AppControl
+    from .paths import AppPaths
 
     paths = AppPaths.from_data_dir(args.data_dir)
     scheme = "https" if args.ssl_certfile is not None else "http"

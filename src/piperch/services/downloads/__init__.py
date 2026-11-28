@@ -1,10 +1,10 @@
-from piperch.services.downloads.artwork import ArtworkDownloadService
-from piperch.services.downloads.cancellation import (
+from .artwork import ArtworkDownloadService
+from .cancellation import (
     DownloadCancellation,
     DownloadCancelledError,
 )
-from piperch.services.downloads.commit import ArtworkDownloadCommitService
-from piperch.services.downloads.supervisor import DownloadSupervisor
+from .commit import ArtworkDownloadCommitService
+from .supervisor import DownloadSupervisor
 
 __all__ = [
     "ArtworkDownloadCommitService",

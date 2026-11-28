@@ -10,7 +10,8 @@ from urllib.parse import urlsplit
 
 from piperch.domain.discovery import AuthorSummary, DiscoveryResult
 from piperch.errors import UpstreamError
-from piperch.fanbox.parsing import (
+
+from .parsing import (
     as_mapping,
     as_text,
     image_attachments,
@@ -19,7 +20,7 @@ from piperch.fanbox.parsing import (
     parse_total_pages,
     positive_id,
 )
-from piperch.fanbox.transport import FanboxTransport
+from .transport import FanboxTransport
 
 if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence

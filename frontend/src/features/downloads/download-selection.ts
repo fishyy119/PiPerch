@@ -5,10 +5,10 @@ import {
   type ArtworkIdentity,
   artworkReferenceKey,
   type DownloadReference,
-} from '@/features/artworks/artwork-source'
-import type { DiscoveryItem } from '@/features/discovery/discovery-api'
-import { discoveryPreview, type DownloadPreview } from '@/features/downloads/download-preview'
-import { useLibraryMembershipStore } from '@/features/library/library-membership'
+} from '../artworks/artwork-source'
+import type { DiscoveryItem } from '../discovery/discovery-api'
+import { useLibraryMembershipStore } from '../library/library-membership'
+import { discoveryPreview, type DownloadPreview } from './download-preview'
 
 export type DownloadSelectionEntry = DownloadReference & { preview: DownloadPreview | null }
 

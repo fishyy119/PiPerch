@@ -1,6 +1,7 @@
-import type { ArtworkSource } from '@/features/artworks/artwork-source'
-import type { FavoriteState } from '@/features/favorites/favorites-api'
 import { toast } from '@ui/toast'
+
+import type { ArtworkSource } from '../artworks/artwork-source'
+import type { FavoriteState } from './favorites-api'
 
 export function notifyFavoriteUpdate(state: FavoriteState, source: ArtworkSource = 'pixiv') {
   const title = state.isFavorite ? '已收藏' : '已取消收藏'

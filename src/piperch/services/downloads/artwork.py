@@ -30,9 +30,10 @@ if TYPE_CHECKING:
     from piperch.paths import AppPaths
     from piperch.pixiv import PixivClient
     from piperch.repositories import ArtworkRepository, FavoriteRepository
-    from piperch.services.downloads.cancellation import DownloadCancellation
-    from piperch.services.downloads.commit import ArtworkDownloadCommitService
     from piperch.settings import SettingsManager
+
+    from .cancellation import DownloadCancellation
+    from .commit import ArtworkDownloadCommitService
 
 _IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp", ".avif", ".tif", ".tiff"}
 logger = logging.getLogger(__name__)

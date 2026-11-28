@@ -7,8 +7,9 @@ from typing import TYPE_CHECKING
 from pydantic import TypeAdapter
 
 from piperch.errors import ConflictError
-from piperch.settings.models import AppSettings
 from piperch.utils.urls import redact_url_password
+
+from .models import AppSettings
 
 if TYPE_CHECKING:
     from pathlib import Path

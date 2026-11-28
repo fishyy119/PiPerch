@@ -1,7 +1,8 @@
 import { z } from 'zod'
 
-import { artworkSourceSchema, type DownloadReference } from '@/features/artworks/artwork-source'
 import { api } from '@/shared/api/http'
+
+import { artworkSourceSchema, type DownloadReference } from '../artworks/artwork-source'
 
 const jobStateSchema = z.enum([
   'queued',

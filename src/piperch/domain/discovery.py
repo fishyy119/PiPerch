@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from piperch.domain.artworks import ArtworkType
+    from .artworks import ArtworkType
 
 
 @dataclass(frozen=True, slots=True)

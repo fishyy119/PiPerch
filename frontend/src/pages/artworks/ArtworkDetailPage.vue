@@ -11,12 +11,13 @@ import {
   parseGalleryNavigationState,
 } from '@/features/gallery/gallery-navigation'
 import { artworkQueryKeys } from '@/features/library/library-query-cache'
-import ArtworkDescriptionSection from '@/pages/artworks/ArtworkDescriptionSection.vue'
-import ArtworkInfoSidebar from '@/pages/artworks/ArtworkInfoSidebar.vue'
-import ArtworkMediaSection from '@/pages/artworks/ArtworkMediaSection.vue'
-import RecommendedArtworksSection from '@/pages/artworks/RecommendedArtworksSection.vue'
-import RelatedArtworksSection from '@/pages/artworks/RelatedArtworksSection.vue'
 import { type KeyboardShortcut, useKeyboardShortcuts } from '@/shared/lib/useKeyboardShortcuts'
+
+import ArtworkDescriptionSection from './ArtworkDescriptionSection.vue'
+import ArtworkInfoSidebar from './ArtworkInfoSidebar.vue'
+import ArtworkMediaSection from './ArtworkMediaSection.vue'
+import RecommendedArtworksSection from './RecommendedArtworksSection.vue'
+import RelatedArtworksSection from './RelatedArtworksSection.vue'
 
 const route = useRoute()
 const router = useRouter()

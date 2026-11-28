@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { useTemplateRef } from 'vue'
 
-import { useImageSource } from '@/shared/lib/image-loading'
+import { useImageSource } from '../../lib/image-loading'
 
 const props = defineProps<{
   src: string

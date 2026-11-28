@@ -1,8 +1,7 @@
 <script setup lang="ts">
 import { onBeforeUnmount, ref, watch } from 'vue'
 
-import { analyzeSmartCrop } from '@/shared/lib/smart-crop'
-
+import { analyzeSmartCrop } from '../../lib/smart-crop'
 import ManagedImage from './ManagedImage.vue'
 
 const props = withDefaults(
