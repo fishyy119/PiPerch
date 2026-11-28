@@ -460,7 +460,7 @@ class ArtworkRepository:
         return int(artwork_id) if artwork_id is not None else None
 
     def list_related_artworks(self, artwork_id: int, limit: int) -> list[ArtworkSummary]:
-        """以基准标签为评分单位，累计作者关联和标签、分组的实时 IDF。"""
+        """为同作者和其他作者的相关作品各预留名额，统一按综合分选取和排序。"""
         with self._database.connect() as connection:
             target_author_id = connection.scalar(select(artworks.c.author_id).where(artworks.c.id == artwork_id))
             if target_author_id is None:
@@ -514,23 +514,64 @@ class ArtworkRepository:
                 .group_by(artwork_group_items.c.artwork_id)
                 .subquery()
             )
-            author_score = case(
-                (artworks.c.author_id == target_author_id, SAME_AUTHOR_EQUIVALENT_TAGS),
-                else_=0.0,
-            )
+            same_author_match = artworks.c.author_id == target_author_id
+            author_score = case((same_author_match, SAME_AUTHOR_EQUIVALENT_TAGS), else_=0.0)
             score = (
                 author_score
                 + func.coalesce(tag_scores.c.score, 0.0)
                 + func.coalesce(group_scores.c.score, 0.0) * SHARED_GROUP_EQUIVALENT_TAGS
             )
-            candidate_condition = or_(
-                artworks.c.author_id == target_author_id,
-                tag_scores.c.artwork_id.is_not(None),
-                group_scores.c.artwork_id.is_not(None),
+            candidates = (
+                select(
+                    artworks.c.id,
+                    artworks.c.downloaded_at,
+                    same_author_match.label("is_same_author"),
+                    score.label("score"),
+                )
+                .select_from(
+                    artworks.outerjoin(tag_scores, tag_scores.c.artwork_id == artworks.c.id).outerjoin(
+                        group_scores, group_scores.c.artwork_id == artworks.c.id
+                    )
+                )
+                .where(
+                    artworks.c.id != artwork_id,
+                    or_(
+                        same_author_match, tag_scores.c.artwork_id.is_not(None), group_scores.c.artwork_id.is_not(None)
+                    ),
+                )
+                .cte()
+            )
+            section_limit = limit // 3
+            score_order = (candidates.c.score.desc(), candidates.c.downloaded_at.desc(), candidates.c.id.desc())
+            same_author = (
+                select(candidates.c.id)
+                .where(candidates.c.is_same_author)
+                .order_by(*score_order)
+                .limit(section_limit)
+                .cte()
+            )
+            tags_and_groups = (
+                select(candidates.c.id)
+                .where(~candidates.c.is_same_author)
+                .order_by(*score_order)
+                .limit(section_limit)
+                .cte()
+            )
+            # 先保留前两路实际选中的作品，再按综合分补足总名额。
+            has_reserved_slot = or_(same_author.c.id.is_not(None), tags_and_groups.c.id.is_not(None))
+            selected = (
+                select(candidates.c.id, candidates.c.score)
+                .select_from(
+                    candidates.outerjoin(same_author, same_author.c.id == candidates.c.id).outerjoin(
+                        tags_and_groups, tags_and_groups.c.id == candidates.c.id
+                    )
+                )
+                .order_by(has_reserved_slot.desc(), *score_order)
+                .limit(limit)
+                .subquery()
             )
             base = (
-                artworks.outerjoin(tag_scores, tag_scores.c.artwork_id == artworks.c.id)
-                .outerjoin(group_scores, group_scores.c.artwork_id == artworks.c.id)
+                selected.join(artworks, artworks.c.id == selected.c.id)
                 .join(authors, artworks.c.author_id == authors.c.id)
                 .outerjoin(series, artworks.c.series_id == series.c.id)
             )
@@ -541,13 +582,7 @@ class ArtworkRepository:
                     series.c.title.label("series_title"),
                 )
                 .select_from(base)
-                .where(artworks.c.id != artwork_id, candidate_condition)
-                .order_by(
-                    score.desc(),
-                    artworks.c.downloaded_at.desc(),
-                    artworks.c.id.desc(),
-                )
-                .limit(limit)
+                .order_by(selected.c.score.desc(), artworks.c.downloaded_at.desc(), artworks.c.id.desc())
             )
             rows = connection.execute(statement).mappings().all()
             summaries = [self._summary_from_row(row) for row in rows]
